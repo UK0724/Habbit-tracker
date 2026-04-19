@@ -1,0 +1,4 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { Link } from "react-router-dom";
+import { Button } from "./Button";
+export const EmptyState = ({ title, description, actionHref, actionLabel, action }) => (_jsxs("div", { className: "surface-card px-6 py-10 text-center sm:px-10", children: [_jsx("div", { className: "mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-xl font-bold text-indigo-600", children: "+" }), _jsx("h2", { className: "font-display text-2xl font-bold text-slate-950", children: title }), _jsx("p", { className: "mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500 sm:text-base", children: description }), _jsxs("div", { className: "mt-6 flex justify-center", children: [action ? action : null, !action && actionHref && actionLabel ? (_jsx(Button, { asChild: true, children: _jsx(Link, { to: actionHref, children: actionLabel }) })) : null] })] }));
