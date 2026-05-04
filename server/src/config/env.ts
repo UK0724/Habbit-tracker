@@ -10,7 +10,17 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(1, "JWT_SECRET is required")
 });
 
-export const env = envSchema.parse(process.env);
+const parsedEnv = envSchema.safeParse(process.env);
+
+if (!parsedEnv.success) {
+  const missingVariables = parsedEnv.error.issues
+    .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+    .join("; ");
+
+  throw new Error(`Invalid server environment: ${missingVariables}`);
+}
+
+export const env = parsedEnv.data;
 
 export const clientOrigins = env.CLIENT_ORIGIN.split(",")
   .map((origin) => origin.trim())
