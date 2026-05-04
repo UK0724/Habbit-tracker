@@ -47,6 +47,7 @@ export const HabitForm = ({
       description: defaultValues?.description ?? "",
       type: defaultValues?.type ?? "action",
       unit: defaultValues?.unit ?? "",
+      requireCompletionComment: defaultValues?.requireCompletionComment ?? false,
       color: defaultValues?.color ?? "violet"
     }
   });
@@ -57,6 +58,11 @@ export const HabitForm = ({
   useEffect(() => {
     if (selectedType === "action") {
       setValue("unit", "", {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+    } else {
+      setValue("requireCompletionComment", false, {
         shouldDirty: true,
         shouldValidate: true
       });
@@ -111,6 +117,30 @@ export const HabitForm = ({
           ) : null}
         </div>
       </div>
+
+      {selectedType === "action" ? (
+        <label className="flex cursor-pointer items-start gap-4 rounded-3xl border border-slate-200 bg-slate-50/80 p-4 transition hover:border-indigo-200 hover:bg-indigo-50/40">
+          <input
+            type="checkbox"
+            className="mt-1 h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200"
+            {...register("requireCompletionComment")}
+          />
+          <span>
+            <span className="block text-sm font-semibold text-slate-900">
+              Ask for a comment when marking Done
+            </span>
+            <span className="mt-1 block text-sm leading-6 text-slate-500">
+              Useful for habits like job applications, outreach, reading, or
+              anything where the completed item matters.
+            </span>
+            {errors.requireCompletionComment ? (
+              <span className="field-hint block text-rose-600">
+                {errors.requireCompletionComment.message}
+              </span>
+            ) : null}
+          </span>
+        </label>
+      ) : null}
 
       <div>
         <label className="field-label" htmlFor="description">

@@ -20,11 +20,19 @@ export const HomePage = () => {
   const habitsQuery = useHabits(selectedDate);
   const saveLogMutation = useSaveHabitLog();
   const [activeHabitId, setActiveHabitId] = useState<string | null>(null);
+  const habitCount = habitsQuery.data?.length ?? 0;
+  const doneCount =
+    habitsQuery.data?.filter((habit) => habit.selectedDateLog?.status === "done")
+      .length ?? 0;
+  const loggedCount =
+    habitsQuery.data?.filter((habit) => habit.selectedDateLog !== null).length ??
+    0;
 
   const handleSaveAction = async (
     habitId: string,
     logId: string | undefined,
-    status: ActionStatus
+    status: ActionStatus,
+    comment?: string
   ) => {
     try {
       setActiveHabitId(habitId);
@@ -33,7 +41,8 @@ export const HomePage = () => {
         logId,
         input: {
           date: selectedDate,
-          status
+          status,
+          comment
         }
       });
     } finally {
@@ -63,33 +72,54 @@ export const HomePage = () => {
 
   return (
     <div className="space-y-6">
-      <SectionCard className="border border-slate-200">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <SectionCard className="border border-white/80 bg-white/90">
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">
-              Daily log
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-700">
+                Daily log
+              </p>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {formatDateLabel(selectedDate)}
+              </span>
+            </div>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-              Update habits in one place
+              Today&apos;s board
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
-              Pick any date, fill each row, and backfill missed entries without
-              jumping between oversized cards.
+              Log actions, numbers, and completion notes from one calm,
+              scannable workspace.
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
-                {isToday(selectedDate)
-                  ? "Editing today"
-                  : `Backfilling ${formatDateLabel(selectedDate)}`}
-              </span>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
-                One row per habit
-              </span>
+            <div className="mt-5 grid max-w-xl grid-cols-3 gap-2">
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Habits
+                </p>
+                <p className="mt-1 text-xl font-bold text-slate-950">
+                  {habitCount}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                  Done
+                </p>
+                <p className="mt-1 text-xl font-bold text-emerald-950">
+                  {doneCount}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-100">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
+                  Logged
+                </p>
+                <p className="mt-1 text-xl font-bold text-amber-950">
+                  {loggedCount}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex w-full max-w-xl flex-col gap-3 lg:items-end">
-            <div className="grid w-full gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 sm:grid-cols-[auto,1fr,auto,auto] sm:items-center">
+          <div className="flex w-full max-w-xl flex-col gap-3 xl:items-end">
+            <div className="grid w-full gap-2 rounded-3xl border border-slate-200 bg-slate-50/80 p-2 sm:grid-cols-[auto,1fr,auto,auto] sm:items-center">
               <Button
                 type="button"
                 variant="secondary"
@@ -127,7 +157,7 @@ export const HomePage = () => {
               ) : null}
             </div>
 
-            <Button asChild size="sm" className="w-full sm:w-auto">
+            <Button asChild size="sm" className="w-full bg-slate-950 sm:w-auto">
               <Link to="/habits/new">Create habit</Link>
             </Button>
           </div>

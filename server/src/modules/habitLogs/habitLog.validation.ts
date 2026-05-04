@@ -17,7 +17,13 @@ const baseLogSchema = z.object({
     })
     .finite("Value must be a finite number")
     .nullable()
+    .optional(),
+  comment: z
+    .string()
+    .trim()
+    .max(280, "Comment must be 280 characters or less")
     .optional()
+    .transform((value) => value || undefined)
 });
 
 export const createHabitLogBodySchema = baseLogSchema.superRefine(

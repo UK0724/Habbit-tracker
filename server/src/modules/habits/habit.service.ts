@@ -8,10 +8,12 @@ import {
 } from "./habit.model.js";
 
 type HabitPayload = {
+  userId: string;
   title: string;
   description?: string;
   type: HabitType;
   unit?: string;
+  requireCompletionComment?: boolean;
   color: string;
 };
 
@@ -42,6 +44,7 @@ export type HabitResponse = {
   description?: string;
   type: HabitType;
   unit?: string;
+  requireCompletionComment: boolean;
   color: string;
   createdAt: string;
   updatedAt: string;
@@ -53,6 +56,7 @@ export type HabitLogResponse = {
   date: string;
   status: "done" | "not_done" | null;
   value: number | null;
+  comment?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -100,6 +104,7 @@ export const serializeHabit = (habit: HabitDocument): HabitResponse => ({
   description: habit.description || undefined,
   type: habit.type,
   unit: habit.unit || undefined,
+  requireCompletionComment: Boolean(habit.requireCompletionComment),
   color: habit.color,
   createdAt: habit.createdAt.toISOString(),
   updatedAt: habit.updatedAt.toISOString()
@@ -111,6 +116,7 @@ export const serializeHabitLog = (log: HabitLogDocument): HabitLogResponse => ({
   date: log.date,
   status: log.status,
   value: log.value,
+  comment: log.comment || undefined,
   createdAt: log.createdAt.toISOString(),
   updatedAt: log.updatedAt.toISOString()
 });
@@ -209,8 +215,8 @@ export const buildHabitStats = (
   };
 };
 
-const getHabitByIdOrThrow = async (id: string) => {
-  const habit = await HabitModel.findById(id);
+const getHabitByIdOrThrow = async (id: string, userId: string) => {
+  const habit = await HabitModel.findOne({ _id: id, userId });
 
   if (!habit) {
     throw new AppError("Habit not found", 404);
@@ -219,8 +225,8 @@ const getHabitByIdOrThrow = async (id: string) => {
   return habit;
 };
 
-export const listHabits = async (selectedDate = getTodayDateString()) => {
-  const habits = await HabitModel.find().sort({ createdAt: 1 });
+export const listHabits = async (userId: string, selectedDate = getTodayDateString()) => {
+  const habits = await HabitModel.find({ userId }).sort({ createdAt: 1 });
 
   if (habits.length === 0) {
     return [];
@@ -269,18 +275,20 @@ export const createHabit = async (payload: HabitPayload) => {
   const habit = await HabitModel.create({
     ...payload,
     description: normalizedDescription,
-    unit: normalizedUnit
+    unit: normalizedUnit,
+    requireCompletionComment:
+      payload.type === "action" ? Boolean(payload.requireCompletionComment) : false
   });
   return serializeHabit(habit);
 };
 
-export const getHabit = async (id: string) => {
-  const habit = await getHabitByIdOrThrow(id);
+export const getHabit = async (id: string, userId: string) => {
+  const habit = await getHabitByIdOrThrow(id, userId);
   return serializeHabit(habit);
 };
 
-export const updateHabit = async (id: string, payload: HabitUpdatePayload) => {
-  const habit = await getHabitByIdOrThrow(id);
+export const updateHabit = async (id: string, userId: string, payload: HabitUpdatePayload) => {
+  const habit = await getHabitByIdOrThrow(id, userId);
 
   const nextType = payload.type ?? habit.type;
   const existingLogsCount = await HabitLogModel.countDocuments({
@@ -307,6 +315,10 @@ export const updateHabit = async (id: string, payload: HabitUpdatePayload) => {
   }
   habit.type = nextType;
   habit.unit = nextType === "action" ? undefined : nextUnit;
+  habit.requireCompletionComment =
+    nextType === "action"
+      ? (payload.requireCompletionComment ?? habit.requireCompletionComment)
+      : false;
   habit.color = payload.color ?? habit.color;
 
   await habit.save();
@@ -314,8 +326,8 @@ export const updateHabit = async (id: string, payload: HabitUpdatePayload) => {
   return serializeHabit(habit);
 };
 
-export const deleteHabit = async (id: string) => {
-  const habit = await getHabitByIdOrThrow(id);
+export const deleteHabit = async (id: string, userId: string) => {
+  const habit = await getHabitByIdOrThrow(id, userId);
 
   await Promise.all([
     habit.deleteOne(),
@@ -325,8 +337,8 @@ export const deleteHabit = async (id: string) => {
   ]);
 };
 
-export const getHabitStats = async (id: string) => {
-  const habit = await getHabitByIdOrThrow(id);
+export const getHabitStats = async (id: string, userId: string) => {
+  const habit = await getHabitByIdOrThrow(id, userId);
   const logs = await HabitLogModel.find({
     habitId: habit._id
   }).sort({ date: -1 });

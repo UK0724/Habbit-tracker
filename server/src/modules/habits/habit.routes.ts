@@ -1,5 +1,6 @@
 import { Router } from "express";
 
+import { requireAuth } from "../../middleware/requireAuth.js";
 import { validateRequest } from "../../middleware/validateRequest.js";
 import {
   createHabitController,
@@ -17,6 +18,8 @@ import {
 } from "./habit.validation.js";
 
 export const habitRouter = Router();
+
+habitRouter.use(requireAuth);
 
 habitRouter.get(
   "/",

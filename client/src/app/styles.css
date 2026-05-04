@@ -14,8 +14,9 @@
   body {
     @apply min-h-screen bg-shell font-sans text-slate-900 antialiased;
     background-image:
-      radial-gradient(circle at top, rgba(129, 140, 248, 0.14), transparent 35%),
-      linear-gradient(180deg, #f8f8fd 0%, #f4f5fb 45%, #eef2ff 100%);
+      radial-gradient(circle at 18% 0%, rgba(20, 184, 166, 0.16), transparent 30%),
+      radial-gradient(circle at 82% 12%, rgba(251, 191, 36, 0.13), transparent 28%),
+      linear-gradient(180deg, #f8fafc 0%, #f1f5f9 52%, #eef2ff 100%);
   }
 
   ::selection {
@@ -32,7 +33,7 @@
 
 @layer components {
   .surface-card {
-    @apply rounded-[28px] border border-white/70 bg-white shadow-panel;
+    @apply rounded-3xl border border-white/80 bg-white/95 shadow-panel backdrop-blur;
   }
 
   .field-label {

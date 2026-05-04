@@ -1,5 +1,6 @@
 import { Router } from "express";
 
+import { requireAuth } from "../../middleware/requireAuth.js";
 import { validateRequest } from "../../middleware/validateRequest.js";
 import {
   createHabitLogController,
@@ -16,6 +17,8 @@ import {
 } from "./habitLog.validation.js";
 
 export const habitLogRouter = Router();
+
+habitLogRouter.use(requireAuth);
 
 habitLogRouter.get("/logs/today", getTodayLogsController);
 

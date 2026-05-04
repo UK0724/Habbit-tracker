@@ -1,3 +1,0 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { cn } from "../../shared/lib/utils";
-export const SectionCard = ({ title, description, action, children, className }) => (_jsxs("section", { className: cn("surface-card p-5 sm:p-6", className), children: [title || description || action ? (_jsxs("div", { className: "mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between", children: [_jsxs("div", { children: [title ? (_jsx("h2", { className: "text-lg font-bold text-slate-950", children: title })) : null, description ? (_jsx("p", { className: "mt-1 text-sm leading-6 text-slate-500", children: description })) : null] }), action ? _jsx("div", { children: action }) : null] })) : null, children] }));

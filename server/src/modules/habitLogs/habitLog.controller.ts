@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 
+import type { AuthRequest } from "../../middleware/requireAuth.js";
 import { catchAsync } from "../../utils/catchAsync.js";
 import {
   createHabitLog,
@@ -10,51 +11,41 @@ import {
 
 export const listHabitLogsController = catchAsync(
   async (request: Request, response: Response) => {
-    const habitId = request.params.id as string;
+    const { userId } = request as AuthRequest;
     const logs = await listHabitLogs(
-      habitId,
+      request.params.id as string,
+      userId,
       request.query.limit as number | undefined
     );
-
-    response.json({
-      data: logs
-    });
+    response.json({ data: logs });
   }
 );
 
 export const createHabitLogController = catchAsync(
   async (request: Request, response: Response) => {
-    const habitId = request.params.id as string;
-    const log = await createHabitLog(habitId, request.body);
-
-    response.status(201).json({
-      data: log
-    });
+    const { userId } = request as AuthRequest;
+    const log = await createHabitLog(request.params.id as string, userId, request.body);
+    response.status(201).json({ data: log });
   }
 );
 
 export const updateHabitLogController = catchAsync(
   async (request: Request, response: Response) => {
-    const habitId = request.params.id as string;
-    const logId = request.params.logId as string;
+    const { userId } = request as AuthRequest;
     const log = await updateHabitLog(
-      habitId,
-      logId,
+      request.params.id as string,
+      request.params.logId as string,
+      userId,
       request.body
     );
-
-    response.json({
-      data: log
-    });
+    response.json({ data: log });
   }
 );
 
 export const getTodayLogsController = catchAsync(
-  async (_request: Request, response: Response) => {
-    const logs = await getTodayLogs();
-
-    response.json({
-      data: logs
-    });
+  async (request: Request, response: Response) => {
+    const { userId } = request as AuthRequest;
+    const logs = await getTodayLogs(userId);
+    response.json({ data: logs });
   }
 );

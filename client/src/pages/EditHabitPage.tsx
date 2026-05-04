@@ -63,6 +63,7 @@ export const EditHabitPage = () => {
             description: habitQuery.data.description ?? "",
             type: habitQuery.data.type,
             unit: habitQuery.data.unit ?? "",
+            requireCompletionComment: habitQuery.data.requireCompletionComment,
             color: habitQuery.data.color as HabitFormValues["color"]
           }}
           submitLabel="Save changes"

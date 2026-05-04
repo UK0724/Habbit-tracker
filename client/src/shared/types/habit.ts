@@ -12,6 +12,7 @@ export type Habit = {
   description?: string;
   type: HabitType;
   unit?: string;
+  requireCompletionComment: boolean;
   color: string;
   createdAt: string;
   updatedAt: string;
@@ -23,6 +24,7 @@ export type HabitLog = {
   date: string;
   status: ActionStatus | null;
   value: number | null;
+  comment?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -58,6 +60,7 @@ export type CreateHabitInput = {
   description?: string;
   type: HabitType;
   unit?: string;
+  requireCompletionComment?: boolean;
   color: string;
 };
 
@@ -67,4 +70,5 @@ export type SaveHabitLogInput = {
   date: string;
   status?: ActionStatus | null;
   value?: number | null;
+  comment?: string;
 };

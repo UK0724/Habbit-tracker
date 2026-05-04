@@ -1,3 +1,4 @@
+import { useAuthStore } from "../stores/authStore";
 import type { ApiResponse } from "../shared/types/habit";
 
 const API_BASE_URL =
@@ -22,6 +23,11 @@ const buildHeaders = (init?: RequestInit) => {
     headers.set("Content-Type", "application/json");
   }
 
+  const token = useAuthStore.getState().token;
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
   return headers;
 };
 
@@ -40,6 +46,9 @@ export const apiRequest = async <T>(
   const payload = hasJson ? ((await response.json()) as ApiResponse<T>) : null;
 
   if (!response.ok) {
+    if (response.status === 401) {
+      useAuthStore.getState().clearAuth();
+    }
     throw new ApiError(
       payload && "message" in payload && typeof payload.message === "string"
         ? payload.message

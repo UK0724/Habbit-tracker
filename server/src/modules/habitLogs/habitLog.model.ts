@@ -9,6 +9,7 @@ export interface HabitLog {
   date: string;
   status: ActionStatus | null;
   value: number | null;
+  comment?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +35,10 @@ const habitLogSchema = new Schema<HabitLog>(
     value: {
       type: Number,
       default: null
+    },
+    comment: {
+      type: String,
+      trim: true
     }
   },
   {

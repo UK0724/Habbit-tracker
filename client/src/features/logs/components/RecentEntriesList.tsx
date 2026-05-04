@@ -37,15 +37,22 @@ export const RecentEntriesList = ({
 
           <div>
             {habitType === "action" ? (
-              <span
-                className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
-                  log.status === "done"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-rose-50 text-rose-700"
-                }`}
-              >
-                {log.status === "done" ? "Done" : "Not done"}
-              </span>
+              <div className="text-left sm:text-right">
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
+                    log.status === "done"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-rose-50 text-rose-700"
+                  }`}
+                >
+                  {log.status === "done" ? "Done" : "Not done"}
+                </span>
+                {log.comment ? (
+                  <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+                    {log.comment}
+                  </p>
+                ) : null}
+              </div>
             ) : (
               <p className="text-base font-bold text-slate-950">
                 {formatValueWithUnit(log.value ?? 0, unit)}

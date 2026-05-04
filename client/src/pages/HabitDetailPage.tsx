@@ -147,6 +147,11 @@ export const HabitDetailPage = () => {
                   >
                     {log.status === "done" ? "Done" : "Not done"}
                   </p>
+                  {log.comment ? (
+                    <p className="mt-2 max-w-xs text-sm leading-6 text-slate-600">
+                      {log.comment}
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -189,7 +194,11 @@ export const HabitDetailPage = () => {
 
       <SectionCard
         title="Recent entries"
-        description="The latest saved daily logs for this habit."
+        description={
+          habit.requireCompletionComment
+            ? "The latest saved daily logs, including completion comments."
+            : "The latest saved daily logs for this habit."
+        }
       >
         {logsQuery.isLoading ? (
           <div className="space-y-3">

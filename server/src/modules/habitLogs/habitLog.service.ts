@@ -14,10 +14,11 @@ type HabitLogPayload = {
   date?: string;
   status?: "done" | "not_done" | null;
   value?: number | null;
+  comment?: string;
 };
 
-const getHabitByIdOrThrow = async (habitId: string) => {
-  const habit = await HabitModel.findById(habitId);
+const getHabitByIdOrThrow = async (habitId: string, userId: string) => {
+  const habit = await HabitModel.findOne({ _id: habitId, userId });
 
   if (!habit) {
     throw new AppError("Habit not found", 404);
@@ -27,7 +28,7 @@ const getHabitByIdOrThrow = async (habitId: string) => {
 };
 
 const normalizePayloadForHabit = (
-  type: "action" | "measurable",
+  habit: { type: "action" | "measurable"; requireCompletionComment: boolean },
   payload: HabitLogPayload,
   currentLog?: HabitLogDocument
 ) => {
@@ -36,12 +37,16 @@ const normalizePayloadForHabit = (
     payload.status !== undefined ? payload.status : currentLog?.status ?? null;
   const nextValue =
     payload.value !== undefined ? payload.value : currentLog?.value ?? null;
+  const nextComment =
+    payload.comment !== undefined
+      ? normalizeOptionalString(payload.comment)
+      : currentLog?.comment;
 
   if (!nextDate) {
     throw new AppError("Date is required", 400);
   }
 
-  if (type === "action") {
+  if (habit.type === "action") {
     if (payload.value !== undefined && payload.value !== null) {
       throw new AppError("Action logs must use status, not value", 400);
     }
@@ -50,10 +55,19 @@ const normalizePayloadForHabit = (
       throw new AppError("Action logs must include a valid status", 400);
     }
 
+    if (
+      habit.requireCompletionComment &&
+      nextStatus === "done" &&
+      !nextComment
+    ) {
+      throw new AppError("Add a comment before marking this habit done", 400);
+    }
+
     return {
       date: nextDate,
       status: nextStatus,
-      value: null
+      value: null,
+      comment: nextStatus === "done" ? nextComment : undefined
     };
   }
 
@@ -68,12 +82,18 @@ const normalizePayloadForHabit = (
   return {
     date: nextDate,
     status: null,
-    value: nextValue
+    value: nextValue,
+    comment: undefined
   };
 };
 
-export const listHabitLogs = async (habitId: string, limit = 10) => {
-  await getHabitByIdOrThrow(habitId);
+const normalizeOptionalString = (value?: string) => {
+  const normalizedValue = value?.trim();
+  return normalizedValue ? normalizedValue : undefined;
+};
+
+export const listHabitLogs = async (habitId: string, userId: string, limit = 10) => {
+  await getHabitByIdOrThrow(habitId, userId);
 
   const logs = await HabitLogModel.find({
     habitId
@@ -84,9 +104,9 @@ export const listHabitLogs = async (habitId: string, limit = 10) => {
   return logs.map(serializeHabitLog);
 };
 
-export const createHabitLog = async (habitId: string, payload: HabitLogPayload) => {
-  const habit = await getHabitByIdOrThrow(habitId);
-  const normalizedPayload = normalizePayloadForHabit(habit.type, payload);
+export const createHabitLog = async (habitId: string, userId: string, payload: HabitLogPayload) => {
+  const habit = await getHabitByIdOrThrow(habitId, userId);
+  const normalizedPayload = normalizePayloadForHabit(habit, payload);
 
   const existingLog = await HabitLogModel.findOne({
     habitId: habit._id,
@@ -108,9 +128,10 @@ export const createHabitLog = async (habitId: string, payload: HabitLogPayload) 
 export const updateHabitLog = async (
   habitId: string,
   logId: string,
+  userId: string,
   payload: HabitLogPayload
 ) => {
-  const habit = await getHabitByIdOrThrow(habitId);
+  const habit = await getHabitByIdOrThrow(habitId, userId);
   const log = await HabitLogModel.findOne({
     _id: logId,
     habitId: habit._id
@@ -120,21 +141,27 @@ export const updateHabitLog = async (
     throw new AppError("Habit log not found", 404);
   }
 
-  const normalizedPayload = normalizePayloadForHabit(habit.type, payload, log);
+  const normalizedPayload = normalizePayloadForHabit(habit, payload, log);
 
   log.date = normalizedPayload.date;
   log.status = normalizedPayload.status;
   log.value = normalizedPayload.value;
+  log.comment = normalizedPayload.comment;
 
   await log.save();
 
   return serializeHabitLog(log);
 };
 
-export const getTodayLogs = async () => {
+export const getTodayLogs = async (userId: string) => {
   const today = getTodayDateString();
+
+  const userHabits = await HabitModel.find({ userId }).select("_id");
+  const userHabitIds = userHabits.map((h) => h._id);
+
   const logs = await HabitLogModel.find({
-    date: today
+    date: today,
+    habitId: { $in: userHabitIds }
   }).sort({ createdAt: 1 });
 
   if (logs.length === 0) {

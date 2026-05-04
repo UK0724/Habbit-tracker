@@ -23,6 +23,7 @@ const baseHabitSchema = z.object({
     .max(20, "Unit must be 20 characters or less")
     .optional()
     .transform((value) => value || undefined),
+  requireCompletionComment: z.boolean().optional(),
   color: z.string().trim().min(1, "Color is required").max(40)
 });
 
@@ -41,6 +42,14 @@ export const createHabitBodySchema = baseHabitSchema.superRefine(
         code: z.ZodIssueCode.custom,
         path: ["unit"],
         message: "Action habits cannot define a unit"
+      });
+    }
+
+    if (value.type === "measurable" && value.requireCompletionComment) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["requireCompletionComment"],
+        message: "Completion comments are only available for action habits"
       });
     }
   }

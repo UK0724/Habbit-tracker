@@ -29,6 +29,7 @@ export const habitFormSchema = z
       .trim()
       .max(20, "Unit must be 20 characters or less")
       .optional(),
+    requireCompletionComment: z.boolean(),
     color: z.enum(habitColorValues)
   })
   .superRefine((value, context) => {
@@ -37,6 +38,14 @@ export const habitFormSchema = z
         code: z.ZodIssueCode.custom,
         path: ["unit"],
         message: "Unit is required for measurable habits"
+      });
+    }
+
+    if (value.type === "measurable" && value.requireCompletionComment) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["requireCompletionComment"],
+        message: "Comments on completion are only for action habits"
       });
     }
   });

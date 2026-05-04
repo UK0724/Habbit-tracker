@@ -1,14 +1,16 @@
-import { HydratedDocument, Schema, model } from "mongoose";
+import { HydratedDocument, Schema, Types, model } from "mongoose";
 
 export const HABIT_TYPES = ["action", "measurable"] as const;
 
 export type HabitType = (typeof HABIT_TYPES)[number];
 
 export interface Habit {
+  userId: Types.ObjectId;
   title: string;
   description?: string;
   type: HabitType;
   unit?: string;
+  requireCompletionComment: boolean;
   color: string;
   createdAt: Date;
   updatedAt: Date;
@@ -18,6 +20,11 @@ export type HabitDocument = HydratedDocument<Habit>;
 
 const habitSchema = new Schema<Habit>(
   {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
     title: {
       type: String,
       required: true,
@@ -35,6 +42,10 @@ const habitSchema = new Schema<Habit>(
     unit: {
       type: String,
       trim: true
+    },
+    requireCompletionComment: {
+      type: Boolean,
+      default: false
     },
     color: {
       type: String,

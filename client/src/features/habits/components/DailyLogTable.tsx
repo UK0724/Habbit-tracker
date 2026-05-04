@@ -15,7 +15,8 @@ type DailyLogTableProps = {
   onSaveAction: (
     habitId: string,
     logId: string | undefined,
-    status: ActionStatus
+    status: ActionStatus,
+    comment?: string
   ) => Promise<void> | void;
   onSaveValue: (
     habitId: string,
@@ -92,6 +93,11 @@ const HabitIdentity = ({
           {habit.unit ? (
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
               {habit.unit}
+            </span>
+          ) : null}
+          {habit.requireCompletionComment ? (
+            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+              Comment on done
             </span>
           ) : null}
         </div>
@@ -176,15 +182,52 @@ const ActionHabitRow = ({
   onSave: (
     habitId: string,
     logId: string | undefined,
-    status: ActionStatus
+    status: ActionStatus,
+    comment?: string
   ) => Promise<void> | void;
 }) => {
   const theme = getHabitTheme(habit.color);
   const currentStatus = habit.selectedDateLog?.status;
+  const currentComment = habit.selectedDateLog?.comment ?? "";
   const stats = habit.stats.type === "action" ? habit.stats : null;
+  const [commentDraft, setCommentDraft] = useState(currentComment);
+  const [isCommentOpen, setIsCommentOpen] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCommentDraft(currentComment);
+    setCommentError(null);
+  }, [currentComment, habit.selectedDateLog?.id]);
+
+  const saveAction = (status: ActionStatus, comment?: string) => {
+    void onSave(habit.id, habit.selectedDateLog?.id, status, comment);
+  };
+
+  const handleStatusClick = (status: ActionStatus) => {
+    if (status === "done" && habit.requireCompletionComment) {
+      setIsCommentOpen(true);
+      return;
+    }
+
+    setCommentError(null);
+    saveAction(status);
+  };
+
+  const handleCommentSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextComment = commentDraft.trim();
+
+    if (!nextComment) {
+      setCommentError("Add a quick comment before saving Done.");
+      return;
+    }
+
+    setCommentError(null);
+    saveAction("done", nextComment);
+  };
 
   return (
-    <tr className="bg-white">
+    <tr className="bg-white transition hover:bg-slate-50/60">
       <HabitNameCell habit={habit} />
 
       <td className="px-4 py-4 align-top">
@@ -196,9 +239,7 @@ const ActionHabitRow = ({
               <button
                 key={status}
                 type="button"
-                onClick={() =>
-                  void onSave(habit.id, habit.selectedDateLog?.id, status)
-                }
+                onClick={() => handleStatusClick(status)}
                 disabled={isSaving}
                 className={cn(
                   actionButtonClassName,
@@ -218,6 +259,48 @@ const ActionHabitRow = ({
         <p className="mt-2 text-xs font-medium text-slate-500">
           {getActionEntryLabel(currentStatus, selectedDate)}
         </p>
+
+        {habit.requireCompletionComment && isCommentOpen ? (
+          <form
+            onSubmit={handleCommentSubmit}
+            className="mt-3 max-w-lg rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3"
+          >
+            <label className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
+              Completion comment
+            </label>
+            <textarea
+              value={commentDraft}
+              onChange={(event) => setCommentDraft(event.target.value)}
+              rows={2}
+              placeholder="Example: Applied to Product Designer at Acme"
+              className="mt-2 w-full resize-none rounded-xl border border-indigo-100 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 shadow-sm focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
+            />
+            {commentError ? (
+              <p className="mt-2 text-xs font-medium text-rose-600">
+                {commentError}
+              </p>
+            ) : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="submit" size="sm" disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save Done"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setIsCommentOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : null}
+
+        {currentStatus === "done" && habit.selectedDateLog?.comment ? (
+          <p className="mt-2 max-w-md rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+            {habit.selectedDateLog.comment}
+          </p>
+        ) : null}
       </td>
 
       <td className="px-4 py-4 align-top">
@@ -277,7 +360,7 @@ const MeasurableHabitRow = ({
   };
 
   return (
-    <tr className="bg-white">
+    <tr className="bg-white transition hover:bg-slate-50/60">
       <HabitNameCell habit={habit} />
 
       <td className="px-4 py-4 align-top">
@@ -338,7 +421,7 @@ const MobileCardShell = ({
   habit: HabitListItem;
   children: ReactNode;
 }) => (
-  <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+  <article className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
     <div className="flex items-start justify-between gap-3">
       <HabitIdentity habit={habit} compact />
       <Link
@@ -364,12 +447,49 @@ const MobileActionHabitCard = ({
   onSave: (
     habitId: string,
     logId: string | undefined,
-    status: ActionStatus
+    status: ActionStatus,
+    comment?: string
   ) => Promise<void> | void;
 }) => {
   const theme = getHabitTheme(habit.color);
   const currentStatus = habit.selectedDateLog?.status;
+  const currentComment = habit.selectedDateLog?.comment ?? "";
   const stats = habit.stats.type === "action" ? habit.stats : null;
+  const [commentDraft, setCommentDraft] = useState(currentComment);
+  const [isCommentOpen, setIsCommentOpen] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCommentDraft(currentComment);
+    setCommentError(null);
+  }, [currentComment, habit.selectedDateLog?.id]);
+
+  const saveAction = (status: ActionStatus, comment?: string) => {
+    void onSave(habit.id, habit.selectedDateLog?.id, status, comment);
+  };
+
+  const handleStatusClick = (status: ActionStatus) => {
+    if (status === "done" && habit.requireCompletionComment) {
+      setIsCommentOpen(true);
+      return;
+    }
+
+    setCommentError(null);
+    saveAction(status);
+  };
+
+  const handleCommentSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextComment = commentDraft.trim();
+
+    if (!nextComment) {
+      setCommentError("Add a quick comment before saving Done.");
+      return;
+    }
+
+    setCommentError(null);
+    saveAction("done", nextComment);
+  };
 
   return (
     <MobileCardShell habit={habit}>
@@ -381,9 +501,7 @@ const MobileActionHabitCard = ({
             <button
               key={status}
               type="button"
-              onClick={() =>
-                void onSave(habit.id, habit.selectedDateLog?.id, status)
-              }
+              onClick={() => handleStatusClick(status)}
               disabled={isSaving}
               className={cn(
                 actionButtonClassName,
@@ -404,6 +522,48 @@ const MobileActionHabitCard = ({
       <p className="mt-3 text-xs font-medium text-slate-500">
         {getActionEntryLabel(currentStatus, selectedDate)}
       </p>
+
+      {habit.requireCompletionComment && isCommentOpen ? (
+        <form
+          onSubmit={handleCommentSubmit}
+          className="mt-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3"
+        >
+          <label className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
+            Completion comment
+          </label>
+          <textarea
+            value={commentDraft}
+            onChange={(event) => setCommentDraft(event.target.value)}
+            rows={3}
+            placeholder="What did you complete?"
+            className="mt-2 w-full resize-none rounded-xl border border-indigo-100 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 shadow-sm focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
+          />
+          {commentError ? (
+            <p className="mt-2 text-xs font-medium text-rose-600">
+              {commentError}
+            </p>
+          ) : null}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button type="submit" size="sm" disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save Done"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsCommentOpen(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : null}
+
+      {currentStatus === "done" && habit.selectedDateLog?.comment ? (
+        <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+          {habit.selectedDateLog.comment}
+        </p>
+      ) : null}
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <div className="rounded-xl bg-slate-50 px-3 py-3">
@@ -553,10 +713,10 @@ export const DailyLogTable = ({
       )}
     </div>
 
-    <div className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-white md:block">
+    <div className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm md:block">
       <div className="overflow-x-auto">
         <table className="min-w-[920px] w-full text-left">
-          <thead className="bg-slate-50">
+          <thead className="bg-slate-100/70">
             <tr className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               <th className="px-4 py-3">Habit</th>
               <th className="px-4 py-3">
