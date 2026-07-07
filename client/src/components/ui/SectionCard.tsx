@@ -22,10 +22,10 @@ export const SectionCard = ({
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           {title ? (
-            <h2 className="text-lg font-bold text-slate-950">{title}</h2>
+            <h2 className="text-lg font-bold text-content">{title}</h2>
           ) : null}
           {description ? (
-            <p className="mt-1 text-sm leading-6 text-slate-500">
+            <p className="mt-1 text-sm leading-6 text-content-muted">
               {description}
             </p>
           ) : null}

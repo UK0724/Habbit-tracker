@@ -10,6 +10,7 @@ import { HomePage } from "../pages/HomePage";
 import { LoginPage } from "../pages/LoginPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { RegisterPage } from "../pages/RegisterPage";
+import { SettingsPage } from "../pages/SettingsPage";
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { index: true, element: <HomePage /> },
+          { path: "settings", element: <SettingsPage /> },
           { path: "habits/new", element: <CreateHabitPage /> },
           { path: "habits/:id", element: <HabitDetailPage /> },
           { path: "habits/:id/edit", element: <EditHabitPage /> },

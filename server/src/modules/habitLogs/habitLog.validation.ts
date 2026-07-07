@@ -54,5 +54,7 @@ export const habitLogUpdateParamsSchema = z.object({
 });
 
 export const habitLogListQuerySchema = z.object({
-  limit: z.coerce.number().int().positive().max(30).optional()
+  // Allow up to a year of daily logs so the client can render streak,
+  // completion-rate, and contribution-heatmap analytics.
+  limit: z.coerce.number().int().positive().max(366).optional()
 });

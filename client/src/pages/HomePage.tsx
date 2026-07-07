@@ -1,15 +1,61 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { SectionCard } from "../components/ui/SectionCard";
+import { Confetti } from "../components/viz/Confetti";
+import { CountUp } from "../components/viz/CountUp";
+import { ProgressRing } from "../components/viz/ProgressRing";
+import { StreakFlame } from "../components/viz/StreakFlame";
 import { DailyLogTable } from "../features/habits/components/DailyLogTable";
 import { useHabits } from "../features/habits/hooks/useHabits";
 import { useHomeDateStore } from "../features/habits/hooks/useHomeDateStore";
 import { useSaveHabitLog } from "../features/logs/hooks/useHabitLogs";
 import { formatDateLabel, isToday } from "../shared/lib/date";
-import type { ActionStatus } from "../shared/types/habit";
+import { accentHex } from "../shared/lib/theme";
+import { useThemeStore } from "../stores/themeStore";
+import type { ActionStatus, HabitListItem } from "../shared/types/habit";
+
+const motivationFor = (
+  tracked: number,
+  total: number,
+  today: boolean
+): { title: string; subtitle: string } => {
+  if (total === 0) {
+    return {
+      title: "Let's build your first habit",
+      subtitle: "One habit is all it takes to start a streak worth protecting."
+    };
+  }
+
+  const remaining = total - tracked;
+
+  if (tracked === 0) {
+    return {
+      title: today ? "A fresh day to show up" : "Nothing logged this day",
+      subtitle: today
+        ? "Log your first habit now — momentum starts with a single check-in."
+        : "Fill in what happened on this day to keep your history complete."
+    };
+  }
+
+  if (remaining === 0) {
+    return {
+      title: today ? "Every habit logged. 🎉" : "This day is fully logged",
+      subtitle: today
+        ? "You didn't miss a single one today. This is how streaks are made."
+        : "Great — no gaps in your history for this day."
+    };
+  }
+
+  return {
+    title: today ? "You're on a roll" : "Almost complete",
+    subtitle: `${remaining} habit${remaining === 1 ? "" : "s"} still waiting to be logged ${
+      today ? "today" : "this day"
+    }.`
+  };
+};
 
 export const HomePage = () => {
   const selectedDate = useHomeDateStore((state) => state.selectedDate);
@@ -19,14 +65,50 @@ export const HomePage = () => {
 
   const habitsQuery = useHabits(selectedDate);
   const saveLogMutation = useSaveHabitLog();
+  const accent = useThemeStore((s) => s.accent);
+  const ringColor = accentHex(accent);
   const [activeHabitId, setActiveHabitId] = useState<string | null>(null);
-  const habitCount = habitsQuery.data?.length ?? 0;
-  const doneCount =
-    habitsQuery.data?.filter((habit) => habit.selectedDateLog?.status === "done")
-      .length ?? 0;
-  const loggedCount =
-    habitsQuery.data?.filter((habit) => habit.selectedDateLog !== null).length ??
-    0;
+  const [celebrate, setCelebrate] = useState(false);
+  const wasComplete = useRef(false);
+
+  const habits = habitsQuery.data ?? [];
+  const habitCount = habits.length;
+  const doneCount = habits.filter(
+    (habit) => habit.selectedDateLog?.status === "done"
+  ).length;
+  const loggedCount = habits.filter(
+    (habit) => habit.selectedDateLog !== null
+  ).length;
+  const missedCount = habits.filter(
+    (habit) => habit.selectedDateLog?.status === "not_done"
+  ).length;
+  const bestStreak = habits.reduce(
+    (max, habit) =>
+      habit.stats.type === "action"
+        ? Math.max(max, habit.stats.currentStreak)
+        : max,
+    0
+  );
+  const untracked = habits.filter((habit) => habit.selectedDateLog === null);
+
+  const today = isToday(selectedDate);
+  const trackedRatio = habitCount === 0 ? 0 : loggedCount / habitCount;
+  const trackedPercent = Math.round(trackedRatio * 100);
+  const motivation = motivationFor(loggedCount, habitCount, today);
+
+  // Celebrate the first moment the day becomes fully logged (today only).
+  useEffect(() => {
+    const complete = habitCount > 0 && loggedCount === habitCount && today;
+    if (complete && !wasComplete.current) {
+      setCelebrate(true);
+      const timer = setTimeout(() => setCelebrate(false), 2600);
+      wasComplete.current = true;
+      return () => clearTimeout(timer);
+    }
+    if (!complete) {
+      wasComplete.current = false;
+    }
+  }, [habitCount, loggedCount, today]);
 
   const handleSaveAction = async (
     habitId: string,
@@ -39,11 +121,7 @@ export const HomePage = () => {
       await saveLogMutation.mutateAsync({
         habitId,
         logId,
-        input: {
-          date: selectedDate,
-          status,
-          comment
-        }
+        input: { date: selectedDate, status, comment }
       });
     } finally {
       setActiveHabitId(null);
@@ -60,10 +138,7 @@ export const HomePage = () => {
       await saveLogMutation.mutateAsync({
         habitId,
         logId,
-        input: {
-          date: selectedDate,
-          value
-        }
+        input: { date: selectedDate, value }
       });
     } finally {
       setActiveHabitId(null);
@@ -72,101 +147,157 @@ export const HomePage = () => {
 
   return (
     <div className="space-y-6">
-      <SectionCard className="border border-white/80 bg-white/90">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-2xl">
+      {celebrate ? <Confetti /> : null}
+
+      {/* Hero */}
+      <section className="surface-card animate-fade-in-up relative overflow-hidden p-6 sm:p-8">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-br from-accent/10 via-accent/10 to-transparent" />
+
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
                 Daily log
               </p>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              <span className="rounded-full bg-surface-3 px-3 py-1 text-xs font-semibold text-content-2">
                 {formatDateLabel(selectedDate)}
               </span>
+              {today ? (
+                <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 ring-1 ring-emerald-500/30">
+                  Today
+                </span>
+              ) : null}
             </div>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-              Today&apos;s board
+
+            <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-content sm:text-4xl">
+              {motivation.title}
             </h1>
-            <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
-              Log actions, numbers, and completion notes from one calm,
-              scannable workspace.
+            <p className="mt-3 text-sm leading-6 text-content-2 sm:text-base">
+              {motivation.subtitle}
             </p>
-            <div className="mt-5 grid max-w-xl grid-cols-3 gap-2">
-              <div className="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Habits
-                </p>
-                <p className="mt-1 text-xl font-bold text-slate-950">
-                  {habitCount}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+
+            {/* stat chips */}
+            <div className="mt-6 flex flex-wrap gap-2">
+              <div className="rounded-2xl bg-surface-2 px-4 py-3 ring-1 ring-border-app">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">
                   Done
                 </p>
-                <p className="mt-1 text-xl font-bold text-emerald-950">
-                  {doneCount}
+                <p className="mt-0.5 text-xl font-bold text-emerald-600">
+                  <CountUp value={doneCount} />
                 </p>
               </div>
-              <div className="rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-100">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
-                  Logged
+              <div className="rounded-2xl bg-surface-2 px-4 py-3 ring-1 ring-border-app">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">
+                  Missed
                 </p>
-                <p className="mt-1 text-xl font-bold text-amber-950">
-                  {loggedCount}
+                <p className="mt-0.5 text-xl font-bold text-rose-500">
+                  <CountUp value={missedCount} />
                 </p>
+              </div>
+              <div className="flex items-center gap-2 rounded-2xl bg-surface-2 px-4 py-3 ring-1 ring-border-app">
+                <StreakFlame count={bestStreak} size={26} />
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-content-muted">
+                    Best streak
+                  </p>
+                  <p className="mt-0.5 text-xl font-bold text-content">
+                    <CountUp value={bestStreak} />
+                    <span className="ml-1 text-sm font-semibold text-content-subtle">
+                      day{bestStreak === 1 ? "" : "s"}
+                    </span>
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex w-full max-w-xl flex-col gap-3 xl:items-end">
-            <div className="grid w-full gap-2 rounded-3xl border border-slate-200 bg-slate-50/80 p-2 sm:grid-cols-[auto,1fr,auto,auto] sm:items-center">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => shiftSelectedDate(-1)}
-                className="w-full sm:w-auto"
-              >
-                Previous
-              </Button>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
-                className="h-10 min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 shadow-sm focus:border-indigo-300 focus:outline-none focus:ring-4 focus:ring-indigo-100"
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => shiftSelectedDate(1)}
-                className="w-full sm:w-auto"
-              >
-                Next
-              </Button>
-              {!isToday(selectedDate) ? (
+            {/* date nav */}
+            <div className="mt-6 flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 rounded-2xl border border-border-app bg-surface-2/80 p-1">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={resetSelectedDate}
-                  className="w-full sm:w-auto"
+                  onClick={() => shiftSelectedDate(-1)}
                 >
-                  Today
+                  ← Prev
+                </Button>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => setSelectedDate(event.target.value)}
+                  className="h-9 rounded-xl border border-border-app bg-surface px-3 text-sm font-medium text-content shadow-sm focus:border-accent/60 focus:ring-4 focus:ring-accent/30"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => shiftSelectedDate(1)}
+                >
+                  Next →
+                </Button>
+              </div>
+              {!today ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={resetSelectedDate}
+                >
+                  Jump to today
                 </Button>
               ) : null}
+              <Button asChild size="sm">
+                <Link to="/habits/new">+ New habit</Link>
+              </Button>
             </div>
+          </div>
 
-            <Button asChild size="sm" className="w-full bg-slate-950 sm:w-auto">
-              <Link to="/habits/new">Create habit</Link>
-            </Button>
+          {/* progress ring */}
+          <div className="flex shrink-0 flex-col items-center gap-3">
+            <ProgressRing
+              value={trackedRatio}
+              size={168}
+              stroke={14}
+              color={ringColor}
+              trackColor="rgba(120,130,150,0.18)"
+            >
+              <span className="text-4xl font-bold text-content">
+                <CountUp value={trackedPercent} suffix="%" />
+              </span>
+              <span className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-content-subtle">
+                Tracked
+              </span>
+            </ProgressRing>
+            <p className="text-sm font-semibold text-content-2">
+              {loggedCount} of {habitCount} logged
+            </p>
           </div>
         </div>
-      </SectionCard>
+
+        {/* untracked nudge */}
+        {today && untracked.length > 0 && habitCount > 0 ? (
+          <div className="relative mt-6 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+            <span className="flex h-2.5 w-2.5 shrink-0 animate-glow rounded-full bg-amber-500" />
+            <p className="text-sm font-semibold text-amber-600">
+              Don&apos;t miss today:
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {untracked.map((habit) => (
+                <span
+                  key={habit.id}
+                  className="rounded-full bg-surface px-2.5 py-1 text-xs font-semibold text-amber-600 ring-1 ring-amber-500/30"
+                >
+                  {habit.title}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </section>
 
       {saveLogMutation.error ? (
-        <SectionCard className="border border-rose-200 bg-rose-50/60">
-          <p className="text-sm font-medium text-rose-700">
+        <SectionCard className="border border-rose-500/30 bg-rose-500/10">
+          <p className="text-sm font-medium text-rose-600">
             {saveLogMutation.error.message}
           </p>
         </SectionCard>
@@ -177,11 +308,11 @@ export const HomePage = () => {
           title={`Habits for ${formatDateLabel(selectedDate)}`}
           description="Loading your daily log..."
         >
-          <div className="overflow-hidden rounded-3xl border border-slate-200">
+          <div className="space-y-3">
             {Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
-                className="h-20 animate-pulse border-b border-slate-100 bg-slate-50/80 last:border-b-0"
+                className="shimmer h-20 rounded-2xl bg-surface-3"
               />
             ))}
           </div>
@@ -190,13 +321,11 @@ export const HomePage = () => {
 
       {habitsQuery.isError ? (
         <SectionCard title="Unable to load habits">
-          <p className="text-sm text-rose-700">{habitsQuery.error.message}</p>
+          <p className="text-sm text-rose-600">{habitsQuery.error.message}</p>
         </SectionCard>
       ) : null}
 
-      {!habitsQuery.isLoading &&
-      !habitsQuery.isError &&
-      !habitsQuery.data?.length ? (
+      {!habitsQuery.isLoading && !habitsQuery.isError && habitCount === 0 ? (
         <EmptyState
           title="No habits created yet"
           description="Create your first habit to start logging action-based check-ins or measurable daily values."
@@ -205,23 +334,19 @@ export const HomePage = () => {
         />
       ) : null}
 
-      {!habitsQuery.isLoading &&
-      !habitsQuery.isError &&
-      habitsQuery.data?.length ? (
+      {!habitsQuery.isLoading && !habitsQuery.isError && habitCount > 0 ? (
         <SectionCard
           title={`Habits for ${formatDateLabel(selectedDate)}`}
           description={
-            isToday(selectedDate)
+            today
               ? "Action habits save immediately. Measurable habits save when you press Save."
               : "Missed a day? Fill the rows below and the selected date updates right away."
           }
         >
           <DailyLogTable
-            habits={habitsQuery.data}
+            habits={habits as HabitListItem[]}
             selectedDate={selectedDate}
-            savingHabitId={
-              saveLogMutation.isPending ? activeHabitId : null
-            }
+            savingHabitId={saveLogMutation.isPending ? activeHabitId : null}
             onSaveAction={handleSaveAction}
             onSaveValue={handleSaveValue}
           />

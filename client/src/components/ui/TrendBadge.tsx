@@ -7,10 +7,10 @@ type TrendBadgeProps = {
 };
 
 const trendClasses: Record<Trend, string> = {
-  up: "bg-amber-50 text-amber-700 ring-amber-200",
-  down: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  same: "bg-slate-100 text-slate-700 ring-slate-200",
-  none: "bg-slate-100 text-slate-500 ring-slate-200"
+  up: "bg-amber-500/10 text-amber-600 ring-amber-500/30",
+  down: "bg-emerald-500/10 text-emerald-600 ring-emerald-500/30",
+  same: "bg-surface-3 text-content-2 ring-border-app",
+  none: "bg-surface-3 text-content-muted ring-border-app"
 };
 
 export const TrendBadge = ({ trend, label }: TrendBadgeProps) => (

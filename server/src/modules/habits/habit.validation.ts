@@ -45,7 +45,7 @@ export const createHabitBodySchema = baseHabitSchema.superRefine(
       });
     }
 
-    if (value.type === "measurable" && value.requireCompletionComment) {
+    if (value.type !== "action" && value.requireCompletionComment) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["requireCompletionComment"],

@@ -32,13 +32,13 @@ export const EditHabitPage = () => {
   };
 
   if (habitQuery.isLoading) {
-    return <div className="surface-card h-80 animate-pulse bg-white/80" />;
+    return <div className="surface-card h-80 animate-pulse bg-surface/80" />;
   }
 
   if (habitQuery.isError || !habitQuery.data) {
     return (
       <SectionCard title="Unable to load habit">
-        <p className="text-sm text-rose-700">
+        <p className="text-sm text-rose-600">
           {habitQuery.error?.message ?? "This habit could not be found."}
         </p>
       </SectionCard>

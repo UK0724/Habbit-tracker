@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { BrandMark } from "../components/brand/BrandMark";
 import { ApiError } from "../services/api";
 import { loginApi } from "../services/authApi";
 import { useAuthStore } from "../stores/authStore";
@@ -32,14 +33,12 @@ export const LoginPage = () => {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-2xl font-extrabold text-white shadow-lg shadow-indigo-200">
-            H
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Welcome back
+          <BrandMark className="mx-auto mb-4 h-14 w-14 rounded-2xl" />
+          <h1 className="text-2xl font-bold tracking-tight text-content">
+            Welcome back to Arc
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Sign in to your Habit Tracker account
+          <p className="mt-1 text-sm text-content-muted">
+            Sign in to keep your streaks going
           </p>
         </div>
 
@@ -48,7 +47,7 @@ export const LoginPage = () => {
             <div>
               <label
                 htmlFor="email"
-                className="mb-1.5 block text-sm font-semibold text-slate-700"
+                className="mb-1.5 block text-sm font-semibold text-content-2"
               >
                 Email
               </label>
@@ -60,14 +59,14 @@ export const LoginPage = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 placeholder-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                className="h-11 w-full rounded-xl border border-border-app bg-surface-2 px-4 text-sm text-content placeholder-slate-400 transition focus:border-accent focus:bg-surface focus:outline-none focus:ring-4 focus:ring-accent/30"
               />
             </div>
 
             <div>
               <label
                 htmlFor="password"
-                className="mb-1.5 block text-sm font-semibold text-slate-700"
+                className="mb-1.5 block text-sm font-semibold text-content-2"
               >
                 Password
               </label>
@@ -79,12 +78,12 @@ export const LoginPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 placeholder-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                className="h-11 w-full rounded-xl border border-border-app bg-surface-2 px-4 text-sm text-content placeholder-slate-400 transition focus:border-accent focus:bg-surface focus:outline-none focus:ring-4 focus:ring-accent/30"
               />
             </div>
 
             {error ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-600">
                 {error}
               </div>
             ) : null}
@@ -92,17 +91,17 @@ export const LoginPage = () => {
             <button
               type="submit"
               disabled={loading}
-              className="h-11 w-full rounded-xl bg-indigo-600 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-11 w-full rounded-xl bg-accent text-sm font-semibold text-white transition hover:bg-accent-hover focus:outline-none focus:ring-4 focus:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-500">
+          <p className="mt-6 text-center text-sm text-content-muted">
             Don&apos;t have an account?{" "}
             <Link
               to="/register"
-              className="font-semibold text-indigo-600 hover:text-indigo-700"
+              className="font-semibold text-accent hover:text-accent"
             >
               Create one
             </Link>

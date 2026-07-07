@@ -27,13 +27,13 @@ const sizeClasses = {
 
 const variantClasses = {
   primary:
-    "bg-slate-900 text-white shadow-sm hover:bg-slate-800 focus-visible:ring-slate-300",
+    "bg-accent text-accent-fg shadow-sm hover:bg-accent-hover focus-visible:ring-accent/40",
   secondary:
-    "bg-slate-100 text-slate-900 hover:bg-slate-200 focus-visible:ring-slate-200",
+    "bg-surface-3 text-content hover:bg-border-app focus-visible:ring-border-app",
   ghost:
-    "bg-transparent text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-200",
+    "bg-transparent text-content-2 hover:bg-surface-3 focus-visible:ring-border-app",
   danger:
-    "bg-rose-600 text-white hover:bg-rose-700 focus-visible:ring-rose-300"
+    "bg-rose-600 text-white hover:bg-rose-700 focus-visible:ring-rose-500/40"
 } as const;
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(

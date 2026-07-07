@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { BrandMark } from "../components/brand/BrandMark";
 import { ApiError } from "../services/api";
 import { registerApi } from "../services/authApi";
 import { useAuthStore } from "../stores/authStore";
@@ -39,14 +40,12 @@ export const RegisterPage = () => {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-2xl font-extrabold text-white shadow-lg shadow-indigo-200">
-            H
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Create your account
+          <BrandMark className="mx-auto mb-4 h-14 w-14 rounded-2xl" />
+          <h1 className="text-2xl font-bold tracking-tight text-content">
+            Create your Arc account
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Start tracking your habits today
+          <p className="mt-1 text-sm text-content-muted">
+            Start tracking habits, streaks &amp; spending
           </p>
         </div>
 
@@ -55,7 +54,7 @@ export const RegisterPage = () => {
             <div>
               <label
                 htmlFor="email"
-                className="mb-1.5 block text-sm font-semibold text-slate-700"
+                className="mb-1.5 block text-sm font-semibold text-content-2"
               >
                 Email
               </label>
@@ -67,17 +66,17 @@ export const RegisterPage = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 placeholder-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                className="h-11 w-full rounded-xl border border-border-app bg-surface-2 px-4 text-sm text-content placeholder-slate-400 transition focus:border-accent focus:bg-surface focus:outline-none focus:ring-4 focus:ring-accent/30"
               />
             </div>
 
             <div>
               <label
                 htmlFor="password"
-                className="mb-1.5 block text-sm font-semibold text-slate-700"
+                className="mb-1.5 block text-sm font-semibold text-content-2"
               >
                 Password
-                <span className="ml-1 font-normal text-slate-400">
+                <span className="ml-1 font-normal text-content-subtle">
                   (min. 8 characters)
                 </span>
               </label>
@@ -90,14 +89,14 @@ export const RegisterPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 placeholder-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                className="h-11 w-full rounded-xl border border-border-app bg-surface-2 px-4 text-sm text-content placeholder-slate-400 transition focus:border-accent focus:bg-surface focus:outline-none focus:ring-4 focus:ring-accent/30"
               />
             </div>
 
             <div>
               <label
                 htmlFor="confirm"
-                className="mb-1.5 block text-sm font-semibold text-slate-700"
+                className="mb-1.5 block text-sm font-semibold text-content-2"
               >
                 Confirm password
               </label>
@@ -109,12 +108,12 @@ export const RegisterPage = () => {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 placeholder="Confirm your password"
-                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 placeholder-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                className="h-11 w-full rounded-xl border border-border-app bg-surface-2 px-4 text-sm text-content placeholder-slate-400 transition focus:border-accent focus:bg-surface focus:outline-none focus:ring-4 focus:ring-accent/30"
               />
             </div>
 
             {error ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-600">
                 {error}
               </div>
             ) : null}
@@ -122,17 +121,17 @@ export const RegisterPage = () => {
             <button
               type="submit"
               disabled={loading}
-              className="h-11 w-full rounded-xl bg-indigo-600 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-11 w-full rounded-xl bg-accent text-sm font-semibold text-white transition hover:bg-accent-hover focus:outline-none focus:ring-4 focus:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Creating account..." : "Create account"}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-500">
+          <p className="mt-6 text-center text-sm text-content-muted">
             Already have an account?{" "}
             <Link
               to="/login"
-              className="font-semibold text-indigo-600 hover:text-indigo-700"
+              className="font-semibold text-accent hover:text-accent"
             >
               Sign in
             </Link>

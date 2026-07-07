@@ -3,8 +3,10 @@ import { Link } from "react-router-dom";
 
 import { Button } from "../../../components/ui/Button";
 import { NumberInput } from "../../../components/ui/NumberInput";
+import { StreakFlame } from "../../../components/viz/StreakFlame";
+import { WeekDots } from "../../../components/viz/WeekDots";
 import { formatShortDateLabel } from "../../../shared/lib/date";
-import { getHabitTheme } from "../../../shared/lib/habitTheme";
+import { getHabitHex, getHabitTheme } from "../../../shared/lib/habitTheme";
 import { cn, formatValueWithUnit } from "../../../shared/lib/utils";
 import type { ActionStatus, HabitListItem } from "../../../shared/types/habit";
 
@@ -76,7 +78,7 @@ const HabitIdentity = ({
       <div className="min-w-0">
         <Link
           to={`/habits/${habit.id}`}
-          className="text-base font-semibold text-slate-950 transition hover:text-indigo-700"
+          className="text-base font-semibold text-content transition hover:text-accent"
         >
           {habit.title}
         </Link>
@@ -88,15 +90,19 @@ const HabitIdentity = ({
               theme.soft
             )}
           >
-            {habit.type === "action" ? "Action" : "Measurable"}
+            {habit.type === "action"
+              ? "Action"
+              : habit.type === "expense"
+                ? "Expense"
+                : "Measurable"}
           </span>
           {habit.unit ? (
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+            <span className="rounded-full bg-surface-3 px-2.5 py-1 text-xs font-semibold text-content-2 ring-1 ring-border-app">
               {habit.unit}
             </span>
           ) : null}
           {habit.requireCompletionComment ? (
-            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+            <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-600 ring-1 ring-amber-500/30">
               Comment on done
             </span>
           ) : null}
@@ -105,12 +111,23 @@ const HabitIdentity = ({
         {habit.description ? (
           <p
             className={cn(
-              "mt-2 text-sm leading-6 text-slate-500",
+              "mt-2 text-sm leading-6 text-content-muted",
               compact ? "" : "max-w-md"
             )}
           >
             {habit.description}
           </p>
+        ) : null}
+
+        {habit.recentDays?.length ? (
+          <div className="mt-3">
+            <WeekDots
+              days={habit.recentDays}
+              mode={habit.type === "action" ? "action" : "measurable"}
+              baseColor={getHabitHex(habit.color).base}
+              showLabels={!compact}
+            />
+          </div>
         ) : null}
       </div>
     </div>
@@ -131,12 +148,15 @@ const ActionSummary = ({
     | null;
 }) => (
   <div className="space-y-1 text-sm">
-    <p className="font-semibold text-slate-900">
-      {stats
-        ? `${stats.currentStreak} day${stats.currentStreak === 1 ? "" : "s"} streak`
-        : "No streak yet"}
-    </p>
-    <p className="text-slate-500">
+    <div className="flex items-center gap-2">
+      <StreakFlame count={stats?.currentStreak ?? 0} size={24} />
+      <p className="font-semibold text-content">
+        {stats && stats.currentStreak > 0
+          ? `${stats.currentStreak} day${stats.currentStreak === 1 ? "" : "s"} streak`
+          : "No streak yet"}
+      </p>
+    </div>
+    <p className="text-content-muted">
       {stats?.lastCompletedDate
         ? `Last completed ${formatShortDateLabel(stats.lastCompletedDate)}`
         : "No completed day yet"}
@@ -154,17 +174,17 @@ const MeasurableSummary = ({
   unit?: string;
 }) => (
   <div className="space-y-1 text-sm">
-    <p className="font-semibold text-slate-900">
+    <p className="font-semibold text-content">
       {stats?.latestValue !== null && stats?.latestValue !== undefined
         ? `Latest ${formatValueWithUnit(stats.latestValue, unit)}`
         : "No values yet"}
     </p>
-    <p className="text-slate-500">
+    <p className="text-content-muted">
       {stats?.previousValue !== null && stats?.previousValue !== undefined
         ? `Previous ${formatValueWithUnit(stats.previousValue, unit)}`
         : "No previous value yet"}
     </p>
-    <p className="text-slate-500">
+    <p className="text-content-muted">
       {stats?.differenceLabel ?? "Add another value to see a trend"}
     </p>
   </div>
@@ -227,7 +247,7 @@ const ActionHabitRow = ({
   };
 
   return (
-    <tr className="bg-white transition hover:bg-slate-50/60">
+    <tr className="bg-surface transition hover:bg-surface-2/60">
       <HabitNameCell habit={habit} />
 
       <td className="px-4 py-4 align-top">
@@ -246,8 +266,8 @@ const ActionHabitRow = ({
                   isActive
                     ? status === "done"
                       ? cn("border-transparent text-white", theme.button)
-                      : "border-rose-600 bg-rose-600 text-white focus-visible:ring-rose-200"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus-visible:ring-slate-200"
+                      : "border-rose-600 bg-rose-600 text-white focus-visible:ring-rose-500/30"
+                    : "border-border-app bg-surface text-content-2 hover:bg-surface-2 focus-visible:ring-border-app"
                 )}
               >
                 {isSaving && isActive ? "Saving..." : statusText[status]}
@@ -256,16 +276,16 @@ const ActionHabitRow = ({
           })}
         </div>
 
-        <p className="mt-2 text-xs font-medium text-slate-500">
+        <p className="mt-2 text-xs font-medium text-content-muted">
           {getActionEntryLabel(currentStatus, selectedDate)}
         </p>
 
         {habit.requireCompletionComment && isCommentOpen ? (
           <form
             onSubmit={handleCommentSubmit}
-            className="mt-3 max-w-lg rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3"
+            className="mt-3 max-w-lg rounded-2xl border border-accent/30 bg-accent-soft/60 p-3"
           >
-            <label className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
+            <label className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
               Completion comment
             </label>
             <textarea
@@ -273,7 +293,7 @@ const ActionHabitRow = ({
               onChange={(event) => setCommentDraft(event.target.value)}
               rows={2}
               placeholder="Example: Applied to Product Designer at Acme"
-              className="mt-2 w-full resize-none rounded-xl border border-indigo-100 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 shadow-sm focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
+              className="mt-2 w-full resize-none rounded-xl border border-accent/30 bg-surface px-3 py-2 text-sm text-content placeholder-slate-400 shadow-sm focus:border-accent/60 focus:ring-4 focus:ring-accent/30"
             />
             {commentError ? (
               <p className="mt-2 text-xs font-medium text-rose-600">
@@ -297,7 +317,7 @@ const ActionHabitRow = ({
         ) : null}
 
         {currentStatus === "done" && habit.selectedDateLog?.comment ? (
-          <p className="mt-2 max-w-md rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+          <p className="mt-2 max-w-md rounded-xl bg-surface-2 px-3 py-2 text-xs leading-5 text-content-2">
             {habit.selectedDateLog.comment}
           </p>
         ) : null}
@@ -310,7 +330,7 @@ const ActionHabitRow = ({
       <td className="px-4 py-4 text-right align-top">
         <Link
           to={`/habits/${habit.id}`}
-          className="text-sm font-semibold text-slate-700 transition hover:text-slate-950"
+          className="text-sm font-semibold text-content-2 transition hover:text-content"
         >
           Details
         </Link>
@@ -360,7 +380,7 @@ const MeasurableHabitRow = ({
   };
 
   return (
-    <tr className="bg-white transition hover:bg-slate-50/60">
+    <tr className="bg-surface transition hover:bg-surface-2/60">
       <HabitNameCell habit={habit} />
 
       <td className="px-4 py-4 align-top">
@@ -383,7 +403,7 @@ const MeasurableHabitRow = ({
           </Button>
         </form>
 
-        <p className="mt-2 text-xs font-medium text-slate-500">
+        <p className="mt-2 text-xs font-medium text-content-muted">
           {getMeasurableEntryLabel(
             habit.selectedDateLog?.value,
             habit.unit,
@@ -405,7 +425,7 @@ const MeasurableHabitRow = ({
       <td className="px-4 py-4 text-right align-top">
         <Link
           to={`/habits/${habit.id}`}
-          className="text-sm font-semibold text-slate-700 transition hover:text-slate-950"
+          className="text-sm font-semibold text-content-2 transition hover:text-content"
         >
           Details
         </Link>
@@ -416,17 +436,22 @@ const MeasurableHabitRow = ({
 
 const MobileCardShell = ({
   habit,
+  index = 0,
   children
 }: {
   habit: HabitListItem;
+  index?: number;
   children: ReactNode;
 }) => (
-  <article className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+  <article
+    className="stagger-item rounded-3xl border border-border-app bg-surface p-4 shadow-sm"
+    style={{ ["--stagger" as string]: index }}
+  >
     <div className="flex items-start justify-between gap-3">
       <HabitIdentity habit={habit} compact />
       <Link
         to={`/habits/${habit.id}`}
-        className="shrink-0 text-sm font-semibold text-slate-700 transition hover:text-slate-950"
+        className="shrink-0 text-sm font-semibold text-content-2 transition hover:text-content"
       >
         Details
       </Link>
@@ -437,11 +462,13 @@ const MobileCardShell = ({
 
 const MobileActionHabitCard = ({
   habit,
+  index,
   isSaving,
   selectedDate,
   onSave
 }: {
   habit: HabitListItem;
+  index: number;
   isSaving: boolean;
   selectedDate: string;
   onSave: (
@@ -492,7 +519,7 @@ const MobileActionHabitCard = ({
   };
 
   return (
-    <MobileCardShell habit={habit}>
+    <MobileCardShell habit={habit} index={index}>
       <div className="mt-4 grid grid-cols-2 gap-2">
         {(["done", "not_done"] as const).map((status) => {
           const isActive = currentStatus === status;
@@ -509,8 +536,8 @@ const MobileActionHabitCard = ({
                 isActive
                   ? status === "done"
                     ? cn("border-transparent text-white", theme.button)
-                    : "border-rose-600 bg-rose-600 text-white focus-visible:ring-rose-200"
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus-visible:ring-slate-200"
+                    : "border-rose-600 bg-rose-600 text-white focus-visible:ring-rose-500/30"
+                  : "border-border-app bg-surface text-content-2 hover:bg-surface-2 focus-visible:ring-border-app"
               )}
             >
               {isSaving && isActive ? "Saving..." : statusText[status]}
@@ -519,16 +546,16 @@ const MobileActionHabitCard = ({
         })}
       </div>
 
-      <p className="mt-3 text-xs font-medium text-slate-500">
+      <p className="mt-3 text-xs font-medium text-content-muted">
         {getActionEntryLabel(currentStatus, selectedDate)}
       </p>
 
       {habit.requireCompletionComment && isCommentOpen ? (
         <form
           onSubmit={handleCommentSubmit}
-          className="mt-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3"
+          className="mt-3 rounded-2xl border border-accent/30 bg-accent-soft/60 p-3"
         >
-          <label className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
+          <label className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
             Completion comment
           </label>
           <textarea
@@ -536,7 +563,7 @@ const MobileActionHabitCard = ({
             onChange={(event) => setCommentDraft(event.target.value)}
             rows={3}
             placeholder="What did you complete?"
-            className="mt-2 w-full resize-none rounded-xl border border-indigo-100 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 shadow-sm focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100"
+            className="mt-2 w-full resize-none rounded-xl border border-accent/30 bg-surface px-3 py-2 text-sm text-content placeholder-slate-400 shadow-sm focus:border-accent/60 focus:ring-4 focus:ring-accent/30"
           />
           {commentError ? (
             <p className="mt-2 text-xs font-medium text-rose-600">
@@ -560,27 +587,30 @@ const MobileActionHabitCard = ({
       ) : null}
 
       {currentStatus === "done" && habit.selectedDateLog?.comment ? (
-        <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+        <p className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-xs leading-5 text-content-2">
           {habit.selectedDateLog.comment}
         </p>
       ) : null}
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <div className="rounded-xl bg-slate-50 px-3 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <div className="rounded-xl bg-surface-2 px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">
             Streak
           </p>
-          <p className="mt-1 text-sm font-semibold text-slate-900">
-            {stats
-              ? `${stats.currentStreak} day${stats.currentStreak === 1 ? "" : "s"}`
-              : "No streak yet"}
-          </p>
+          <div className="mt-1 flex items-center gap-1.5">
+            <StreakFlame count={stats?.currentStreak ?? 0} size={20} />
+            <p className="text-sm font-semibold text-content">
+              {stats && stats.currentStreak > 0
+                ? `${stats.currentStreak} day${stats.currentStreak === 1 ? "" : "s"}`
+                : "None yet"}
+            </p>
+          </div>
         </div>
-        <div className="rounded-xl bg-slate-50 px-3 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <div className="rounded-xl bg-surface-2 px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">
             Last completed
           </p>
-          <p className="mt-1 text-sm font-semibold text-slate-900">
+          <p className="mt-1 text-sm font-semibold text-content">
             {stats?.lastCompletedDate
               ? formatShortDateLabel(stats.lastCompletedDate)
               : "No completed day"}
@@ -593,11 +623,13 @@ const MobileActionHabitCard = ({
 
 const MobileMeasurableHabitCard = ({
   habit,
+  index,
   isSaving,
   selectedDate,
   onSave
 }: {
   habit: HabitListItem;
+  index: number;
   isSaving: boolean;
   selectedDate: string;
   onSave: (
@@ -632,7 +664,7 @@ const MobileMeasurableHabitCard = ({
   };
 
   return (
-    <MobileCardShell habit={habit}>
+    <MobileCardShell habit={habit} index={index}>
       <form onSubmit={handleSubmit} className="mt-4 space-y-3">
         <NumberInput
           value={value}
@@ -647,7 +679,7 @@ const MobileMeasurableHabitCard = ({
         </Button>
       </form>
 
-      <p className="mt-3 text-xs font-medium text-slate-500">
+      <p className="mt-3 text-xs font-medium text-content-muted">
         {getMeasurableEntryLabel(
           habit.selectedDateLog?.value,
           habit.unit,
@@ -660,21 +692,21 @@ const MobileMeasurableHabitCard = ({
       ) : null}
 
       <div className="mt-4 grid gap-2">
-        <div className="rounded-xl bg-slate-50 px-3 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <div className="rounded-xl bg-surface-2 px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">
             Latest
           </p>
-          <p className="mt-1 text-sm font-semibold text-slate-900">
+          <p className="mt-1 text-sm font-semibold text-content">
             {stats?.latestValue !== null && stats?.latestValue !== undefined
               ? formatValueWithUnit(stats.latestValue, habit.unit)
               : "No values yet"}
           </p>
         </div>
-        <div className="rounded-xl bg-slate-50 px-3 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <div className="rounded-xl bg-surface-2 px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-content-muted">
             Trend
           </p>
-          <p className="mt-1 text-sm font-semibold text-slate-900">
+          <p className="mt-1 text-sm font-semibold text-content">
             {stats?.differenceLabel ?? "Add another value to see a trend"}
           </p>
         </div>
@@ -692,11 +724,12 @@ export const DailyLogTable = ({
 }: DailyLogTableProps) => (
   <div className="space-y-4">
     <div className="grid gap-3 md:hidden">
-      {habits.map((habit) =>
+      {habits.map((habit, index) =>
         habit.type === "action" ? (
           <MobileActionHabitCard
             key={habit.id}
             habit={habit}
+            index={index}
             selectedDate={selectedDate}
             isSaving={savingHabitId === habit.id}
             onSave={onSaveAction}
@@ -705,6 +738,7 @@ export const DailyLogTable = ({
           <MobileMeasurableHabitCard
             key={habit.id}
             habit={habit}
+            index={index}
             selectedDate={selectedDate}
             isSaving={savingHabitId === habit.id}
             onSave={onSaveValue}
@@ -713,11 +747,11 @@ export const DailyLogTable = ({
       )}
     </div>
 
-    <div className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm md:block">
+    <div className="animate-fade-in-up hidden overflow-hidden rounded-3xl border border-border-app bg-surface shadow-sm md:block">
       <div className="overflow-x-auto">
         <table className="min-w-[920px] w-full text-left">
-          <thead className="bg-slate-100/70">
-            <tr className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <thead className="bg-surface-3/70">
+            <tr className="text-xs font-semibold uppercase tracking-[0.16em] text-content-muted">
               <th className="px-4 py-3">Habit</th>
               <th className="px-4 py-3">
                 Entry for {formatShortDateLabel(selectedDate)}
@@ -727,7 +761,7 @@ export const DailyLogTable = ({
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border-app">
             {habits.map((habit) =>
               habit.type === "action" ? (
                 <ActionHabitRow

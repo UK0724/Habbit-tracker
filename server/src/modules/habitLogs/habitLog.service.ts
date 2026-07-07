@@ -28,7 +28,10 @@ const getHabitByIdOrThrow = async (habitId: string, userId: string) => {
 };
 
 const normalizePayloadForHabit = (
-  habit: { type: "action" | "measurable"; requireCompletionComment: boolean },
+  habit: {
+    type: "action" | "measurable" | "expense";
+    requireCompletionComment: boolean;
+  },
   payload: HabitLogPayload,
   currentLog?: HabitLogDocument
 ) => {

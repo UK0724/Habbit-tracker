@@ -47,3 +47,22 @@ export type HabitThemeName = keyof typeof habitThemes;
 
 export const getHabitTheme = (color: string) =>
   habitThemes[color as HabitThemeName] ?? habitThemes.indigo;
+
+/**
+ * Raw hex values for SVG-based visualizations (rings, sparklines, heatmaps)
+ * where Tailwind utility classes cannot be applied to `fill`/`stroke`.
+ * `base` mirrors the *-500 accent, `soft` the *-100 wash, `ink` a darker
+ * *-700 for legible text on soft backgrounds.
+ */
+export const habitHexThemes = {
+  violet: { base: "#8b5cf6", soft: "#ede9fe", ink: "#6d28d9" },
+  indigo: { base: "#6366f1", soft: "#e0e7ff", ink: "#4338ca" },
+  blue: { base: "#3b82f6", soft: "#dbeafe", ink: "#1d4ed8" },
+  emerald: { base: "#10b981", soft: "#d1fae5", ink: "#047857" },
+  rose: { base: "#f43f5e", soft: "#ffe4e6", ink: "#be123c" },
+  amber: { base: "#f59e0b", soft: "#fef3c7", ink: "#b45309" },
+  slate: { base: "#64748b", soft: "#f1f5f9", ink: "#334155" }
+} as const;
+
+export const getHabitHex = (color: string) =>
+  habitHexThemes[color as HabitThemeName] ?? habitHexThemes.indigo;

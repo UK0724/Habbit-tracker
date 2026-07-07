@@ -1,4 +1,4 @@
-export type HabitType = "action" | "measurable";
+export type HabitType = "action" | "measurable" | "expense";
 export type ActionStatus = "done" | "not_done";
 export type Trend = "up" | "down" | "same" | "none";
 
@@ -46,9 +46,17 @@ export type MeasurableHabitStats = {
 
 export type HabitStats = ActionHabitStats | MeasurableHabitStats;
 
+export type RecentDay = {
+  date: string;
+  status: ActionStatus | null;
+  value: number | null;
+  hasLog: boolean;
+};
+
 export type HabitListItem = Habit & {
   selectedDateLog: HabitLog | null;
   stats: HabitStats;
+  recentDays: RecentDay[];
 };
 
 export type TodayLogEntry = HabitLog & {

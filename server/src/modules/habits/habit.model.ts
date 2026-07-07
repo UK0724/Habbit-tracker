@@ -1,6 +1,6 @@
 import { HydratedDocument, Schema, Types, model } from "mongoose";
 
-export const HABIT_TYPES = ["action", "measurable"] as const;
+export const HABIT_TYPES = ["action", "measurable", "expense"] as const;
 
 export type HabitType = (typeof HABIT_TYPES)[number];
 

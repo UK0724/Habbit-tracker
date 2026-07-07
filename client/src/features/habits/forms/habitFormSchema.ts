@@ -23,7 +23,7 @@ export const habitFormSchema = z
       .trim()
       .max(280, "Description must be 280 characters or less")
       .optional(),
-    type: z.enum(["action", "measurable"]),
+    type: z.enum(["action", "measurable", "expense"]),
     unit: z
       .string()
       .trim()
@@ -41,7 +41,7 @@ export const habitFormSchema = z
       });
     }
 
-    if (value.type === "measurable" && value.requireCompletionComment) {
+    if (value.type !== "action" && value.requireCompletionComment) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["requireCompletionComment"],

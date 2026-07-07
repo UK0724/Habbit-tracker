@@ -61,9 +61,17 @@ export type HabitLogResponse = {
   updatedAt: string;
 };
 
+export type RecentDay = {
+  date: string;
+  status: "done" | "not_done" | null;
+  value: number | null;
+  hasLog: boolean;
+};
+
 export type HabitListItemResponse = HabitResponse & {
   selectedDateLog: HabitLogResponse | null;
   stats: HabitStats;
+  recentDays: RecentDay[];
 };
 
 const currencyLikeUnits = new Set(["₹", "$", "€", "£", "¥"]);
@@ -215,6 +223,37 @@ export const buildHabitStats = (
   };
 };
 
+/**
+ * A trailing window of days ending at `endDate`, filled with each day's log
+ * (if any). Powers the "don't break the chain" strip on the daily board.
+ */
+export const buildRecentDays = (
+  logs: HabitLogDocument[],
+  endDate: string,
+  days = 7
+): RecentDay[] => {
+  const logByDate = new Map<string, HabitLogDocument>();
+  for (const log of logs) {
+    if (!logByDate.has(log.date)) {
+      logByDate.set(log.date, log);
+    }
+  }
+
+  const window: RecentDay[] = [];
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const date = addDaysToDateString(endDate, -offset);
+    const log = logByDate.get(date);
+    window.push({
+      date,
+      status: log?.status ?? null,
+      value: log?.value ?? null,
+      hasLog: Boolean(log)
+    });
+  }
+
+  return window;
+};
+
 const getHabitByIdOrThrow = async (id: string, userId: string) => {
   const habit = await HabitModel.findOne({ _id: id, userId });
 
@@ -226,8 +265,7 @@ const getHabitByIdOrThrow = async (id: string, userId: string) => {
 };
 
 export const listHabits = async (userId: string, selectedDate = getTodayDateString()) => {
-  const habits = await HabitModel.find({ userId }).sort({ createdAt: 1 });
-
+  const habits = await HabitModel.find().sort({ createdAt: 1 });
   if (habits.length === 0) {
     return [];
   }
@@ -261,14 +299,18 @@ export const listHabits = async (userId: string, selectedDate = getTodayDateStri
       selectedDateLog: selectedLogByHabit.has(habit._id.toString())
         ? serializeHabitLog(selectedLogByHabit.get(habit._id.toString())!)
         : null,
-      stats: buildHabitStats(habit, habitLogs)
+      stats: buildHabitStats(habit, habitLogs),
+      recentDays: buildRecentDays(habitLogs, selectedDate, 7)
     } satisfies HabitListItemResponse;
   });
 };
 
 export const createHabit = async (payload: HabitPayload) => {
   const normalizedDescription = normalizeOptionalString(payload.description);
-  const normalizedUnit = normalizeOptionalString(payload.unit);
+  const normalizedUnit =
+    payload.type === "expense"
+      ? normalizeOptionalString(payload.unit) ?? "₹"
+      : normalizeOptionalString(payload.unit);
 
   ensureHabitConfiguration(payload.type, normalizedUnit);
 
@@ -305,7 +347,9 @@ export const updateHabit = async (id: string, userId: string, payload: HabitUpda
   const nextUnit =
     nextType === "action"
       ? undefined
-      : normalizeOptionalString(payload.unit) ?? habit.unit;
+      : normalizeOptionalString(payload.unit) ??
+        habit.unit ??
+        (nextType === "expense" ? "₹" : undefined);
 
   ensureHabitConfiguration(nextType, nextUnit);
 

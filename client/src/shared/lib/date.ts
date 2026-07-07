@@ -38,3 +38,24 @@ export const formatShortDateLabel = (value: string) => {
 };
 
 export const isToday = (value: string) => value === getTodayDateString();
+
+/** Current month as YYYY-MM. */
+export const getCurrentMonthString = () => getTodayDateString().slice(0, 7);
+
+/** Shift a YYYY-MM month string by a number of months. */
+export const shiftMonthString = (month: string, amount: number) => {
+  const [year = 0, monthIndex = 1] = month.split("-").map(Number);
+  const date = new Date(year, monthIndex - 1 + amount, 1);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
+};
+
+export const formatMonthLabel = (month: string) => {
+  const [year = 0, monthIndex = 1] = month.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-IN", {
+    month: "long",
+    year: "numeric"
+  }).format(new Date(year, monthIndex - 1, 1));
+};
+
+export const isCurrentMonth = (month: string) =>
+  month === getCurrentMonthString();

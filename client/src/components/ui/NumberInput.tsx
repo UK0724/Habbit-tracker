@@ -19,7 +19,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(
         {...props}
       />
       {unit ? (
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-surface-3 px-3 py-1 text-sm font-semibold text-content-2">
           {unit}
         </span>
       ) : null}

@@ -4,7 +4,6 @@ import { useForm } from "react-hook-form";
 
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
-import { Select } from "../../../components/ui/Select";
 import { Textarea } from "../../../components/ui/Textarea";
 import { cn } from "../../../shared/lib/utils";
 import {
@@ -24,6 +23,29 @@ type HabitFormProps = {
   isDeleting?: boolean;
 };
 
+const TYPE_OPTIONS = [
+  {
+    value: "action",
+    label: "Action",
+    emoji: "✅",
+    desc: "Done / not done each day"
+  },
+  {
+    value: "measurable",
+    label: "Measurable",
+    emoji: "📊",
+    desc: "Track a number — kg, km, hrs"
+  },
+  {
+    value: "expense",
+    label: "Expense",
+    emoji: "💸",
+    desc: "Track money you spend"
+  }
+] as const;
+
+const CURRENCIES = ["₹", "$", "€", "£"] as const;
+
 export const HabitForm = ({
   defaultValues,
   submitLabel,
@@ -38,6 +60,7 @@ export const HabitForm = ({
     register,
     watch,
     setValue,
+    getValues,
     handleSubmit,
     formState: { errors }
   } = useForm<HabitFormValues>({
@@ -54,20 +77,25 @@ export const HabitForm = ({
 
   const selectedType = watch("type");
   const selectedColor = watch("color");
+  const selectedUnit = watch("unit");
 
   useEffect(() => {
     if (selectedType === "action") {
-      setValue("unit", "", {
-        shouldDirty: true,
-        shouldValidate: true
-      });
+      setValue("unit", "", { shouldDirty: true, shouldValidate: true });
+    } else if (selectedType === "expense") {
+      const current = getValues("unit") ?? "";
+      if (!CURRENCIES.includes(current as (typeof CURRENCIES)[number])) {
+        setValue("unit", "₹", { shouldDirty: true, shouldValidate: true });
+      }
+      setValue("requireCompletionComment", false, { shouldValidate: true });
     } else {
-      setValue("requireCompletionComment", false, {
-        shouldDirty: true,
-        shouldValidate: true
-      });
+      setValue("requireCompletionComment", false, { shouldValidate: true });
     }
-  }, [selectedType, setValue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedType]);
+
+  const setType = (value: HabitFormValues["type"]) =>
+    setValue("type", value, { shouldDirty: true, shouldValidate: true });
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
@@ -75,69 +103,127 @@ export const HabitForm = ({
         <label className="field-label" htmlFor="title">
           Title
         </label>
-        <Input id="title" placeholder="Workout" {...register("title")} />
+        <Input
+          id="title"
+          placeholder={
+            selectedType === "expense" ? "e.g. Food, Rent, Fuel" : "e.g. Workout"
+          }
+          {...register("title")}
+        />
         {errors.title ? (
           <p className="field-hint text-rose-600">{errors.title.message}</p>
         ) : null}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div>
-          <label className="field-label" htmlFor="type">
-            Habit type
-          </label>
-          <Select id="type" disabled={typeDisabled} {...register("type")}>
-            <option value="action">Action</option>
-            <option value="measurable">Measurable</option>
-          </Select>
-          <p className="field-hint">
-            Action habits use Done / Not done. Measurable habits store numeric
-            values.
-          </p>
-          {errors.type ? (
-            <p className="field-hint text-rose-600">{errors.type.message}</p>
-          ) : null}
+      {/* Type selector */}
+      <div>
+        <p className="field-label">Habit type</p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {TYPE_OPTIONS.map((option) => {
+            const isActive = selectedType === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                disabled={typeDisabled}
+                onClick={() => setType(option.value)}
+                className={cn(
+                  "flex flex-col gap-1 rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
+                  isActive
+                    ? "border-accent bg-accent/10 ring-1 ring-accent"
+                    : "border-border-app bg-surface hover:border-content-subtle"
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  <span aria-hidden className="text-xl">
+                    {option.emoji}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-sm font-bold",
+                      isActive ? "text-accent" : "text-content"
+                    )}
+                  >
+                    {option.label}
+                  </span>
+                </span>
+                <span className="text-xs leading-5 text-content-muted">
+                  {option.desc}
+                </span>
+              </button>
+            );
+          })}
         </div>
+        {typeDisabled ? (
+          <p className="field-hint">
+            Type can&apos;t change once a habit has logs.
+          </p>
+        ) : null}
+      </div>
 
+      {/* Conditional config */}
+      {selectedType === "measurable" ? (
         <div>
           <label className="field-label" htmlFor="unit">
             Unit
           </label>
-          <Input
-            id="unit"
-            placeholder={selectedType === "measurable" ? "kg" : "Not needed"}
-            disabled={selectedType === "action"}
-            {...register("unit")}
-          />
-          <p className="field-hint">
-            Required only for measurable habits like `kg`, `₹`, or `liters`.
-          </p>
+          <Input id="unit" placeholder="kg, km, hrs, pages…" {...register("unit")} />
+          <p className="field-hint">The unit for the number you log each day.</p>
           {errors.unit ? (
             <p className="field-hint text-rose-600">{errors.unit.message}</p>
           ) : null}
         </div>
-      </div>
+      ) : null}
+
+      {selectedType === "expense" ? (
+        <div>
+          <p className="field-label">Currency</p>
+          <div className="flex gap-2">
+            {CURRENCIES.map((currency) => {
+              const isActive = selectedUnit === currency;
+              return (
+                <button
+                  key={currency}
+                  type="button"
+                  onClick={() =>
+                    setValue("unit", currency, {
+                      shouldDirty: true,
+                      shouldValidate: true
+                    })
+                  }
+                  className={cn(
+                    "h-11 w-14 rounded-xl border text-lg font-bold transition",
+                    isActive
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border-app bg-surface text-content-2 hover:border-content-subtle"
+                  )}
+                >
+                  {currency}
+                </button>
+              );
+            })}
+          </div>
+          <p className="field-hint">
+            You&apos;ll log an amount each time you spend on this.
+          </p>
+        </div>
+      ) : null}
 
       {selectedType === "action" ? (
-        <label className="flex cursor-pointer items-start gap-4 rounded-3xl border border-slate-200 bg-slate-50/80 p-4 transition hover:border-indigo-200 hover:bg-indigo-50/40">
+        <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-border-app bg-surface-2 p-4 transition hover:border-accent/40">
           <input
             type="checkbox"
-            className="mt-1 h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200"
+            className="mt-1 h-5 w-5 rounded border-border-app text-accent focus:ring-accent/30"
             {...register("requireCompletionComment")}
           />
           <span>
-            <span className="block text-sm font-semibold text-slate-900">
+            <span className="block text-sm font-semibold text-content">
               Ask for a comment when marking Done
             </span>
-            <span className="mt-1 block text-sm leading-6 text-slate-500">
-              Useful for habits like job applications, outreach, reading, or
+            <span className="mt-1 block text-sm leading-6 text-content-muted">
+              Useful for habits like job applications, outreach, or reading —
               anything where the completed item matters.
             </span>
-            {errors.requireCompletionComment ? (
-              <span className="field-hint block text-rose-600">
-                {errors.requireCompletionComment.message}
-              </span>
-            ) : null}
           </span>
         </label>
       ) : null}
@@ -158,16 +244,18 @@ export const HabitForm = ({
         ) : null}
       </div>
 
+      {/* Color picker */}
       <div>
         <p className="field-label">Color</p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="flex flex-wrap gap-3">
           {habitColorOptions.map((option) => {
             const isSelected = selectedColor === option.value;
-
             return (
               <button
                 key={option.value}
                 type="button"
+                aria-label={option.label}
+                aria-pressed={isSelected}
                 onClick={() =>
                   setValue("color", option.value, {
                     shouldDirty: true,
@@ -175,17 +263,18 @@ export const HabitForm = ({
                   })
                 }
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition",
+                  "relative flex h-11 w-11 items-center justify-center rounded-2xl ring-2 ring-offset-2 ring-offset-surface transition",
+                  option.swatch,
                   isSelected
-                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                    ? "ring-content scale-105"
+                    : "ring-transparent hover:scale-105"
                 )}
               >
-                <span
-                  className={cn("h-4 w-4 rounded-full", option.swatch)}
-                  aria-hidden
-                />
-                <span className="font-semibold">{option.label}</span>
+                {isSelected ? (
+                  <span className="text-lg font-bold text-white drop-shadow">
+                    ✓
+                  </span>
+                ) : null}
               </button>
             );
           })}
@@ -196,12 +285,12 @@ export const HabitForm = ({
       </div>
 
       {errorMessage ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-600">
           {errorMessage}
         </div>
       ) : null}
 
-      <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col-reverse gap-3 border-t border-border-app pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           {onDelete ? (
             <Button
