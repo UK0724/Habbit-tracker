@@ -71,13 +71,16 @@ export const HabitForm = ({
       type: defaultValues?.type ?? "action",
       unit: defaultValues?.unit ?? "",
       requireCompletionComment: defaultValues?.requireCompletionComment ?? false,
-      color: defaultValues?.color ?? "violet"
+      color: defaultValues?.color ?? "violet",
+      goalDirection: defaultValues?.goalDirection ?? "up",
+      target: defaultValues?.target
     }
   });
 
   const selectedType = watch("type");
   const selectedColor = watch("color");
   const selectedUnit = watch("unit");
+  const selectedGoal = watch("goalDirection");
 
   useEffect(() => {
     if (selectedType === "action") {
@@ -87,6 +90,7 @@ export const HabitForm = ({
       if (!CURRENCIES.includes(current as (typeof CURRENCIES)[number])) {
         setValue("unit", "₹", { shouldDirty: true, shouldValidate: true });
       }
+      setValue("goalDirection", "down", { shouldValidate: true });
       setValue("requireCompletionComment", false, { shouldValidate: true });
     } else {
       setValue("requireCompletionComment", false, { shouldValidate: true });
@@ -96,6 +100,15 @@ export const HabitForm = ({
 
   const setType = (value: HabitFormValues["type"]) =>
     setValue("type", value, { shouldDirty: true, shouldValidate: true });
+
+  // Convert the numeric input's string value to number | undefined so the
+  // schema stays a real optional number (no zod preprocess needed).
+  const targetField = register("target", {
+    setValueAs: (value) =>
+      value === "" || value === null || value === undefined
+        ? undefined
+        : Number(value)
+  });
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
@@ -163,15 +176,86 @@ export const HabitForm = ({
 
       {/* Conditional config */}
       {selectedType === "measurable" ? (
-        <div>
-          <label className="field-label" htmlFor="unit">
-            Unit
-          </label>
-          <Input id="unit" placeholder="kg, km, hrs, pages…" {...register("unit")} />
-          <p className="field-hint">The unit for the number you log each day.</p>
-          {errors.unit ? (
-            <p className="field-hint text-rose-600">{errors.unit.message}</p>
-          ) : null}
+        <div className="space-y-5">
+          <div>
+            <label className="field-label" htmlFor="unit">
+              Unit
+            </label>
+            <Input
+              id="unit"
+              placeholder="kg, km, hrs, pages…"
+              {...register("unit")}
+            />
+            <p className="field-hint">The unit for the number you log each day.</p>
+            {errors.unit ? (
+              <p className="field-hint text-rose-600">{errors.unit.message}</p>
+            ) : null}
+          </div>
+
+          <div>
+            <p className="field-label">Goal</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  { value: "up", label: "Higher is better", hint: "steps, water, pages" },
+                  { value: "down", label: "Lower is better", hint: "weight, screen time" }
+                ] as const
+              ).map((option) => {
+                const isActive = selectedGoal === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      setValue("goalDirection", option.value, {
+                        shouldDirty: true,
+                        shouldValidate: true
+                      })
+                    }
+                    className={cn(
+                      "rounded-2xl border p-3 text-left transition",
+                      isActive
+                        ? "border-accent bg-accent/10"
+                        : "border-border-app bg-surface hover:border-content-subtle"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "block text-sm font-bold",
+                        isActive ? "text-accent" : "text-content"
+                      )}
+                    >
+                      {option.value === "up" ? "↑ " : "↓ "}
+                      {option.label}
+                    </span>
+                    <span className="text-xs text-content-muted">
+                      e.g. {option.hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="target">
+              Target {selectedUnit ? `(${selectedUnit})` : ""} — optional
+            </label>
+            <Input
+              id="target"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              placeholder="e.g. 75"
+              {...targetField}
+            />
+            <p className="field-hint">
+              We&apos;ll show your progress toward this.
+            </p>
+            {errors.target ? (
+              <p className="field-hint text-rose-600">{errors.target.message}</p>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -204,8 +288,29 @@ export const HabitForm = ({
             })}
           </div>
           <p className="field-hint">
-            You&apos;ll log an amount each time you spend on this.
+            You&apos;ll log an amount each time you spend on this. Lower spend
+            is always better here.
           </p>
+
+          <div className="mt-4">
+            <label className="field-label" htmlFor="target">
+              Monthly budget {selectedUnit ?? "₹"} — optional
+            </label>
+            <Input
+              id="target"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              placeholder="e.g. 5000"
+              {...targetField}
+            />
+            <p className="field-hint">
+              We&apos;ll warn you as you approach it.
+            </p>
+            {errors.target ? (
+              <p className="field-hint text-rose-600">{errors.target.message}</p>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

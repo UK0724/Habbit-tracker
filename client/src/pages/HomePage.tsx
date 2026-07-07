@@ -8,11 +8,12 @@ import { Confetti } from "../components/viz/Confetti";
 import { CountUp } from "../components/viz/CountUp";
 import { ProgressRing } from "../components/viz/ProgressRing";
 import { StreakFlame } from "../components/viz/StreakFlame";
+import { ArchivedHabits } from "../features/habits/components/ArchivedHabits";
 import { DailyLogTable } from "../features/habits/components/DailyLogTable";
 import { useHabits } from "../features/habits/hooks/useHabits";
 import { useHomeDateStore } from "../features/habits/hooks/useHomeDateStore";
 import { useSaveHabitLog } from "../features/logs/hooks/useHabitLogs";
-import { formatDateLabel, isToday } from "../shared/lib/date";
+import { formatDateLabel, getTodayDateString, isToday } from "../shared/lib/date";
 import { accentHex } from "../shared/lib/theme";
 import { useThemeStore } from "../stores/themeStore";
 import type { ActionStatus, HabitListItem } from "../shared/types/habit";
@@ -224,6 +225,7 @@ export const HomePage = () => {
                 <input
                   type="date"
                   value={selectedDate}
+                  max={getTodayDateString()}
                   onChange={(event) => setSelectedDate(event.target.value)}
                   className="h-9 rounded-xl border border-border-app bg-surface px-3 text-sm font-medium text-content shadow-sm focus:border-accent/60 focus:ring-4 focus:ring-accent/30"
                 />
@@ -232,6 +234,8 @@ export const HomePage = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => shiftSelectedDate(1)}
+                  disabled={today}
+                  title={today ? "You can't log the future" : undefined}
                 >
                   Next →
                 </Button>
@@ -352,6 +356,8 @@ export const HomePage = () => {
           />
         </SectionCard>
       ) : null}
+
+      <ArchivedHabits />
     </div>
   );
 };

@@ -9,6 +9,8 @@ type SparklineProps = {
   color?: string;
   className?: string;
   showArea?: boolean;
+  /** Optional target value — drawn as a dashed reference line. */
+  target?: number;
 };
 
 /** A compact line + area chart for measurable habit trends. */
@@ -18,7 +20,8 @@ export const Sparkline = ({
   height = 96,
   color = "#6366f1",
   className,
-  showArea = true
+  showArea = true,
+  target
 }: SparklineProps) => {
   const gradientId = useId();
 
@@ -37,10 +40,14 @@ export const Sparkline = ({
   }
 
   const pad = 6;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  const hasTarget = typeof target === "number";
+  const min = Math.min(...data, ...(hasTarget ? [target as number] : []));
+  const max = Math.max(...data, ...(hasTarget ? [target as number] : []));
   const range = max - min || 1;
   const stepX = data.length > 1 ? (width - pad * 2) / (data.length - 1) : 0;
+  const targetY = hasTarget
+    ? pad + (1 - ((target as number) - min) / range) * (height - pad * 2)
+    : 0;
 
   const points = data.map((value, index) => {
     const x = data.length > 1 ? pad + index * stepX : width / 2;
@@ -74,6 +81,18 @@ export const Sparkline = ({
       </defs>
       {showArea && points.length > 1 ? (
         <path d={areaPath} fill={`url(#${gradientId})`} />
+      ) : null}
+      {hasTarget ? (
+        <line
+          x1={pad}
+          y1={targetY}
+          x2={width - pad}
+          y2={targetY}
+          stroke="#94a3b8"
+          strokeWidth={1.25}
+          strokeDasharray="4 4"
+          vectorEffect="non-scaling-stroke"
+        />
       ) : null}
       <path
         d={linePath}

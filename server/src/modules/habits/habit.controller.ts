@@ -7,7 +7,9 @@ import {
   deleteHabit,
   getHabit,
   getHabitStats,
+  listArchivedHabits,
   listHabits,
+  setHabitArchived,
   updateHabit
 } from "./habit.service.js";
 
@@ -48,6 +50,26 @@ export const deleteHabitController = catchAsync(
     const { userId } = request as AuthRequest;
     await deleteHabit(request.params.id as string, userId);
     response.status(204).send();
+  }
+);
+
+export const listArchivedHabitsController = catchAsync(
+  async (request: Request, response: Response) => {
+    const { userId } = request as AuthRequest;
+    const habits = await listArchivedHabits(userId);
+    response.json({ data: habits });
+  }
+);
+
+export const archiveHabitController = catchAsync(
+  async (request: Request, response: Response) => {
+    const { userId } = request as AuthRequest;
+    const habit = await setHabitArchived(
+      request.params.id as string,
+      userId,
+      Boolean(request.body.archived)
+    );
+    response.json({ data: habit });
   }
 );
 

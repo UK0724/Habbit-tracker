@@ -1,17 +1,16 @@
 import { useMemo } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { PageHeader } from "../components/ui/PageHeader";
 import { SectionCard } from "../components/ui/SectionCard";
-import { TrendBadge } from "../components/ui/TrendBadge";
 import { ContributionGrid } from "../components/viz/ContributionGrid";
 import { CountUp } from "../components/viz/CountUp";
 import { ProgressRing } from "../components/viz/ProgressRing";
 import { Sparkline } from "../components/viz/Sparkline";
 import { StreakFlame } from "../components/viz/StreakFlame";
-import { useHabit } from "../features/habits/hooks/useHabits";
+import { useHabit, useSetHabitArchived } from "../features/habits/hooks/useHabits";
 import { RecentEntriesList } from "../features/logs/components/RecentEntriesList";
 import { useHabitLogs } from "../features/logs/hooks/useHabitLogs";
 import {
@@ -44,8 +43,19 @@ const MetricCard = ({
 
 export const HabitDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const habitQuery = useHabit(id);
   const logsQuery = useHabitLogs(id, 180);
+  const archiveMutation = useSetHabitArchived();
+
+  const handleArchive = async () => {
+    await archiveMutation.mutateAsync({ id: id as string, archived: true });
+    navigate("/");
+  };
+
+  const handleRestore = async () => {
+    await archiveMutation.mutateAsync({ id: id as string, archived: false });
+  };
 
   const logs = useMemo(() => logsQuery.data ?? [], [logsQuery.data]);
   const habit = habitQuery.data;
@@ -77,6 +87,24 @@ export const HabitDetailPage = () => {
 
   const hex = getHabitHex(habit.color);
   const isExpense = habit.type === "expense";
+  const lowerIsBetter = isExpense || habit.goalDirection === "down";
+
+  // Is the latest movement toward the goal? (green) or away from it? (rose)
+  const trend = measurableAnalytics?.trend ?? "none";
+  const trendFavorable =
+    trend === "up" ? !lowerIsBetter : trend === "down" ? lowerIsBetter : null;
+  const trendBadgeClass =
+    trendFavorable === true
+      ? "bg-emerald-500/15 text-emerald-600"
+      : trendFavorable === false
+        ? "bg-rose-500/15 text-rose-600"
+        : "bg-surface-3 text-content-muted";
+  const trendLabel =
+    trend === "up"
+      ? "↑ higher than last"
+      : trend === "down"
+        ? "↓ lower than last"
+        : "no change yet";
 
   return (
     <div className="space-y-6">
@@ -98,6 +126,25 @@ export const HabitDetailPage = () => {
             <Button asChild>
               <Link to={`/habits/${habit.id}/edit`}>Edit habit</Link>
             </Button>
+            {habit.archived ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleRestore}
+                disabled={archiveMutation.isPending}
+              >
+                {archiveMutation.isPending ? "Restoring..." : "Restore"}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleArchive}
+                disabled={archiveMutation.isPending}
+              >
+                {archiveMutation.isPending ? "Archiving..." : "Archive"}
+              </Button>
+            )}
           </>
         }
       />
@@ -228,14 +275,14 @@ export const HabitDetailPage = () => {
                 )}
               </p>
               <div className="mt-2">
-                <TrendBadge
-                  trend={measurableAnalytics.trend}
-                  label={
-                    measurableAnalytics.trend === "none"
-                      ? "No trend yet"
-                      : measurableAnalytics.trend
+                <span
+                  className={
+                    "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold " +
+                    trendBadgeClass
                   }
-                />
+                >
+                  {trendLabel}
+                </span>
               </div>
             </MetricCard>
             <MetricCard label="Average">
@@ -248,18 +295,41 @@ export const HabitDetailPage = () => {
                   : "—"}
               </p>
             </MetricCard>
-            <MetricCard label={isExpense ? "Highest" : "Best"}>
+            <MetricCard label={lowerIsBetter ? "Best (lowest)" : "Best (highest)"}>
               <p className="text-2xl font-bold text-content">
-                {measurableAnalytics.max !== null
-                  ? formatValueWithUnit(measurableAnalytics.max, habit.unit)
-                  : "—"}
+                {(() => {
+                  const best = lowerIsBetter
+                    ? measurableAnalytics.min
+                    : measurableAnalytics.max;
+                  return best !== null
+                    ? formatValueWithUnit(best, habit.unit)
+                    : "—";
+                })()}
               </p>
             </MetricCard>
-            <MetricCard label="Entries">
-              <p className="text-2xl font-bold text-content">
-                <CountUp value={measurableAnalytics.entries} />
-              </p>
-            </MetricCard>
+            {habit.target != null ? (
+              <MetricCard label="Target">
+                <p className="text-2xl font-bold text-content">
+                  {formatValueWithUnit(habit.target, habit.unit)}
+                </p>
+                {measurableAnalytics.latest !== null ? (
+                  <p className="mt-1 text-xs font-medium text-content-muted">
+                    {(() => {
+                      const diff = measurableAnalytics.latest - habit.target;
+                      const reached = lowerIsBetter ? diff <= 0 : diff >= 0;
+                      if (reached) return "🎯 reached";
+                      return `${formatValueWithUnit(Math.abs(diff), habit.unit)} to go`;
+                    })()}
+                  </p>
+                ) : null}
+              </MetricCard>
+            ) : (
+              <MetricCard label="Entries">
+                <p className="text-2xl font-bold text-content">
+                  <CountUp value={measurableAnalytics.entries} />
+                </p>
+              </MetricCard>
+            )}
           </div>
 
           <SectionCard
@@ -274,6 +344,7 @@ export const HabitDetailPage = () => {
               data={measurableAnalytics.series.map((point) => point.value)}
               color={hex.base}
               height={140}
+              target={habit.target}
             />
             {measurableAnalytics.series.length ? (
               <div className="mt-3 flex justify-between text-xs font-semibold text-content-subtle">

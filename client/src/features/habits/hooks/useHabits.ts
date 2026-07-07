@@ -12,8 +12,10 @@ import type {
 import {
   createHabit,
   deleteHabit,
+  getArchivedHabits,
   getHabit,
   getHabits,
+  setHabitArchived,
   updateHabit
 } from "../services/habitsApi";
 
@@ -24,6 +26,9 @@ const invalidateHabitCollections = async (
   await Promise.all([
     queryClient.invalidateQueries({
       queryKey: ["habits"]
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ["archived-habits"]
     }),
     queryClient.invalidateQueries({
       queryKey: ["today-logs"]
@@ -58,6 +63,24 @@ export const useHabit = (id?: string) =>
     queryFn: () => getHabit(id as string),
     enabled: Boolean(id)
   });
+
+export const useArchivedHabits = () =>
+  useQuery({
+    queryKey: ["archived-habits"],
+    queryFn: getArchivedHabits
+  });
+
+export const useSetHabitArchived = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, archived }: { id: string; archived: boolean }) =>
+      setHabitArchived(id, archived),
+    onSuccess: async (_data, variables) => {
+      await invalidateHabitCollections(queryClient, variables.id);
+    }
+  });
+};
 
 export const useCreateHabit = () => {
   const queryClient = useQueryClient();

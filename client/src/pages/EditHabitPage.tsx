@@ -64,7 +64,9 @@ export const EditHabitPage = () => {
             type: habitQuery.data.type,
             unit: habitQuery.data.unit ?? "",
             requireCompletionComment: habitQuery.data.requireCompletionComment,
-            color: habitQuery.data.color as HabitFormValues["color"]
+            color: habitQuery.data.color as HabitFormValues["color"],
+            goalDirection: habitQuery.data.goalDirection,
+            target: habitQuery.data.target
           }}
           submitLabel="Save changes"
           isSubmitting={updateHabitMutation.isPending}

@@ -1,6 +1,7 @@
 export type HabitType = "action" | "measurable" | "expense";
 export type ActionStatus = "done" | "not_done";
 export type Trend = "up" | "down" | "same" | "none";
+export type GoalDirection = "up" | "down";
 
 export type ApiResponse<T> = {
   data: T;
@@ -14,6 +15,9 @@ export type Habit = {
   unit?: string;
   requireCompletionComment: boolean;
   color: string;
+  archived: boolean;
+  goalDirection: GoalDirection;
+  target?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -70,6 +74,8 @@ export type CreateHabitInput = {
   unit?: string;
   requireCompletionComment?: boolean;
   color: string;
+  goalDirection?: GoalDirection;
+  target?: number;
 };
 
 export type UpdateHabitInput = Partial<CreateHabitInput>;

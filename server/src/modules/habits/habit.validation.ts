@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { HABIT_TYPES } from "./habit.model.js";
+import { GOAL_DIRECTIONS, HABIT_TYPES } from "./habit.model.js";
 import {
   dateStringSchemaMessage,
   isValidDateString
@@ -24,7 +24,13 @@ const baseHabitSchema = z.object({
     .optional()
     .transform((value) => value || undefined),
   requireCompletionComment: z.boolean().optional(),
-  color: z.string().trim().min(1, "Color is required").max(40)
+  color: z.string().trim().min(1, "Color is required").max(40),
+  goalDirection: z.enum(GOAL_DIRECTIONS).optional(),
+  target: z
+    .number({ invalid_type_error: "Target must be a number" })
+    .finite()
+    .positive("Target must be greater than zero")
+    .optional()
 });
 
 export const createHabitBodySchema = baseHabitSchema.superRefine(
@@ -63,6 +69,10 @@ export const updateHabitBodySchema = baseHabitSchema
 
 export const habitParamsSchema = z.object({
   id: objectIdSchema
+});
+
+export const archiveHabitBodySchema = z.object({
+  archived: z.boolean()
 });
 
 export const listHabitsQuerySchema = z.object({

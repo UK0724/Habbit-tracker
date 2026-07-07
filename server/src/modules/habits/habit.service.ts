@@ -2,6 +2,7 @@ import { HabitLogDocument, HabitLogModel } from "../habitLogs/habitLog.model.js"
 import { AppError } from "../../utils/appError.js";
 import { addDaysToDateString, getTodayDateString } from "../../utils/date.js";
 import {
+  GoalDirection,
   HabitDocument,
   HabitModel,
   HabitType
@@ -15,6 +16,8 @@ type HabitPayload = {
   unit?: string;
   requireCompletionComment?: boolean;
   color: string;
+  goalDirection?: GoalDirection;
+  target?: number;
 };
 
 type HabitUpdatePayload = Partial<HabitPayload>;
@@ -46,6 +49,9 @@ export type HabitResponse = {
   unit?: string;
   requireCompletionComment: boolean;
   color: string;
+  archived: boolean;
+  goalDirection: GoalDirection;
+  target?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -114,6 +120,9 @@ export const serializeHabit = (habit: HabitDocument): HabitResponse => ({
   unit: habit.unit || undefined,
   requireCompletionComment: Boolean(habit.requireCompletionComment),
   color: habit.color,
+  archived: Boolean(habit.archived),
+  goalDirection: habit.goalDirection ?? "up",
+  target: typeof habit.target === "number" ? habit.target : undefined,
   createdAt: habit.createdAt.toISOString(),
   updatedAt: habit.updatedAt.toISOString()
 });
@@ -265,7 +274,9 @@ const getHabitByIdOrThrow = async (id: string, userId: string) => {
 };
 
 export const listHabits = async (userId: string, selectedDate = getTodayDateString()) => {
-  const habits = await HabitModel.find().sort({ createdAt: 1 });
+  const habits = await HabitModel.find({ archived: { $ne: true } }).sort({
+    createdAt: 1
+  });
   if (habits.length === 0) {
     return [];
   }
@@ -314,18 +325,45 @@ export const createHabit = async (payload: HabitPayload) => {
 
   ensureHabitConfiguration(payload.type, normalizedUnit);
 
+  const goalDirection: GoalDirection =
+    payload.type === "expense"
+      ? "down"
+      : payload.type === "measurable"
+        ? payload.goalDirection ?? "up"
+        : "up";
+
   const habit = await HabitModel.create({
     ...payload,
     description: normalizedDescription,
     unit: normalizedUnit,
     requireCompletionComment:
-      payload.type === "action" ? Boolean(payload.requireCompletionComment) : false
+      payload.type === "action" ? Boolean(payload.requireCompletionComment) : false,
+    goalDirection,
+    target: payload.type === "action" ? undefined : payload.target
   });
   return serializeHabit(habit);
 };
 
 export const getHabit = async (id: string, userId: string) => {
   const habit = await getHabitByIdOrThrow(id, userId);
+  return serializeHabit(habit);
+};
+
+export const listArchivedHabits = async (_userId: string) => {
+  const habits = await HabitModel.find({ archived: true }).sort({
+    updatedAt: -1
+  });
+  return habits.map(serializeHabit);
+};
+
+export const setHabitArchived = async (
+  id: string,
+  userId: string,
+  archived: boolean
+) => {
+  const habit = await getHabitByIdOrThrow(id, userId);
+  habit.archived = archived;
+  await habit.save();
   return serializeHabit(habit);
 };
 
@@ -364,6 +402,14 @@ export const updateHabit = async (id: string, userId: string, payload: HabitUpda
       ? (payload.requireCompletionComment ?? habit.requireCompletionComment)
       : false;
   habit.color = payload.color ?? habit.color;
+  habit.goalDirection =
+    nextType === "expense"
+      ? "down"
+      : nextType === "action"
+        ? "up"
+        : payload.goalDirection ?? habit.goalDirection ?? "up";
+  habit.target =
+    nextType === "action" ? undefined : payload.target ?? habit.target;
 
   await habit.save();
 

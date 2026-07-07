@@ -4,6 +4,10 @@ export const HABIT_TYPES = ["action", "measurable", "expense"] as const;
 
 export type HabitType = (typeof HABIT_TYPES)[number];
 
+export const GOAL_DIRECTIONS = ["up", "down"] as const;
+
+export type GoalDirection = (typeof GOAL_DIRECTIONS)[number];
+
 export interface Habit {
   userId: Types.ObjectId;
   title: string;
@@ -12,6 +16,11 @@ export interface Habit {
   unit?: string;
   requireCompletionComment: boolean;
   color: string;
+  archived: boolean;
+  /** For measurable/expense: is a higher or lower value "better". */
+  goalDirection: GoalDirection;
+  /** Optional target value (e.g. target weight, monthly budget). */
+  target?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +60,18 @@ const habitSchema = new Schema<Habit>(
       type: String,
       required: true,
       trim: true
+    },
+    archived: {
+      type: Boolean,
+      default: false
+    },
+    goalDirection: {
+      type: String,
+      enum: GOAL_DIRECTIONS,
+      default: "up"
+    },
+    target: {
+      type: Number
     }
   },
   {

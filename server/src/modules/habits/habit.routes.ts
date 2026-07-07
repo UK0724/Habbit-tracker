@@ -3,14 +3,17 @@ import { Router } from "express";
 import { requireAuth } from "../../middleware/requireAuth.js";
 import { validateRequest } from "../../middleware/validateRequest.js";
 import {
+  archiveHabitController,
   createHabitController,
   deleteHabitController,
   getHabitController,
   getHabitStatsController,
+  listArchivedHabitsController,
   listHabitsController,
   updateHabitController
 } from "./habit.controller.js";
 import {
+  archiveHabitBodySchema,
   createHabitBodySchema,
   habitParamsSchema,
   listHabitsQuerySchema,
@@ -35,6 +38,17 @@ habitRouter.post(
     body: createHabitBodySchema
   }),
   createHabitController
+);
+
+habitRouter.get("/archived", listArchivedHabitsController);
+
+habitRouter.patch(
+  "/:id/archive",
+  validateRequest({
+    params: habitParamsSchema,
+    body: archiveHabitBodySchema
+  }),
+  archiveHabitController
 );
 
 habitRouter.get(

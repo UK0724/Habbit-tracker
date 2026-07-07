@@ -30,7 +30,12 @@ export const habitFormSchema = z
       .max(20, "Unit must be 20 characters or less")
       .optional(),
     requireCompletionComment: z.boolean(),
-    color: z.enum(habitColorValues)
+    color: z.enum(habitColorValues),
+    goalDirection: z.enum(["up", "down"]).optional(),
+    target: z
+      .number({ invalid_type_error: "Target must be a number" })
+      .positive("Target must be greater than zero")
+      .optional()
   })
   .superRefine((value, context) => {
     if (value.type === "measurable" && !value.unit) {
