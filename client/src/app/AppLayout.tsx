@@ -1,9 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Link, Outlet, useNavigate } from "react-router-dom";
+import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
 
 import { BrandMark } from "../components/brand/BrandMark";
 import { useAuthStore } from "../stores/authStore";
+import { useHabits } from "../features/habits/hooks/useHabits";
 
 const ProfileMenu = ({
   email,
@@ -103,7 +104,12 @@ export const AppLayout = () => {
   const user = useAuthStore((s) => s.user);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+
+  const todayDateStr = new Date().toISOString().split("T")[0] || "";
+  const habitsQuery = useHabits(todayDateStr);
+  const hasJobTrackerHabit = Boolean(token && habitsQuery.data?.some(h => h.linkToJobTracker));
 
   useEffect(() => {
     if (!token) {
@@ -111,11 +117,19 @@ export const AppLayout = () => {
     }
   }, [token, navigate]);
 
+  useEffect(() => {
+    if (token && habitsQuery.isSuccess && !hasJobTrackerHabit && location.pathname.startsWith("/job-tracker")) {
+      navigate("/");
+    }
+  }, [token, habitsQuery.isSuccess, hasJobTrackerHabit, location.pathname, navigate]);
+
   const handleLogout = () => {
     clearAuth();
     queryClient.clear();
     navigate("/login");
   };
+
+  const isJobTrackerActive = location.pathname.startsWith("/job-tracker");
 
   return (
     <div className="min-h-screen text-content">
@@ -146,3 +160,4 @@ export const AppLayout = () => {
     </div>
   );
 };
+

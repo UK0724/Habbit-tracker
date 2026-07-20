@@ -17,6 +17,7 @@ export interface Habit {
   requireCompletionComment: boolean;
   color: string;
   archived: boolean;
+  linkToJobTracker?: boolean;
   /** For measurable/expense: is a higher or lower value "better". */
   goalDirection: GoalDirection;
   /** Optional target value (e.g. target weight, monthly budget). */
@@ -62,6 +63,10 @@ const habitSchema = new Schema<Habit>(
       trim: true
     },
     archived: {
+      type: Boolean,
+      default: false
+    },
+    linkToJobTracker: {
       type: Boolean,
       default: false
     },

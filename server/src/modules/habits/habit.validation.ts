@@ -24,6 +24,7 @@ const baseHabitSchema = z.object({
     .optional()
     .transform((value) => value || undefined),
   requireCompletionComment: z.boolean().optional(),
+  linkToJobTracker: z.boolean().optional(),
   color: z.string().trim().min(1, "Color is required").max(40),
   goalDirection: z.enum(GOAL_DIRECTIONS).optional(),
   target: z

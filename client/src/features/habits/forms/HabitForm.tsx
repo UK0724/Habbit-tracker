@@ -71,6 +71,7 @@ export const HabitForm = ({
       type: defaultValues?.type ?? "action",
       unit: defaultValues?.unit ?? "",
       requireCompletionComment: defaultValues?.requireCompletionComment ?? false,
+      linkToJobTracker: defaultValues?.linkToJobTracker ?? false,
       color: defaultValues?.color ?? "violet",
       goalDirection: defaultValues?.goalDirection ?? "up",
       target: defaultValues?.target
@@ -315,22 +316,40 @@ export const HabitForm = ({
       ) : null}
 
       {selectedType === "action" ? (
-        <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-border-app bg-surface-2 p-4 transition hover:border-accent/40">
-          <input
-            type="checkbox"
-            className="mt-1 h-5 w-5 rounded border-border-app text-accent focus:ring-accent/30"
-            {...register("requireCompletionComment")}
-          />
-          <span>
-            <span className="block text-sm font-semibold text-content">
-              Ask for a comment when marking Done
+        <div className="space-y-3">
+          <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-border-app bg-surface-2 p-4 transition hover:border-accent/40">
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 rounded border-border-app text-accent focus:ring-accent/30"
+              {...register("requireCompletionComment")}
+            />
+            <span>
+              <span className="block text-sm font-semibold text-content">
+                Ask for a comment when marking Done
+              </span>
+              <span className="mt-1 block text-sm leading-6 text-content-muted">
+                Useful for habits like job applications, outreach, or reading —
+                anything where the completed item matters.
+              </span>
             </span>
-            <span className="mt-1 block text-sm leading-6 text-content-muted">
-              Useful for habits like job applications, outreach, or reading —
-              anything where the completed item matters.
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-border-app bg-surface-2 p-4 transition hover:border-accent/40">
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 rounded border-border-app text-accent focus:ring-accent/30"
+              {...register("linkToJobTracker")}
+            />
+            <span>
+              <span className="block text-sm font-semibold text-content">
+                Link to Job Search Tracker
+              </span>
+              <span className="mt-1 block text-sm leading-6 text-content-muted">
+                Connect this habit to the Job Search workspace. The switcher and homepage card will only be visible when this habit exists.
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+        </div>
       ) : null}
 
       <div>

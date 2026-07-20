@@ -70,6 +70,7 @@ export const HomePage = () => {
   const ringColor = accentHex(accent);
   const [activeHabitId, setActiveHabitId] = useState<string | null>(null);
   const [celebrate, setCelebrate] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const wasComplete = useRef(false);
 
   const habits = habitsQuery.data ?? [];
@@ -250,6 +251,20 @@ export const HomePage = () => {
                   Jump to today
                 </Button>
               ) : null}
+              <Button
+                type="button"
+                variant={showArchived ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setShowArchived(!showArchived)}
+                className="flex items-center gap-1.5"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                  <rect x="1" y="3" width="22" height="5"></rect>
+                  <line x1="10" y1="12" x2="14" y2="12"></line>
+                </svg>
+                {showArchived ? "Hide Archived" : "Show Archived"}
+              </Button>
               <Button asChild size="sm">
                 <Link to="/habits/new">+ New habit</Link>
               </Button>
@@ -338,6 +353,32 @@ export const HomePage = () => {
         />
       ) : null}
 
+      {/* Job Search Tracker Link Widget */}
+      {habits.some((h) => h.linkToJobTracker) && (
+        <div className="surface-card p-6 flex flex-col sm:flex-row items-center justify-between gap-4 border border-accent/20 bg-accent/5 rounded-2xl animate-fade-in-up">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-accent/10 text-accent rounded-xl">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-display font-bold text-sm text-content">Job Search Tracker</h3>
+              <p className="text-xs text-content-muted mt-0.5 font-medium">Directly access your applications, referral lists, daily outreach planner, and study notes.</p>
+            </div>
+          </div>
+          <Button asChild size="sm" className="w-full sm:w-auto shrink-0 bg-accent text-accent-fg hover:bg-accent/90">
+            <Link to="/job-tracker" className="flex items-center gap-1 text-xs font-bold">
+              Open Job Search
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </Link>
+          </Button>
+        </div>
+      )}
+
       {!habitsQuery.isLoading && !habitsQuery.isError && habitCount > 0 ? (
         <SectionCard
           title={`Habits for ${formatDateLabel(selectedDate)}`}
@@ -357,7 +398,11 @@ export const HomePage = () => {
         </SectionCard>
       ) : null}
 
-      <ArchivedHabits />
+      {showArchived ? (
+        <div className="animate-pop-in">
+          <ArchivedHabits />
+        </div>
+      ) : null}
     </div>
   );
 };

@@ -15,6 +15,7 @@ type HabitPayload = {
   type: HabitType;
   unit?: string;
   requireCompletionComment?: boolean;
+  linkToJobTracker?: boolean;
   color: string;
   goalDirection?: GoalDirection;
   target?: number;
@@ -50,6 +51,7 @@ export type HabitResponse = {
   requireCompletionComment: boolean;
   color: string;
   archived: boolean;
+  linkToJobTracker?: boolean;
   goalDirection: GoalDirection;
   target?: number;
   createdAt: string;
@@ -121,6 +123,7 @@ export const serializeHabit = (habit: HabitDocument): HabitResponse => ({
   requireCompletionComment: Boolean(habit.requireCompletionComment),
   color: habit.color,
   archived: Boolean(habit.archived),
+  linkToJobTracker: Boolean(habit.linkToJobTracker),
   goalDirection: habit.goalDirection ?? "up",
   target: typeof habit.target === "number" ? habit.target : undefined,
   createdAt: habit.createdAt.toISOString(),
@@ -402,6 +405,10 @@ export const updateHabit = async (id: string, userId: string, payload: HabitUpda
       ? (payload.requireCompletionComment ?? habit.requireCompletionComment)
       : false;
   habit.color = payload.color ?? habit.color;
+  habit.linkToJobTracker =
+    nextType === "action"
+      ? (payload.linkToJobTracker ?? habit.linkToJobTracker)
+      : false;
   habit.goalDirection =
     nextType === "expense"
       ? "down"

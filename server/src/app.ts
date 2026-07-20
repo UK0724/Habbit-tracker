@@ -8,6 +8,7 @@ import { notFoundHandler } from "./middleware/notFound.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { habitRouter } from "./modules/habits/habit.routes.js";
 import { habitLogRouter } from "./modules/habitLogs/habitLog.routes.js";
+import { jobTrackerRouter } from "./modules/jobTracker/jobTracker.routes.js";
 
 export const app = express();
 
@@ -32,6 +33,7 @@ app.get("/api/health", (_request, response) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/habits", habitRouter);
+app.use("/api/job-tracker", jobTrackerRouter);
 app.use("/api", habitLogRouter);
 
 app.use(notFoundHandler);

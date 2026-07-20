@@ -30,6 +30,7 @@ export const habitFormSchema = z
       .max(20, "Unit must be 20 characters or less")
       .optional(),
     requireCompletionComment: z.boolean(),
+    linkToJobTracker: z.boolean().optional(),
     color: z.enum(habitColorValues),
     goalDirection: z.enum(["up", "down"]).optional(),
     target: z
