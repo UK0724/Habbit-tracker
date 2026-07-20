@@ -35,12 +35,6 @@ const TYPE_OPTIONS = [
     label: "Measurable",
     emoji: "📊",
     desc: "Track a number — kg, km, hrs"
-  },
-  {
-    value: "expense",
-    label: "Expense",
-    emoji: "💸",
-    desc: "Track money you spend"
   }
 ] as const;
 
@@ -346,6 +340,38 @@ export const HabitForm = ({
               </span>
               <span className="mt-1 block text-sm leading-6 text-content-muted">
                 Connect this habit to the Job Search workspace. The switcher and homepage card will only be visible when this habit exists.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-border-app bg-surface-2 p-4 transition hover:border-accent/40">
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 rounded border-border-app text-accent focus:ring-accent/30"
+              {...register("linkToDSAPrep")}
+            />
+            <span>
+              <span className="block text-sm font-semibold text-content">
+                Link to DSA Prep Tracker
+              </span>
+              <span className="mt-1 block text-sm leading-6 text-content-muted">
+                Connect this habit to the DSA Prep workspace. The switcher and homepage card will only be visible when this habit exists.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-border-app bg-surface-2 p-4 transition hover:border-accent/40">
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 rounded border-border-app text-accent focus:ring-accent/30"
+              {...register("linkToExpenseTracker")}
+            />
+            <span>
+              <span className="block text-sm font-semibold text-content">
+                Link to Expense Tracker
+              </span>
+              <span className="mt-1 block text-sm leading-6 text-content-muted">
+                Connect this habit to the Expenses workspace. The switcher and homepage card will only be visible when this habit exists.
               </span>
             </span>
           </label>

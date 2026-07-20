@@ -96,13 +96,41 @@ const HabitIdentity = ({
                 ? "Expense"
                 : "Measurable"}
           </span>
-          {habit.linkToJobTracker ? (
+           {habit.linkToJobTracker ? (
             <Link
               to="/job-tracker"
               className="rounded-full bg-accent/15 px-2.5 py-1 text-xs font-extrabold text-accent hover:bg-accent/25 transition ring-1 ring-accent/30 flex items-center gap-1 shrink-0"
               onClick={(e) => e.stopPropagation()}
             >
               Open Job Search
+              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </Link>
+          ) : null}
+          {habit.linkToDSAPrep ? (
+            <Link
+              to="/dsa-prep"
+              className="rounded-full bg-violet-500/15 px-2.5 py-1 text-xs font-extrabold text-violet-600 dark:text-violet-400 hover:bg-violet-500/25 transition ring-1 ring-violet-500/30 flex items-center gap-1 shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Open DSA Prep
+              <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </Link>
+          ) : null}
+          {habit.linkToExpenseTracker ? (
+            <Link
+              to="/expenses"
+              className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-extrabold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 transition ring-1 ring-emerald-500/30 flex items-center gap-1 shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Open Expenses
               <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                 <polyline points="15 3 21 3 21 9"></polyline>

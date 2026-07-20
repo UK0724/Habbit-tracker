@@ -17,6 +17,8 @@ export type Habit = {
   color: string;
   archived: boolean;
   linkToJobTracker?: boolean;
+  linkToDSAPrep?: boolean;
+  linkToExpenseTracker?: boolean;
   goalDirection: GoalDirection;
   target?: number;
   createdAt: string;
@@ -75,6 +77,8 @@ export type CreateHabitInput = {
   unit?: string;
   requireCompletionComment?: boolean;
   linkToJobTracker?: boolean;
+  linkToDSAPrep?: boolean;
+  linkToExpenseTracker?: boolean;
   color: string;
   goalDirection?: GoalDirection;
   target?: number;

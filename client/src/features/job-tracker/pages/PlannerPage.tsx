@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useJobTrackerStore } from "../stores/jobTrackerStore";
 import { DailyTask } from "../types";
 import {
@@ -11,6 +11,7 @@ import {
   Info
 } from "lucide-react";
 import { useHabits } from "../../habits/hooks/useHabits";
+import { useSaveHabitLog } from "../../logs/hooks/useHabitLogs";
 
 export const PlannerPage = () => {
   const dailyTasks = useJobTrackerStore((s) => s.dailyTasks);
@@ -21,6 +22,8 @@ export const PlannerPage = () => {
 
   const todayStr = new Date().toISOString().split("T")[0] || "";
   const { data: habits } = useHabits(todayStr);
+  const saveLogMutation = useSaveHabitLog();
+
   const linkedHabit = habits?.find((h) => h.linkToJobTracker);
   const activeStreak = linkedHabit
     ? linkedHabit.stats.type === "action"
@@ -40,6 +43,42 @@ export const PlannerPage = () => {
     ];
     return daysMap[new Date().getDay()] || "Wednesday";
   };
+
+  // Sync completion checklist state with linked habit streak
+  useEffect(() => {
+    if (!habits || !dailyTasks) return;
+    const todayName = getTodayDayName();
+    const todayTasks = dailyTasks.filter((t) => t.dayOfWeek === todayName);
+    if (todayTasks.length === 0) return;
+
+    const allDone = todayTasks.every((t) => t.completed);
+    const jobHabit = habits.find((h) => h.linkToJobTracker);
+
+    if (jobHabit) {
+      const isCurrentlyDone = jobHabit.selectedDateLog?.status === "done";
+      if (allDone && !isCurrentlyDone) {
+        saveLogMutation.mutate({
+          habitId: jobHabit.id,
+          logId: jobHabit.selectedDateLog?.id,
+          input: {
+            date: todayStr,
+            status: "done",
+            comment: `Completed all checklist tasks for ${todayName}`
+          }
+        });
+      } else if (!allDone && isCurrentlyDone && jobHabit.selectedDateLog?.comment?.includes("Completed all checklist tasks")) {
+        saveLogMutation.mutate({
+          habitId: jobHabit.id,
+          logId: jobHabit.selectedDateLog?.id,
+          input: {
+            date: todayStr,
+            status: "not_done",
+            comment: ""
+          }
+        });
+      }
+    }
+  }, [dailyTasks, habits, todayStr]);
 
   const [selectedDay, setSelectedDay] = useState<DailyTask["dayOfWeek"]>(getTodayDayName());
   const [newTaskText, setNewTaskText] = useState("");

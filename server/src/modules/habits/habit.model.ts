@@ -18,6 +18,8 @@ export interface Habit {
   color: string;
   archived: boolean;
   linkToJobTracker?: boolean;
+  linkToDSAPrep?: boolean;
+  linkToExpenseTracker?: boolean;
   /** For measurable/expense: is a higher or lower value "better". */
   goalDirection: GoalDirection;
   /** Optional target value (e.g. target weight, monthly budget). */
@@ -67,6 +69,14 @@ const habitSchema = new Schema<Habit>(
       default: false
     },
     linkToJobTracker: {
+      type: Boolean,
+      default: false
+    },
+    linkToDSAPrep: {
+      type: Boolean,
+      default: false
+    },
+    linkToExpenseTracker: {
       type: Boolean,
       default: false
     },

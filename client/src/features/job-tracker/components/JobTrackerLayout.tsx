@@ -65,7 +65,7 @@ export const JobTrackerLayout = () => {
   }, [loadAllData, user]);
 
   const menuItems: SidebarItem[] = [
-    { name: "← Back to Habits", path: "/", icon: ArrowLeft },
+    { name: "Back to Habits", path: "/", icon: ArrowLeft },
     { name: "Dashboard", path: "/job-tracker", icon: LayoutDashboard },
     { name: "Applications", path: "/job-tracker/applications", icon: Briefcase },
     { name: "Referrals", path: "/job-tracker/referrals", icon: Users },

@@ -31,6 +31,8 @@ export const habitFormSchema = z
       .optional(),
     requireCompletionComment: z.boolean(),
     linkToJobTracker: z.boolean().optional(),
+    linkToDSAPrep: z.boolean().optional(),
+    linkToExpenseTracker: z.boolean().optional(),
     color: z.enum(habitColorValues),
     goalDirection: z.enum(["up", "down"]).optional(),
     target: z

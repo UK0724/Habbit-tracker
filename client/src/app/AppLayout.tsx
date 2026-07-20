@@ -110,6 +110,8 @@ export const AppLayout = () => {
   const todayDateStr = new Date().toISOString().split("T")[0] || "";
   const habitsQuery = useHabits(todayDateStr);
   const hasJobTrackerHabit = Boolean(token && habitsQuery.data?.some(h => h.linkToJobTracker));
+  const hasDsaPrepHabit = Boolean(token && habitsQuery.data?.some(h => h.linkToDSAPrep));
+  const hasExpenseHabit = Boolean(token && habitsQuery.data?.some(h => h.linkToExpenseTracker));
 
   useEffect(() => {
     if (!token) {
@@ -118,10 +120,23 @@ export const AppLayout = () => {
   }, [token, navigate]);
 
   useEffect(() => {
-    if (token && habitsQuery.isSuccess && !hasJobTrackerHabit && location.pathname.startsWith("/job-tracker")) {
-      navigate("/");
+    if (token && habitsQuery.isSuccess) {
+      if (!hasJobTrackerHabit && location.pathname.startsWith("/job-tracker")) {
+        navigate("/");
+      }
+      if (!hasDsaPrepHabit && location.pathname.startsWith("/dsa-prep")) {
+        navigate("/");
+      }
+      if (!hasExpenseHabit && location.pathname.startsWith("/expenses")) {
+        navigate("/");
+      }
     }
-  }, [token, habitsQuery.isSuccess, hasJobTrackerHabit, location.pathname, navigate]);
+  }, [token, habitsQuery.isSuccess, hasJobTrackerHabit, hasDsaPrepHabit, hasExpenseHabit, location.pathname, navigate]);
+
+  // Scroll to top on navigation/route change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" as any });
+  }, [location.pathname]);
 
   const handleLogout = () => {
     clearAuth();

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useJobTrackerStore } from "../stores/jobTrackerStore";
 import { useAuthStore } from "../../../stores/authStore";
 import { useHabits } from "../../habits/hooks/useHabits";
+import { useSaveHabitLog } from "../../logs/hooks/useHabitLogs";
 import {
   Briefcase,
   Users,
@@ -45,12 +46,53 @@ export const DashboardPage = () => {
 
   const todayStr = new Date().toISOString().split("T")[0] || "";
   const { data: habits } = useHabits(todayStr);
+  const saveLogMutation = useSaveHabitLog();
+
   const linkedHabit = habits?.find((h) => h.linkToJobTracker);
   const activeStreak = linkedHabit
     ? linkedHabit.stats.type === "action"
       ? linkedHabit.stats.currentStreak
       : 0
     : 0;
+
+  // Sync completion checklist state with linked habit streak
+  useEffect(() => {
+    if (!habits || !dailyTasks) return;
+    const todayName = (() => {
+      const daysMap = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      return daysMap[new Date().getDay()] || "Monday";
+    })();
+    const todayTasks = dailyTasks.filter((t) => t.dayOfWeek === todayName);
+    if (todayTasks.length === 0) return;
+
+    const allDone = todayTasks.every((t) => t.completed);
+    const jobHabit = habits.find((h) => h.linkToJobTracker);
+
+    if (jobHabit) {
+      const isCurrentlyDone = jobHabit.selectedDateLog?.status === "done";
+      if (allDone && !isCurrentlyDone) {
+        saveLogMutation.mutate({
+          habitId: jobHabit.id,
+          logId: jobHabit.selectedDateLog?.id,
+          input: {
+            date: todayStr,
+            status: "done",
+            comment: `Completed all checklist tasks for ${todayName}`
+          }
+        });
+      } else if (!allDone && isCurrentlyDone && jobHabit.selectedDateLog?.comment?.includes("Completed all checklist tasks")) {
+        saveLogMutation.mutate({
+          habitId: jobHabit.id,
+          logId: jobHabit.selectedDateLog?.id,
+          input: {
+            date: todayStr,
+            status: "not_done",
+            comment: ""
+          }
+        });
+      }
+    }
+  }, [dailyTasks, habits, todayStr]);
 
   // Compute counts
   const appsSentCount = applications.filter(a => a.status !== "Wishlist").length;
@@ -157,6 +199,16 @@ export const DashboardPage = () => {
       studyHoursCurrent: Math.min(
         weeklyGoals.studyHoursTarget,
         weeklyGoals.studyHoursCurrent + 0.5
+      )
+    });
+  };
+
+  // Handle study goal decrement
+  const handleSubtractStudyHour = () => {
+    updateWeeklyGoals({
+      studyHoursCurrent: Math.max(
+        0,
+        weeklyGoals.studyHoursCurrent - 0.5
       )
     });
   };
@@ -325,12 +377,22 @@ export const DashboardPage = () => {
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-border-app/40 flex items-center justify-between">
-            <button
-              onClick={handleAddStudyHour}
-              className="text-xs font-bold text-accent hover:underline inline-flex items-center gap-1"
-            >
-              +0.5h Study Hour
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSubtractStudyHour}
+                disabled={weeklyGoals.studyHoursCurrent <= 0}
+                className="text-xs font-bold text-rose-500 hover:underline inline-flex items-center gap-1 disabled:opacity-50 disabled:no-underline"
+              >
+                -0.5h Study Hour
+              </button>
+              <span className="text-content-muted">/</span>
+              <button
+                onClick={handleAddStudyHour}
+                className="text-xs font-bold text-accent hover:underline inline-flex items-center gap-1"
+              >
+                +0.5h Study Hour
+              </button>
+            </div>
             <span className="text-[10px] text-content-muted">Target changes reset weekly</span>
           </div>
         </div>

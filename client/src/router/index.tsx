@@ -26,6 +26,15 @@ import { CalendarPage } from "../features/job-tracker/pages/CalendarPage";
 import { ResourcesPage } from "../features/job-tracker/pages/ResourcesPage";
 import { AnalyticsPage } from "../features/job-tracker/pages/AnalyticsPage";
 
+// DSA Prep imports
+import { DsaPrepLayout } from "../features/dsa-prep/components/DsaPrepLayout";
+import { DsaPrepDashboardPage } from "../features/dsa-prep/pages/DsaPrepDashboardPage";
+import { DsaProblemDetailsPage } from "../features/dsa-prep/pages/DsaProblemDetailsPage";
+
+// Expense Tracker imports
+import { ExpenseLayout } from "../features/expenses/components/ExpenseLayout";
+import { ExpenseDashboardPage } from "../features/expenses/pages/ExpenseDashboardPage";
+
 export const router = createBrowserRouter([
   {
     element: <RedirectIfAuthed />,
@@ -62,6 +71,23 @@ export const router = createBrowserRouter([
               { path: "calendar", element: <CalendarPage /> },
               { path: "resources", element: <ResourcesPage /> },
               { path: "analytics", element: <AnalyticsPage /> }
+            ]
+          },
+          // Nested DSA Prep Routes
+          {
+            path: "dsa-prep",
+            element: <DsaPrepLayout />,
+            children: [
+              { index: true, element: <DsaPrepDashboardPage /> },
+              { path: ":id", element: <DsaProblemDetailsPage /> }
+            ]
+          },
+          // Nested Expense Tracker Routes
+          {
+            path: "expenses",
+            element: <ExpenseLayout />,
+            children: [
+              { index: true, element: <ExpenseDashboardPage /> }
             ]
           },
           { path: "*", element: <NotFoundPage /> }
