@@ -32,3 +32,49 @@ const dsaPrepProfileSchema = new Schema<DsaPrepProfile>({
 });
 
 export const DsaPrepProfileModel = model<DsaPrepProfile>("DsaPrepProfile", dsaPrepProfileSchema);
+
+export interface DsaProblemDetail {
+  id: number;
+  title: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+  section: string;
+  subSection: string;
+  pattern: string;
+  description: string;
+  naiveSolution: {
+    explanation: string;
+    timeComplexity: string;
+    spaceComplexity: string;
+    code: Record<string, string>;
+  };
+  optimizedSolution: {
+    explanation: string;
+    timeComplexity: string;
+    spaceComplexity: string;
+    code: Record<string, string>;
+  };
+}
+
+const solutionSchema = new Schema({
+  explanation: { type: String, required: true },
+  timeComplexity: { type: String, required: true },
+  spaceComplexity: { type: String, required: true },
+  code: { type: Map, of: String, default: {} }
+}, { _id: false });
+
+const dsaProblemSchema = new Schema<DsaProblemDetail>({
+  id: { type: Number, required: true, unique: true },
+  title: { type: String, required: true },
+  difficulty: { type: String, required: true },
+  section: { type: String, required: true },
+  subSection: { type: String, required: true },
+  pattern: { type: String, required: true },
+  description: { type: String, required: true },
+  naiveSolution: { type: solutionSchema, required: true },
+  optimizedSolution: { type: solutionSchema, required: true }
+}, {
+  timestamps: true,
+  versionKey: false
+});
+
+export const DsaProblemModel = model<DsaProblemDetail>("DsaProblem", dsaProblemSchema);

@@ -27,6 +27,7 @@ interface JobTrackerState {
   resources: ResourceBookmark[];
   notes: UserNote[];
   streak: number;
+  saveError: string | null;
 
   // Actions
   loadAllData: () => Promise<void>;
@@ -83,26 +84,54 @@ interface JobTrackerState {
   deleteNote: (id: string) => void;
 }
 
+// Matches the server-side seed in jobTracker.service.ts so the pre-load UI
+// does not flash different numbers than the profile it is about to receive.
+const DEFAULT_WEEKLY_GOALS: WeeklyGoals = {
+  appsTarget: 10,
+  appsCurrent: 0,
+  referralsTarget: 5,
+  referralsCurrent: 0,
+  studyHoursTarget: 5,
+  studyHoursCurrent: 0,
+  linkedinTarget: 1,
+  linkedinCurrent: 0
+};
+
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+
+// ponytail: every mutation PUTs the whole profile, so it is debounced rather
+// than split into per-entity routes. Split it if the document gets large or
+// two tabs start clobbering each other.
+const queueSave = (
+  state: JobTrackerState,
+  set: (partial: Partial<JobTrackerState>) => void
+) => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    jobTrackerStorage
+      .saveProfile(state)
+      .then(() => set({ saveError: null }))
+      .catch((err: unknown) =>
+        set({
+          saveError:
+            err instanceof Error ? err.message : "Failed to save changes"
+        })
+      );
+  }, 600);
+};
+
 export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
   applications: [],
   referrals: [],
   dailyTasks: [],
-  weeklyGoals: {
-    appsTarget: 40,
-    appsCurrent: 18,
-    referralsTarget: 20,
-    referralsCurrent: 7,
-    studyHoursTarget: 5,
-    studyHoursCurrent: 2.5,
-    linkedinTarget: 1,
-    linkedinCurrent: 0
-  },
+  weeklyGoals: DEFAULT_WEEKLY_GOALS,
   prepCategories: [],
   wishlist: [],
   resumes: [],
   resources: [],
   notes: [],
-  streak: 8,
+  streak: 0,
+  saveError: null,
 
   loadAllData: async () => {
     try {
@@ -112,16 +141,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
           applications: data.applications || [],
           referrals: data.referrals || [],
           dailyTasks: data.dailyTasks || [],
-          weeklyGoals: data.weeklyGoals || {
-            appsTarget: 40,
-            appsCurrent: 18,
-            referralsTarget: 20,
-            referralsCurrent: 7,
-            studyHoursTarget: 5,
-            studyHoursCurrent: 2.5,
-            linkedinTarget: 1,
-            linkedinCurrent: 0
-          },
+          weeklyGoals: data.weeklyGoals || DEFAULT_WEEKLY_GOALS,
           prepCategories: data.prepCategories || [],
           wishlist: data.wishlist || [],
           resumes: data.resumes || [],
@@ -137,7 +157,6 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
 
   clearAllData: () => {
     // Resetting local Zustand state to defaults and saving to the server
-    const uid = useAuthStore.getState().user?.id ?? "guest";
     set({
       applications: [],
       referrals: [],
@@ -156,18 +175,9 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       resources: [],
       notes: [],
       streak: 0,
-      weeklyGoals: {
-        appsTarget: 10,
-        appsCurrent: 0,
-        referralsTarget: 5,
-        referralsCurrent: 0,
-        studyHoursTarget: 5,
-        studyHoursCurrent: 0,
-        linkedinTarget: 1,
-        linkedinCurrent: 0
-      }
+      weeklyGoals: DEFAULT_WEEKLY_GOALS
     });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   // Applications
@@ -182,7 +192,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
     }
 
     set({ applications: updated, weeklyGoals: goals });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   updateApplication: (updatedApp) => {
@@ -197,13 +207,13 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
     }
 
     set({ applications: updated, weeklyGoals: goals });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   deleteApplication: (id) => {
     const updated = get().applications.filter((app) => app.id !== id);
     set({ applications: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   duplicateApplication: (id) => {
@@ -217,7 +227,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
     };
     const updated = [duplicated, ...get().applications];
     set({ applications: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   // Referrals
@@ -230,7 +240,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
     const updatedGoals = { ...goals, referralsCurrent: goals.referralsCurrent + 1 };
 
     set({ referrals: updated, weeklyGoals: updatedGoals });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   updateReferral: (updatedRef) => {
@@ -238,13 +248,13 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       ref.id === updatedRef.id ? updatedRef : ref
     );
     set({ referrals: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   deleteReferral: (id) => {
     const updated = get().referrals.filter((ref) => ref.id !== id);
     set({ referrals: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   // Daily Tasks
@@ -258,7 +268,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
     };
     const updated = [...get().dailyTasks, newTask];
     set({ dailyTasks: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   toggleTask: (id) => {
@@ -266,13 +276,13 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       t.id === id ? { ...t, completed: !t.completed } : t
     );
     set({ dailyTasks: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   deleteTask: (id) => {
     const updated = get().dailyTasks.filter((t) => t.id !== id);
     set({ dailyTasks: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   preloadDayTasks: (day) => {
@@ -290,19 +300,19 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
 
     const updated = [...nonDayTasks, ...newTasks];
     set({ dailyTasks: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   updateStreak: (streak) => {
     set({ streak });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   // Weekly Goals
   updateWeeklyGoals: (goals) => {
     const updated = { ...get().weeklyGoals, ...goals };
     set({ weeklyGoals: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   incrementGoalProgress: (key, amount = 1) => {
@@ -312,7 +322,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       [key]: Math.max(0, (goals[key] || 0) + amount)
     };
     set({ weeklyGoals: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   // Interview Prep
@@ -327,7 +337,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       };
     });
     set({ prepCategories: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   updateTopicNotes: (categoryId, topicId, notes) => {
@@ -339,7 +349,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       };
     });
     set({ prepCategories: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   incrementRevision: (categoryId, topicId) => {
@@ -353,7 +363,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       };
     });
     set({ prepCategories: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   setTopicDifficulty: (categoryId, topicId, difficulty) => {
@@ -367,7 +377,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       };
     });
     set({ prepCategories: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   addPrepCategory: (name) => {
@@ -379,13 +389,13 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
     };
     const updated = [...get().prepCategories, newCategory];
     set({ prepCategories: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   deletePrepCategory: (id) => {
     const updated = get().prepCategories.filter((cat) => cat.id !== id);
     set({ prepCategories: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   addPrepTopic: (categoryId, topicName, difficulty) => {
@@ -405,7 +415,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       };
     });
     set({ prepCategories: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   // Wishlist
@@ -414,7 +424,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
     const newCompany: WishlistCompany = { ...companyData, id };
     const updated = [newCompany, ...get().wishlist];
     set({ wishlist: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   updateWishlistCompany: (updatedCompany) => {
@@ -422,13 +432,13 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       c.id === updatedCompany.id ? updatedCompany : c
     );
     set({ wishlist: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   deleteWishlistCompany: (id) => {
     const updated = get().wishlist.filter((c) => c.id !== id);
     set({ wishlist: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   // Resumes
@@ -437,7 +447,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
     const newResume: ResumeVersion = { ...resumeData, id };
     const updated = [newResume, ...get().resumes];
     set({ resumes: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   updateResumeVersion: (updatedResume) => {
@@ -445,13 +455,13 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       r.id === updatedResume.id ? updatedResume : r
     );
     set({ resumes: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   deleteResumeVersion: (id) => {
     const updated = get().resumes.filter((r) => r.id !== id);
     set({ resumes: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   // Resources
@@ -460,13 +470,13 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
     const newRes: ResourceBookmark = { ...resData, id };
     const updated = [newRes, ...get().resources];
     set({ resources: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   deleteResource: (id) => {
     const updated = get().resources.filter((r) => r.id !== id);
     set({ resources: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   // Notes
@@ -475,7 +485,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
     const newNote: UserNote = { ...noteData, id };
     const updated = [newNote, ...get().notes];
     set({ notes: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
     return id;
   },
 
@@ -484,12 +494,12 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
       n.id === updatedNote.id ? updatedNote : n
     );
     set({ notes: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   },
 
   deleteNote: (id) => {
     const updated = get().notes.filter((n) => n.id !== id);
     set({ notes: updated });
-    jobTrackerStorage.saveProfile(get());
+    queueSave(get(), set);
   }
 }));

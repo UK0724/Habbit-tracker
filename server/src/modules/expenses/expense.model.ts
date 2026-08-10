@@ -32,5 +32,21 @@ const budgetSchema = new Schema<IBudget>({
 
 budgetSchema.index({ userId: 1, category: 1 }, { unique: true });
 
+// The client keys rows off `id`; without this Mongoose serializes `_id` only
+// and edit/delete send `undefined` as the route param.
+const idTransform = {
+  virtuals: true,
+  versionKey: false,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transform: (_doc: unknown, ret: any) => {
+    ret.id = String(ret._id);
+    delete ret._id;
+    return ret;
+  }
+};
+
+expenseSchema.set("toJSON", idTransform);
+budgetSchema.set("toJSON", idTransform);
+
 export const ExpenseModel = model<IExpense>("Expense", expenseSchema);
 export const BudgetModel = model<IBudget>("Budget", budgetSchema);

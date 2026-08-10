@@ -54,7 +54,7 @@ export const ExpenseLayout = () => {
       <aside className="w-full lg:w-80 shrink-0 border-b lg:border-b-0 lg:border-r border-border-app bg-surface p-6 flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <Link
-            to="/habits"
+            to="/"
             className="text-xs font-bold text-content-muted hover:text-content flex items-center gap-1 transition"
           >
             <ArrowLeft className="h-4 w-4" />

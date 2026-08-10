@@ -1,7 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useDsaPrepStore } from "../stores/dsaPrepStore";
-import { dsaProblems } from "../data/dsaProblems";
 import { AlgorithmVisualizer } from "../components/AlgorithmVisualizer";
 import { useHabits } from "../../habits/hooks/useHabits";
 import { useSaveHabitLog } from "../../logs/hooks/useHabitLogs";
@@ -16,15 +15,16 @@ import {
   BookOpen,
   LineChart
 } from "lucide-react";
+import type { DsaProblem } from "../services/dsaPrepApi";
 
 export const DsaProblemDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const problemId = Number(id);
 
-  const problem = useMemo(() => {
-    return dsaProblems.find((p) => p.id === problemId);
-  }, [problemId]);
+  const [problem, setProblem] = useState<DsaProblem | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(true);
+  const fetchProblemDetail = useDsaPrepStore((s) => s.fetchProblemDetail);
 
   const solvedProblems = useDsaPrepStore((s) => s.solvedProblems);
   const solveProblemMutation = useDsaPrepStore((s) => s.solveProblem);
@@ -40,6 +40,20 @@ export const DsaProblemDetailsPage = () => {
   const habitsQuery = useHabits(todayStr);
   const saveLogMutation = useSaveHabitLog();
 
+  useEffect(() => {
+    let active = true;
+    setLoadingDetail(true);
+    fetchProblemDetail(problemId).then((res) => {
+      if (active) {
+        setProblem(res);
+        setLoadingDetail(false);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [problemId, fetchProblemDetail]);
+
   const isSolved = useMemo(() => {
     return solvedProblems.some((p) => p.problemId === problemId);
   }, [solvedProblems, problemId]);
@@ -49,6 +63,21 @@ export const DsaProblemDetailsPage = () => {
   }, [solvedProblems, problemId]);
 
   const [notes, setNotes] = useState(solvedEntry?.notes || "");
+
+  // Update notes if record loaded changes
+  useEffect(() => {
+    if (solvedEntry) {
+      setNotes(solvedEntry.notes || "");
+    }
+  }, [solvedEntry]);
+
+  if (loadingDetail) {
+    return (
+      <div className="surface-card p-12 text-center text-content-muted">
+        <p className="text-sm font-semibold animate-pulse">Loading problem details from database...</p>
+      </div>
+    );
+  }
 
   if (!problem) {
     return (

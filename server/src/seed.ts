@@ -1,6 +1,9 @@
 import { connectDatabase, disconnectDatabase } from "./config/database.js";
+import { UserModel } from "./modules/auth/user.model.js";
 import { HabitModel } from "./modules/habits/habit.model.js";
 import { HabitLogModel } from "./modules/habitLogs/habitLog.model.js";
+import { DsaProblemModel } from "./modules/dsaPrep/dsaPrep.model.js";
+import { dsaProblems } from "./modules/dsaPrep/dsaProblemsData.js";
 import { addDaysToDateString, getTodayDateString } from "./utils/date.js";
 
 const seed = async () => {
@@ -8,15 +11,32 @@ const seed = async () => {
 
   await HabitLogModel.deleteMany({});
   await HabitModel.deleteMany({});
+  await DsaProblemModel.deleteMany({});
+
+  // Ensure at least one seed user exists to associate habits with
+  let user = await UserModel.findOne();
+  if (!user) {
+    user = await UserModel.create({
+      email: "uday@example.com",
+      passwordHash: "$2a$10$T8Z.nL.G691XyK1lqY9UKeH14J1F7Dq9t/Z1U3Jk3c2c1a1r1t1s1" // mock bcrypt hash
+    });
+  }
+  const userId = user._id;
+
+  console.log("Seeding 500 DSA Problems to MongoDB...");
+  await DsaProblemModel.insertMany(dsaProblems);
+  console.log("500 DSA Problems seeded successfully.");
 
   const seededHabits = await HabitModel.create([
     {
+      userId,
       title: "Quit sugar",
       type: "action",
       color: "violet",
       description: "Stay mindful about added sugar each day."
     },
     {
+      userId,
       title: "Weight",
       type: "measurable",
       unit: "kg",
@@ -24,6 +44,7 @@ const seed = async () => {
       description: "Track morning weigh-ins for steady progress."
     },
     {
+      userId,
       title: "Expenses",
       type: "measurable",
       unit: "₹",

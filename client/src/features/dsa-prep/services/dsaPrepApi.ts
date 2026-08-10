@@ -11,8 +11,36 @@ export interface DsaPrepProfile {
   solvedProblems: SolvedProblem[];
 }
 
+export interface DsaProblem {
+  id: number;
+  title: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+  section: string;
+  subSection: string;
+  pattern: string;
+  description: string;
+  naiveSolution: {
+    explanation: string;
+    timeComplexity: string;
+    spaceComplexity: string;
+    code: Record<string, string>;
+  };
+  optimizedSolution: {
+    explanation: string;
+    timeComplexity: string;
+    spaceComplexity: string;
+    code: Record<string, string>;
+  };
+}
+
 export const getDsaProfile = () =>
   apiRequest<DsaPrepProfile>("/dsa-prep");
+
+export const getDsaProblems = () =>
+  apiRequest<DsaProblem[]>("/dsa-prep/problems");
+
+export const getDsaProblemDetail = (id: number) =>
+  apiRequest<DsaProblem>(`/dsa-prep/problems/${id}`);
 
 export const markProblemSolved = (input: { problemId: number; language: string; notes?: string }) =>
   apiRequest<DsaPrepProfile>("/dsa-prep/solve", {

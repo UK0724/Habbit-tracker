@@ -11,19 +11,33 @@ export const getDsaProfileController = catchAsync(
   }
 );
 
+export const getAllProblemsController = catchAsync(
+  async (request: Request, response: Response) => {
+    const problems = await dsaPrepService.getAllProblems();
+    response.json({ data: problems });
+  }
+);
+
+export const getProblemByIdController = catchAsync(
+  async (request: Request, response: Response) => {
+    const { id } = request.params;
+    const problem = await dsaPrepService.getProblemById(Number(id));
+    if (!problem) {
+      response.status(404).json({ error: "Problem not found" });
+      return;
+    }
+    response.json({ data: problem });
+  }
+);
+
 export const markProblemSolvedController = catchAsync(
   async (request: Request, response: Response) => {
     const { userId } = request as AuthRequest;
     const { problemId, language, notes } = request.body;
 
-    if (problemId === undefined || !language) {
-      response.status(400).json({ error: "problemId and language are required" });
-      return;
-    }
-
     const profile = await dsaPrepService.markSolved(
       userId,
-      Number(problemId),
+      problemId,
       language,
       notes
     );
@@ -36,15 +50,7 @@ export const unmarkProblemSolvedController = catchAsync(
     const { userId } = request as AuthRequest;
     const { problemId } = request.body;
 
-    if (problemId === undefined) {
-      response.status(400).json({ error: "problemId is required" });
-      return;
-    }
-
-    const profile = await dsaPrepService.unmarkSolved(
-      userId,
-      Number(problemId)
-    );
+    const profile = await dsaPrepService.unmarkSolved(userId, problemId);
     response.json({ data: profile });
   }
 );

@@ -1,7 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useDsaPrepStore } from "../stores/dsaPrepStore";
-import { dsaProblems } from "../data/dsaProblems";
 import { Input } from "../../../components/ui/Input";
 import { Button } from "../../../components/ui/Button";
 import { Search, Filter, CheckCircle2, Circle } from "lucide-react";
@@ -10,9 +9,15 @@ import { useSaveHabitLog } from "../../logs/hooks/useHabitLogs";
 
 export const DsaPrepDashboardPage = () => {
   const solvedProblems = useDsaPrepStore((s) => s.solvedProblems);
+  const problems = useDsaPrepStore((s) => s.problems);
+  const fetchProblems = useDsaPrepStore((s) => s.fetchProblems);
   const isLoading = useDsaPrepStore((s) => s.isLoading);
   const solveProblem = useDsaPrepStore((s) => s.solveProblem);
   const unsolveProblem = useDsaPrepStore((s) => s.unsolveProblem);
+
+  useEffect(() => {
+    fetchProblems();
+  }, [fetchProblems]);
 
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0] || "", []);
   const habitsQuery = useHabits(todayStr);
@@ -56,12 +61,12 @@ export const DsaPrepDashboardPage = () => {
 
   // Extract unique sections
   const sections = useMemo(() => {
-    const set = new Set(dsaProblems.map((p) => p.section));
+    const set = new Set(problems.map((p) => p.section));
     return Array.from(set);
-  }, []);
+  }, [problems]);
 
   const filteredProblems = useMemo(() => {
-    return dsaProblems.filter((p) => {
+    return problems.filter((p) => {
       const matchSearch = p.title.toLowerCase().includes(search.toLowerCase()) || 
                           p.pattern.toLowerCase().includes(search.toLowerCase());
       const matchDiff = difficulty === "all" || p.difficulty.toLowerCase() === difficulty.toLowerCase();
@@ -74,7 +79,7 @@ export const DsaPrepDashboardPage = () => {
 
       return matchSearch && matchDiff && matchSec && matchStatus;
     });
-  }, [search, difficulty, section, status, solvedSet]);
+  }, [problems, search, difficulty, section, status, solvedSet]);
 
   const diffColors: Record<string, string> = {
     easy: "text-emerald-600 bg-emerald-500/10 ring-emerald-500/20",

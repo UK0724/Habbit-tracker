@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Plus, Search, Trash2, Edit, Calendar, CreditCard, Wallet, TrendingDown } from "lucide-react";
 import { useExpenseStore, Expense } from "../stores/expenseStore";
 import { CATEGORIES } from "../components/ExpenseLayout";
@@ -354,16 +355,26 @@ export const ExpenseDashboardPage = () => {
         </div>
       </section>
 
-      {/* Add / Edit Transaction Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="surface-card w-full max-w-md p-6 space-y-4 animate-pop-in">
+      {/* Add / Edit Transaction Modal.
+          Rendered through a portal: inside the page tree it is a sibling under
+          `space-y-8`, which would push it down by a 2rem margin, and any future
+          transform on an ancestor would re-anchor `fixed` away from the
+          viewport. document.body has neither problem. */}
+      {showModal && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="surface-card my-auto max-h-[90vh] w-full max-w-md overflow-y-auto p-5 sm:p-6 space-y-4 animate-pop-in"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-lg font-bold text-content">
               {editExpense ? "Edit Transaction Record" : "Log New Expense"}
             </h3>
-            
+
             <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-content-2 mb-1">Amount (₹)</label>
                   <input
@@ -389,7 +400,7 @@ export const ExpenseDashboardPage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-content-2 mb-1">Category</label>
                   <select
@@ -445,7 +456,8 @@ export const ExpenseDashboardPage = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

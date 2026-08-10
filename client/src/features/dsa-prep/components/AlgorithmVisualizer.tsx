@@ -150,33 +150,69 @@ export const AlgorithmVisualizer = ({ problemId }: { problemId: number }) => {
 // --- Custom Render Functions for Archetypes ---
 
 function renderTwoSum(state: any) {
-  const { numbers, left, right, sum, target } = state;
+  const { numbers, index, map, target, complement, found } = state;
   return (
-    <div className="flex flex-col items-center gap-6 w-full max-w-sm">
-      {/* Numbers block list */}
+    <div className="flex flex-col items-center gap-5 w-full max-w-md">
+      {/* Array Elements */}
       <div className="flex gap-2">
         {numbers.map((num: number, idx: number) => {
-          const isL = idx === left;
-          const isR = idx === right;
+          const isActive = idx === index && !found;
+          const isResult = found && (num === 7 || num === 2);
           return (
             <div key={idx} className="relative flex flex-col items-center w-14">
               <div className={`h-11 w-11 rounded-xl font-mono text-sm font-bold flex items-center justify-center border transition ${
-                isL || isR
-                  ? "border-violet-500 bg-violet-500/10 text-violet-600 dark:text-violet-400 scale-105"
-                  : "border-border-app bg-surface-2 text-content-2"
+                isResult
+                  ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 scale-105"
+                  : isActive
+                    ? "border-violet-500 bg-violet-500/10 text-violet-600 dark:text-violet-400 scale-105"
+                    : "border-border-app bg-surface-2 text-content-2"
               }`}>
                 {num}
               </div>
-              <div className="absolute top-12 text-[10px] font-bold text-violet-600 dark:text-violet-400">
-                {isL && isR ? "L, R" : isL ? "L (left)" : isR ? "R (right)" : ""}
+              <div className="absolute top-12 text-[9px] font-bold text-content-muted leading-normal">
+                Idx {idx}
               </div>
             </div>
           );
         })}
       </div>
 
-      <div className="text-center font-semibold text-xs text-content-2">
-        Sum: {numbers[left]} + {numbers[right]} = <span className={sum === target ? "text-emerald-600 font-bold" : "text-content font-bold"}>{sum}</span> (Target: {target})
+      {/* Hash Map and checking logic */}
+      <div className="w-full grid grid-cols-2 gap-4 mt-2">
+        <div className="bg-surface-2 border border-border-app/40 rounded-xl p-3 flex flex-col justify-between">
+          <p className="text-[10px] font-extrabold uppercase tracking-wider text-content-muted mb-2">Hash Map (Seen Values)</p>
+          <div className="space-y-1 text-xs font-mono text-content-2">
+            {Object.keys(map).length > 0 ? (
+              Object.entries(map).map(([key, val]) => (
+                <div key={key} className="flex justify-between border-b border-border-app/20 pb-0.5">
+                  <span>{key}</span>
+                  <span className="text-violet-500">idx {val as any}</span>
+                </div>
+              ))
+            ) : (
+              <span className="text-[11px] text-content-subtle italic">Empty Map</span>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-surface-2 border border-border-app/40 rounded-xl p-3 flex flex-col justify-center gap-1.5 text-xs font-semibold text-content-2">
+          {complement !== null ? (
+            <>
+              <div>Target: <span className="font-bold">{target}</span></div>
+              <div>Current: <span className="text-violet-600 font-bold">{numbers[index] ?? 7}</span></div>
+              <div>Complement: <span className="text-amber-500 font-bold">{complement}</span></div>
+              <div className="mt-1 text-[11px]">
+                {found ? (
+                  <span className="text-emerald-600 font-extrabold">✓ Found in Map!</span>
+                ) : (
+                  <span className="text-content-muted">✗ Not in Map</span>
+                )}
+              </div>
+            </>
+          ) : (
+            <span className="text-content-subtle italic">Press next to scan...</span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -317,25 +353,25 @@ function renderBinarySearch(state: any) {
 
 function useMemoSteps(problemId: number): Step[] {
   if (problemId === 1) {
-    // Two Sum (sorted array)
-    const numbers = [2, 7, 11, 15];
+    // Two Sum (unsorted array using HashMap)
+    const numbers = [2, 11, 7, 15];
     const target = 9;
     return [
       {
-        explanation: "Initialize low pointer (L) at index 0 (val: 2) and high pointer (R) at index 3 (val: 15).",
-        state: { numbers, left: 0, right: 3, sum: 17, target }
+        explanation: "Initialize an empty Hash Map to store numbers and their indices. Start scanning from index 0.",
+        state: { numbers, index: 0, map: {}, target, complement: null, found: false }
       },
       {
-        explanation: "Sum of pointers (2 + 15 = 17) is greater than target (9). Since the array is sorted, we must decrease the sum by shifting the right pointer left.",
-        state: { numbers, left: 0, right: 2, sum: 13, target }
+        explanation: "Scan index 0 (val: 2). Complement is 9 - 2 = 7. 7 is not in the map. Store 2 at index 0.",
+        state: { numbers, index: 1, map: { 2: 0 }, target, complement: 7, found: false }
       },
       {
-        explanation: "Sum of pointers (2 + 11 = 13) is still greater than target (9). Shift the right pointer left again.",
-        state: { numbers, left: 0, right: 1, sum: 9, target }
+        explanation: "Scan index 1 (val: 11). Complement is 9 - 11 = -2. -2 is not in the map. Store 11 at index 1.",
+        state: { numbers, index: 2, map: { 2: 0, 11: 1 }, target, complement: -2, found: false }
       },
       {
-        explanation: "Sum of pointers (2 + 7 = 9) is equal to target (9). Target found! Return 1-based indices [1, 2].",
-        state: { numbers, left: 0, right: 1, sum: 9, target }
+        explanation: "Scan index 2 (val: 7). Complement is 9 - 7 = 2. 2 is found in the map at index 0! Return index pair [0, 2].",
+        state: { numbers, index: 2, map: { 2: 0, 11: 1 }, target, complement: 2, found: true }
       }
     ];
   }

@@ -1,4 +1,5 @@
 import { JobSearchProfileModel } from "./jobTracker.model.js";
+import type { UpdateProfileBody } from "./jobTracker.validation.js";
 
 // Clean initial data seeder for starting fresh
 const getSeeds = (userId: string) => ({
@@ -104,12 +105,13 @@ export const jobTrackerService = {
     return profile;
   },
 
-  updateProfileByUserId: async (userId: string, updateData: any) => {
-    const { userId: _, createdAt: __, updatedAt: ___, ...allowedUpdates } = updateData;
-    
+  updateProfileByUserId: async (
+    userId: string,
+    updateData: UpdateProfileBody
+  ) => {
     const profile = await JobSearchProfileModel.findOneAndUpdate(
       { userId },
-      { $set: allowedUpdates },
+      { $set: updateData },
       { new: true, runValidators: true }
     );
     

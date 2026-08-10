@@ -1,6 +1,14 @@
-import { DsaPrepProfileModel } from "./dsaPrep.model.js";
+import { DsaPrepProfileModel, DsaProblemModel } from "./dsaPrep.model.js";
 
 export const dsaPrepService = {
+  getAllProblems: async () => {
+    return DsaProblemModel.find().sort({ id: 1 });
+  },
+
+  getProblemById: async (id: number) => {
+    return DsaProblemModel.findOne({ id });
+  },
+
   getProfileByUserId: async (userId: string) => {
     let profile = await DsaPrepProfileModel.findOne({ userId });
     if (!profile) {

@@ -41,6 +41,7 @@ export const JobTrackerLayout = () => {
   const clearAllData = useJobTrackerStore((s) => s.clearAllData);
   const referrals = useJobTrackerStore((s) => s.referrals);
   const applications = useJobTrackerStore((s) => s.applications);
+  const saveError = useJobTrackerStore((s) => s.saveError);
 
   const todayStr = new Date().toISOString().split("T")[0] || "";
   const { data: habits } = useHabits(todayStr);
@@ -295,6 +296,12 @@ export const JobTrackerLayout = () => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {saveError && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-600 shadow-lg">
+          Changes could not be saved: {saveError}
         </div>
       )}
 

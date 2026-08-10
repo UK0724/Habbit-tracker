@@ -1,19 +1,31 @@
 import { create } from "zustand";
-import { getDsaProfile, markProblemSolved, unmarkProblemSolved, SolvedProblem } from "../services/dsaPrepApi";
+import {
+  getDsaProfile,
+  markProblemSolved,
+  unmarkProblemSolved,
+  getDsaProblems,
+  getDsaProblemDetail,
+  SolvedProblem,
+  DsaProblem
+} from "../services/dsaPrepApi";
 
 interface DsaPrepState {
   solvedProblems: SolvedProblem[];
+  problems: DsaProblem[];
   isLoading: boolean;
   error: string | null;
 
   fetchProfile: () => Promise<void>;
+  fetchProblems: () => Promise<void>;
+  fetchProblemDetail: (id: number) => Promise<DsaProblem | null>;
   solveProblem: (problemId: number, language: string, notes?: string) => Promise<void>;
   unsolveProblem: (problemId: number) => Promise<void>;
   clearData: () => void;
 }
 
-export const useDsaPrepStore = create<DsaPrepState>((set) => ({
+export const useDsaPrepStore = create<DsaPrepState>((set, get) => ({
   solvedProblems: [],
+  problems: [],
   isLoading: false,
   error: null,
 
@@ -24,6 +36,31 @@ export const useDsaPrepStore = create<DsaPrepState>((set) => ({
       set({ solvedProblems: data?.solvedProblems || [], isLoading: false });
     } catch (err: any) {
       set({ error: err?.message || "Failed to load DSA Profile", isLoading: false });
+    }
+  },
+
+  fetchProblems: async () => {
+    // Return early if already loaded
+    if (get().problems.length > 0) return;
+    set({ isLoading: true, error: null });
+    try {
+      const data = await getDsaProblems();
+      set({ problems: data || [], isLoading: false });
+    } catch (err: any) {
+      set({ error: err?.message || "Failed to load DSA problems catalog", isLoading: false });
+    }
+  },
+
+  fetchProblemDetail: async (id) => {
+    // Check cache first
+    const cached = get().problems.find(p => p.id === id);
+    if (cached) return cached;
+    try {
+      const data = await getDsaProblemDetail(id);
+      return data || null;
+    } catch (err) {
+      console.error(`Failed to fetch problem detail for Q${id}:`, err);
+      return null;
     }
   },
 
@@ -50,6 +87,6 @@ export const useDsaPrepStore = create<DsaPrepState>((set) => ({
   },
 
   clearData: () => {
-    set({ solvedProblems: [], error: null, isLoading: false });
+    set({ solvedProblems: [], problems: [], error: null, isLoading: false });
   }
 }));

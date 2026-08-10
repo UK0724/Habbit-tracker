@@ -1,11 +1,19 @@
 # Habit Tracker
 
-A focused full-stack habit tracker MVP for exactly two habit types:
+A full-stack personal productivity app built around habit tracking, with three additional feature modules.
+
+**Habits** — two types:
 
 - `action` habits: log `done` or `not_done`
 - `measurable` habits: log a numeric value with a unit like `kg`, `₹`, or `liters`
 
-The project is intentionally scoped for a clean foundation that can grow later into auth, reminders, reports, dashboards, and analytics.
+**Job Tracker** — applications, referrals, planner, interview prep, wishlist, notes, resumes, calendar, resources, analytics
+
+**DSA Prep** — 500 seeded problems with per-user solved tracking and an algorithm visualizer
+
+**Expenses** — expense log plus per-category budgets
+
+Auth is JWT-based; every feature route is scoped to the logged-in user.
 
 ## Stack
 
@@ -21,20 +29,25 @@ habit-tracker/
 │   ├── src/
 │   │   ├── app/             # app shell and global styles
 │   │   ├── components/ui/   # reusable UI building blocks
-│   │   ├── features/        # feature-based hooks, services, forms, cards
-│   │   ├── pages/           # routed pages
+│   │   ├── features/        # habits, logs, stats, job-tracker, dsa-prep, expenses
+│   │   ├── pages/           # routed pages (home, auth, habit CRUD, settings)
 │   │   ├── providers/       # React Query provider
 │   │   ├── router/          # app router
 │   │   ├── services/        # shared API client
+│   │   ├── stores/          # Zustand stores
 │   │   └── shared/          # shared types and helpers
 │   └── .env.example
 ├── server/                  # Express API
 │   ├── src/
 │   │   ├── config/          # env and database setup
-│   │   ├── middleware/      # validation, error handling, 404 handling
+│   │   ├── middleware/      # auth, validation, error handling, 404 handling
 │   │   ├── modules/
+│   │   │   ├── auth/        # register, login, me
 │   │   │   ├── habits/      # habit model, validation, service, controller, routes
-│   │   │   └── habitLogs/   # habit log model, validation, service, controller, routes
+│   │   │   ├── habitLogs/   # habit log model, validation, service, controller, routes
+│   │   │   ├── jobTracker/  # single job-tracker profile document per user
+│   │   │   ├── dsaPrep/     # problem catalog + solved tracking
+│   │   │   └── expenses/    # expenses and budgets
 │   │   ├── utils/           # app utilities
 │   │   ├── app.ts           # express app
 │   │   ├── server.ts        # runtime entry
@@ -124,13 +137,11 @@ http://localhost:4000
 
 ## Seed sample data
 
-The seed script creates:
+The seed script wipes habits, habit logs, and DSA problems, then creates:
 
-- Quit sugar
-- Weight
-- Expenses
-
-It also inserts recent sample logs so the UI has meaningful stats and states immediately.
+- A demo user (if none exists)
+- Sample habits (Quit sugar, Weight, Expenses) with recent logs so stats render immediately
+- The 500-problem DSA catalog
 
 Run:
 
@@ -138,7 +149,7 @@ Run:
 npm run seed
 ```
 
-This is optional. For production deployment, you can skip the seed step entirely.
+The DSA Prep module needs the problem catalog, so run this at least once even in production. The sample habits and logs are only there for demo purposes.
 
 ## Deploy
 
@@ -167,6 +178,7 @@ Set these environment variables in Render:
 ```text
 MONGODB_URI=your-mongodb-connection-string
 CLIENT_ORIGIN=https://your-netlify-site.netlify.app
+JWT_SECRET=a-long-random-secret
 ```
 
 If you later add a custom frontend domain or want preview URLs too, `CLIENT_ORIGIN` can be a comma-separated list:
@@ -199,12 +211,22 @@ npm run format
 
 ## API summary
 
+Everything except `/api/health` and the register/login routes requires a bearer token.
+
+### Auth
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+
 ### Habits
 
 - `GET /api/habits`
 - `POST /api/habits`
+- `GET /api/habits/archived`
 - `GET /api/habits/:id`
 - `PATCH /api/habits/:id`
+- `PATCH /api/habits/:id/archive`
 - `DELETE /api/habits/:id`
 - `GET /api/habits/:id/stats`
 
@@ -215,11 +237,33 @@ npm run format
 - `PATCH /api/habits/:id/logs/:logId`
 - `GET /api/logs/today`
 
+### Job Tracker
+
+- `GET /api/job-tracker`
+- `PUT /api/job-tracker`
+
+### DSA Prep
+
+- `GET /api/dsa-prep`
+- `GET /api/dsa-prep/problems`
+- `GET /api/dsa-prep/problems/:id`
+- `POST /api/dsa-prep/solve`
+- `POST /api/dsa-prep/unsolve`
+
+### Expenses
+
+- `GET /api/expenses`
+- `POST /api/expenses`
+- `PUT /api/expenses/:id`
+- `DELETE /api/expenses/:id`
+- `GET /api/expenses/budgets`
+- `POST /api/expenses/budgets`
+
 ## Notes
 
-- Single-user only
-- No auth yet
-- No reminders, workers, dashboards, or advanced analytics yet
+- JWT auth; all data is scoped per user
+- No reminders or background workers yet
+- The job tracker stores one profile document per user and saves it whole on `PUT`
 - Dates are stored as `YYYY-MM-DD`
 - Habit logs are unique per `habitId + date`
 - Edit mode keeps habit type locked in the UI to avoid breaking historical data

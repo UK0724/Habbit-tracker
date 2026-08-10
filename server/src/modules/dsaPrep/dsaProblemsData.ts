@@ -23,7 +23,7 @@ export interface DsaProblem {
 const rawProblems: [number, string, "Easy" | "Medium" | "Hard", string, string, string][] = [
   // Section 1: Arrays (1 - 50)
   // 1.1 Two Pointers
-  [1, "Two Sum (sorted array)", "Easy", "Arrays", "Two Pointers", "Two Pointers"],
+  [1, "Two Sum", "Easy", "Arrays", "Hashing", "HashMap"],
   [2, "Three Sum", "Medium", "Arrays", "Two Pointers", "Two Pointers"],
   [3, "Four Sum", "Medium", "Arrays", "Two Pointers", "Two Pointers"],
   [4, "Container With Most Water", "Medium", "Arrays", "Two Pointers", "Two Pointers"],
@@ -777,46 +777,44 @@ export const dsaProblems: DsaProblem[] = rawProblems.map(([id, title, difficulty
   const overrides: Partial<DsaProblem> = {};
 
   if (id === 1) { // Two Sum
-    overrides.description = `Given a 1-indexed array of integers numbers that is already sorted in non-decreasing order, find two numbers such that they add up to a specific target number.
+    overrides.description = `Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.
 
-Return the indices of the two numbers, [index1, index2], added by one, as an integer array [index1, index2] of length 2.
+You may assume that each input would have exactly one solution, and you may not use the same element twice.
 
-The tests are generated such that there is exactly one solution. You may not use the same element twice.
-
-Your solution must use only constant extra space.
+You can return the answer in any order.
 
 Example 1:
-Input: numbers = [2,7,11,15], target = 9
-Output: [1,2]
-Explanation: The sum of 2 and 7 is 9. Therefore, index1 = 1, index2 = 2. We return [1, 2].`;
+Input: nums = [2,7,11,15], target = 9
+Output: [0,1]
+Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].
+
+Example 2:
+Input: nums = [3,2,4], target = 6
+Output: [1,2]`;
 
     overrides.naiveSolution = {
-      explanation: `Use nested loops to check every possible pair of elements. If numbers[i] + numbers[j] equals target, return [i + 1, j + 1].`,
+      explanation: `Use nested loops to check every possible pair of elements. If nums[i] + nums[j] equals target, return [i, j].`,
       timeComplexity: "O(N²)",
       spaceComplexity: "O(1)",
       code: {
-        python: `class Solution:\n    def twoSum(self, numbers: List[int], target: int) -> List[int]:\n        n = len(numbers)\n        for i in range(n):\n            for j in range(i + 1, n):\n                if numbers[i] + numbers[j] == target:\n                    return [i + 1, j + 1]\n        return []`,
-        javascript: `function twoSum(numbers, target) {\n    const n = numbers.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j < n; j++) {\n            if (numbers[i] + numbers[j] === target) {\n                return [i + 1, j + 1];\n            }\n        }\n    }\n    return [];\n}`,
-        typescript: `function twoSum(numbers: number[], target: number): number[] {\n    const n = numbers.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j < n; j++) {\n            if (numbers[i] + numbers[j] === target) {\n                return [i + 1, j + 1];\n            }\n        }\n    }\n    return [];\n}`,
-        cpp: `class Solution {\npublic:\n    vector<int> twoSum(vector<int>& numbers, int target) {\n        int n = numbers.size();\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j < n; j++) {\n                if (numbers[i] + numbers[j] == target) {\n                    return {i + 1, j + 1};\n                }\n            }\n        }\n        return {};\n    }\n};`,
-        java: `class Solution {\n    public int[] twoSum(int[] numbers, int target) {\n        int n = numbers.length;\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j < n; j++) {\n                if (numbers[i] + numbers[j] == target) {\n                    return new int[]{i + 1, j + 1};\n                }\n            }\n        }\n        return new int[]{};\n    }\n}`
+        python: `class Solution:\n    def twoSum(self, nums: List[int], target: int) -> List[int]:\n        n = len(nums)\n        for i in range(n):\n            for j in range(i + 1, n):\n                if nums[i] + nums[j] == target:\n                    return [i, j]\n        return []`,
+        javascript: `function twoSum(nums, target) {\n    const n = nums.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j < n; j++) {\n            if (nums[i] + nums[j] === target) {\n                return [i, j];\n            }\n        }\n    }\n    return [];\n}`,
+        typescript: `function twoSum(nums: number[], target: number): number[] {\n    const n = nums.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j < n; j++) {\n            if (nums[i] + nums[j] === target) {\n                return [i, j];\n            }\n        }\n    }\n    return [];\n}`,
+        cpp: `class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        int n = nums.size();\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j < n; j++) {\n                if (nums[i] + nums[j] == target) {\n                    return {i, j};\n                }\n            }\n        }\n        return {};\n    }\n};`,
+        java: `class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        int n = nums.length;\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j < n; j++) {\n                if (nums[i] + nums[j] == target) {\n                    return new int[]{i, j};\n                }\n            }\n        }\n        return new int[]{};\n    }\n}`
       }
     };
 
     overrides.optimizedSolution = {
-      explanation: `Initialize two pointers: left at the start (index 0) and right at the end (index numbers.length - 1). 
-Calculate the sum at each step. 
-Since the array is sorted, if the sum is greater than the target, decrement the right pointer. 
-If the sum is less than the target, increment the left pointer. 
-If they are equal, return the 1-based indices.`,
+      explanation: `Use a Hash Map to store values and their index. While iterating, calculate the complement (target - nums[i]). If complement is already in the map, return the index of the complement and i. Otherwise, add the current number and its index to the map.`,
       timeComplexity: "O(N)",
-      spaceComplexity: "O(1)",
+      spaceComplexity: "O(N)",
       code: {
-        python: `class Solution:\n    def twoSum(self, numbers: List[int], target: int) -> List[int]:\n        left, right = 0, len(numbers) - 1\n        while left < right:\n            curr = numbers[left] + numbers[right]\n            if curr == target:\n                return [left + 1, right + 1]\n            elif curr < target:\n                left += 1\n            else:\n                right -= 1\n        return []`,
-        javascript: `function twoSum(numbers, target) {\n    let left = 0;\n    let right = numbers.length - 1;\n    while (left < right) {\n        const curr = numbers[left] + numbers[right];\n        if (curr === target) {\n            return [left + 1, right + 1];\n        } else if (curr < target) {\n            left++;\n        } else {\n            right--;\n        }\n    }\n    return [];\n}`,
-        typescript: `function twoSum(numbers: number[], target: number): number[] {\n    let left = 0;\n    let right = numbers.length - 1;\n    while (left < right) {\n        const curr = numbers[left] + numbers[right];\n        if (curr === target) {\n            return [left + 1, right + 1];\n        } else if (curr < target) {\n            left++;\n        } else {\n            right--;\n        }\n    }\n    return [];\n}`,
-        cpp: `class Solution {\npublic:\n    vector<int> twoSum(vector<int>& numbers, int target) {\n        int left = 0, right = numbers.size() - 1;\n        while (left < right) {\n            int curr = numbers[left] + numbers[right];\n            if (curr == target) {\n                return {left + 1, right + 1};\n            } else if (curr < target) {\n                left++;\n            } else {\n                right--;\n            }\n        }\n        return {};\n    }\n};`,
-        java: `class Solution {\n    public int[] twoSum(int[] numbers, int target) {\n        int left = 0, right = numbers.length - 1;\n        while (left < right) {\n            int curr = numbers[left] + numbers[right];\n            if (curr == target) {\n                return new int[]{left + 1, right + 1};\n            } else if (curr < target) {\n                left++;\n            } else {\n                right--;\n            }\n        }\n        return new int[]{};\n    }\n}`
+        python: `class Solution:\n    def twoSum(self, nums: List[int], target: int) -> List[int]:\n        seen = {}\n        for i, num in enumerate(nums):\n            complement = target - num\n            if complement in seen:\n                return [seen[complement], i]\n            seen[num] = i\n        return []`,
+        javascript: `function twoSum(nums, target) {\n    const seen = {};\n    for (let i = 0; i < nums.length; i++) {\n        const complement = target - nums[i];\n        if (complement in seen) {\n            return [seen[complement], i];\n        }\n        seen[nums[i]] = i;\n    }\n    return [];\n}`,
+        typescript: `function twoSum(nums: number[], target: number): number[] {\n    const seen: Record<number, number> = {};\n    for (let i = 0; i < nums.length; i++) {\n        const complement = target - nums[i];\n        if (complement in seen) {\n            return [seen[complement], i];\n        }\n        seen[nums[i]] = i;\n    }\n    return [];\n}`,
+        cpp: `class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        unordered_map<int, int> seen;\n        for (int i = 0; i < nums.size(); i++) {\n            int complement = target - nums[i];\n            if (seen.count(complement)) {\n                return {seen[complement], i};\n            }\n            seen[nums[i]] = i;\n        }\n        return {};\n    }\n};`,
+        java: `class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        java.util.Map<Integer, Integer> seen = new java.util.HashMap<>();\n        for (int i = 0; i < nums.length; i++) {\n            int complement = target - nums[i];\n            if (seen.containsKey(complement)) {\n                return new int[]{seen.get(complement), i};\n            }\n            seen.put(nums[i], i);\n        }\n        return new int[]{};\n    }\n}`
       }
     };
   }
@@ -933,6 +931,294 @@ Explanation: 9 exists in nums and its index is 4`;
         typescript: `function search(nums: number[], target: number): number {\n    let low = 0;\n    let right = nums.length - 1;\n    while (low <= right) {\n        const mid = Math.floor((low + right) / 2);\n        if (nums[mid] === target) return mid;\n        if (nums[mid] < target) low = mid + 1;\n        else right = mid - 1;\n    }\n    return -1;\n}`,
         cpp: `class Solution {\npublic:\n    int search(vector<int>& nums, int target) {\n        int low = 0, right = nums.size() - 1;\n        while (low <= right) {\n            int mid = low + (right - low) / 2;\n            if (nums[mid] == target) return mid;\n            if (nums[mid] < target) low = mid + 1;\n            else right = mid - 1;\n        }\n        return -1;\n    }\n};`,
         java: `class Solution {\n    public int search(int[] nums, int target) {\n        int low = 0, right = nums.length - 1;\n        while (low <= right) {\n            int mid = low + (right - low) / 2;\n            if (nums[mid] == target) return mid;\n            if (nums[mid] < target) low = mid + 1;\n            else right = mid - 1;\n        }\n        return -1;\n    }\n}`
+      }
+    };
+  }
+
+  if (id === 2) { // Three Sum
+    overrides.description = `Given an integer array nums, return all the triplets [nums[i], nums[j], nums[k]] such that i != j, i != k, and j != k, and nums[i] + nums[j] + nums[k] == 0.
+
+Notice that the solution set must not contain duplicate triplets.
+
+Example 1:
+Input: nums = [-1,0,1,2,-1,-4]
+Output: [[-1,-1,2],[-1,0,1]]`;
+
+    overrides.naiveSolution = {
+      explanation: `Use three nested loops to check all possible triplets. To avoid duplicate triplets, sort each valid triplet and add it to a Set. Return the unique triplets.`,
+      timeComplexity: "O(N³ log N)",
+      spaceComplexity: "O(N)",
+      code: {
+        python: `class Solution:\n    def threeSum(self, nums: List[int]) -> List[List[int]]:\n        res = set()\n        nums.sort()\n        n = len(nums)\n        for i in range(n):\n            for j in range(i + 1, n):\n                for k in range(j + 1, n):\n                    if nums[i] + nums[j] + nums[k] == 0:\n                        res.add((nums[i], nums[j], nums[k]))\n        return [list(t) for t in res]`,
+        javascript: `function threeSum(nums) {\n    nums.sort((a, b) => a - b);\n    const res = [];\n    const seen = new Set();\n    const n = nums.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j < n; j++) {\n            for (let k = j + 1; k < n; k++) {\n                if (nums[i] + nums[j] + nums[k] === 0) {\n                    const triplet = [nums[i], nums[j], nums[k]].join(",");\n                    if (!seen.has(triplet)) {\n                        seen.add(triplet);\n                        res.push([nums[i], nums[j], nums[k]]);\n                    }\n                }\n            }\n        }\n    }\n    return res;\n}`,
+        typescript: `function threeSum(nums: number[]): number[][] {\n    nums.sort((a, b) => a - b);\n    const res: number[][] = [];\n    const seen = new Set<string>();\n    const n = nums.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j < n; j++) {\n            for (let k = j + 1; k < n; k++) {\n                if (nums[i] + nums[j] + nums[k] === 0) {\n                    const triplet = [nums[i], nums[j], nums[k]].join(",");\n                    if (!seen.has(triplet)) {\n                        seen.add(triplet);\n                        res.push([nums[i], nums[j], nums[k]]);\n                    }\n                }\n            }\n        }\n    }\n    return res;\n}`,
+        cpp: `class Solution {\npublic:\n    vector<vector<int>> threeSum(vector<int>& nums) {\n        sort(nums.begin(), nums.end());\n        set<vector<int>> s;\n        int n = nums.size();\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j < n; j++) {\n                for (int k = j + 1; k < n; k++) {\n                    if (nums[i] + nums[j] + nums[k] == 0) {\n                        s.insert({nums[i], nums[j], nums[k]});\n                    }\n                }\n            }\n        }\n        return vector<vector<int>>(s.begin(), s.end());\n    }\n};`,
+        java: `class Solution {\n    public List<List<Integer>> threeSum(int[] nums) {\n        Arrays.sort(nums);\n        Set<List<Integer>> s = new HashSet<>();\n        int n = nums.length;\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j < n; j++) {\n                for (int k = j + 1; k < n; k++) {\n                    if (nums[i] + nums[j] + nums[k] == 0) {\n                        s.add(Arrays.asList(nums[i], nums[j], nums[k]));\n                    }\n                }\n            }\n        }\n        return new ArrayList<>(s);\n    }\n}`
+      }
+    };
+
+    overrides.optimizedSolution = {
+      explanation: `Sort the array first. Loop through each element, treating it as the first element of the triplet. Use two pointers (left and right) on the remaining suffix to find pairs that sum to the negative of the first element. Skip duplicate values to avoid duplicate triplets.`,
+      timeComplexity: "O(N²)",
+      spaceComplexity: "O(1)",
+      code: {
+        python: `class Solution:\n    def threeSum(self, nums: List[int]) -> List[List[int]]:\n        res = []\n        nums.sort()\n        for i, a in enumerate(nums):\n            if i > 0 and a == nums[i - 1]:\n                continue\n            l, r = i + 1, len(nums) - 1\n            while l < r:\n                three_sum = a + nums[l] + nums[r]\n                if three_sum > 0:\n                    r -= 1\n                elif three_sum < 0:\n                    l += 1\n                else:\n                    res.append([a, nums[l], nums[r]])\n                    l += 1\n                    while nums[l] == nums[l - 1] and l < r:\n                        l += 1\n        return res`,
+        javascript: `function threeSum(nums) {\n    const res = [];\n    nums.sort((a, b) => a - b);\n    for (let i = 0; i < nums.length - 2; i++) {\n        if (i > 0 && nums[i] === nums[i - 1]) continue;\n        let l = i + 1, r = nums.length - 1;\n        while (l < r) {\n            const sum = nums[i] + nums[l] + nums[r];\n            if (sum > 0) r--;\n            else if (sum < 0) l++;\n            else {\n                res.push([nums[i], nums[l], nums[r]]);\n                l++;\n                while (nums[l] === nums[l - 1] && l < r) l++;\n            }\n        }\n    }\n    return res;\n}`,
+        typescript: `function threeSum(nums: number[]): number[][] {\n    const res: number[][] = [];\n    nums.sort((a, b) => a - b);\n    for (let i = 0; i < nums.length - 2; i++) {\n        if (i > 0 && nums[i] === nums[i - 1]) continue;\n        let l = i + 1, r = nums.length - 1;\n        while (l < r) {\n            const sum = nums[i] + nums[l] + nums[r];\n            if (sum > 0) r--;\n            else if (sum < 0) l++;\n            else {\n                res.push([nums[i], nums[l], nums[r]]);\n                l++;\n                while (nums[l] === nums[l - 1] && l < r) l++;\n            }\n        }\n    }\n    return res;\n}`,
+        cpp: `class Solution {\npublic:\n    vector<vector<int>> threeSum(vector<int>& nums) {\n        vector<vector<int>> res;\n        sort(nums.begin(), nums.end());\n        for (int i = 0; i < nums.size(); i++) {\n            if (i > 0 && nums[i] == nums[i - 1]) continue;\n            int l = i + 1, r = nums.size() - 1;\n            while (l < r) {\n                int sum = nums[i] + nums[l] + nums[r];\n                if (sum > 0) r--;\n                else if (sum < 0) l++;\n                else {\n                    res.push_back({nums[i], nums[l], nums[r]});\n                    l++;\n                    while (nums[l] == nums[l - 1] && l < r) l++;\n                }\n            }\n        }\n        return res;\n    }\n};`,
+        java: `class Solution {\n    public List<List<Integer>> threeSum(int[] nums) {\n        List<List<Integer>> res = new ArrayList<>();\n        Arrays.sort(nums);\n        for (int i = 0; i < nums.length - 2; i++) {\n            if (i > 0 && nums[i] == nums[i - 1]) continue;\n            int l = i + 1, r = nums.length - 1;\n            while (l < r) {\n                int sum = nums[i] + nums[l] + nums[r];\n                if (sum > 0) r--;\n                else if (sum < 0) l++;\n                else {\n                    res.add(Arrays.asList(nums[i], nums[l], nums[r]));\n                    l++;\n                    while (nums[l] == nums[l - 1] && l < r) l++;\n                }\n            }\n        }\n        return res;\n    }\n}`
+      }
+    };
+  }
+
+  if (id === 4) { // Container With Most Water
+    overrides.description = `You are given an integer array height of length n. There are n vertical lines drawn such that the two endpoints of the ith line are (i, 0) and (i, height[i]).
+
+Find two lines that together with the x-axis form a container, such that the container contains the most water.
+
+Return the maximum amount of water a container can store.
+
+Example 1:
+Input: height = [1,8,6,2,5,4,8,3,7]
+Output: 49`;
+
+    overrides.naiveSolution = {
+      explanation: `Use two nested loops to check all possible pairs of lines. Compute the area for each pair and record the maximum.`,
+      timeComplexity: "O(N²)",
+      spaceComplexity: "O(1)",
+      code: {
+        python: `class Solution:\n    def maxArea(self, height: List[int]) -> int:\n        ans = 0\n        n = len(height)\n        for i in range(n):\n            for j in range(i + 1, n):\n                ans = max(ans, min(height[i], height[j]) * (j - i))\n        return ans`,
+        javascript: `function maxArea(height) {\n    let ans = 0;\n    const n = height.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j < n; j++) {\n            ans = Math.max(ans, Math.min(height[i], height[j]) * (j - i));\n        }\n    }\n    return ans;\n}`,
+        typescript: `function maxArea(height: number[]): number {\n    let ans = 0;\n    const n = height.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j < n; j++) {\n            ans = Math.max(ans, Math.min(height[i], height[j]) * (j - i));\n        }\n    }\n    return ans;\n}`,
+        cpp: `class Solution {\npublic:\n    int maxArea(vector<int>& height) {\n        int ans = 0, n = height.size();\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j < n; j++) {\n                ans = max(ans, min(height[i], height[j]) * (j - i));\n            }\n        }\n        return ans;\n    }\n};`,
+        java: `class Solution {\n    public int maxArea(int[] height) {\n        int ans = 0, n = height.length;\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j < n; j++) {\n                ans = Math.max(ans, Math.min(height[i], height[j]) * (j - i));\n            }\n        }\n        return ans;\n    }\n}`
+      }
+    };
+
+    overrides.optimizedSolution = {
+      explanation: `Initialize two pointers at opposite ends of the array. At each step, calculate the container area, record the max, then move the pointer pointing to the shorter line inward.`,
+      timeComplexity: "O(N)",
+      spaceComplexity: "O(1)",
+      code: {
+        python: `class Solution:\n    def maxArea(self, height: List[int]) -> int:\n        l, r = 0, len(height) - 1\n        ans = 0\n        while l < r:\n            area = min(height[l], height[r]) * (r - l)\n            ans = max(ans, area)\n            if height[l] < height[r]:\n                l += 1\n            else:\n                r -= 1\n        return ans`,
+        javascript: `function maxArea(height) {\n    let l = 0, r = height.length - 1;\n    let ans = 0;\n    while (l < r) {\n        const area = Math.min(height[l], height[r]) * (r - l);\n        ans = Math.max(ans, area);\n        if (height[l] < height[r]) l++;\n        else r--;\n    }\n    return ans;\n}`,
+        typescript: `function maxArea(height: number[]): number {\n    let l = 0, r = height.length - 1;\n    let ans = 0;\n    while (l < r) {\n        const area = Math.min(height[l], height[r]) * (r - l);\n        ans = Math.max(ans, area);\n        if (height[l] < height[r]) l++;\n        else r--;\n    }\n    return ans;\n}`,
+        cpp: `class Solution {\npublic:\n    int maxArea(vector<int>& height) {\n        int l = 0, r = height.size() - 1;\n        int ans = 0;\n        while (l < r) {\n            int area = min(height[l], height[r]) * (r - l);\n            ans = max(ans, area);\n            if (height[l] < height[r]) l++;\n            else r--;\n        }\n        return ans;\n    }\n};`,
+        java: `class Solution {\n    public int maxArea(int[] height) {\n        int l = 0, r = height.length - 1;\n        int ans = 0;\n        while (l < r) {\n            int area = Math.min(height[l], height[r]) * (r - l);\n            ans = Math.max(ans, area);\n            if (height[l] < height[r]) l++;\n            else r--;\n        }\n        return ans;\n    }\n}`
+      }
+    };
+  }
+
+  if (id === 11) { // Longest Substring Without Repeating Characters
+    overrides.description = `Given a string s, find the length of the longest substring without repeating characters.
+
+Example 1:
+Input: s = "abcabcbb"
+Output: 3
+Explanation: The answer is "abc", with the length of 3.`;
+
+    overrides.naiveSolution = {
+      explanation: `Check all possible substrings. For each substring, use a Hash Set to verify if all characters are unique. Return the length of the longest unique substring.`,
+      timeComplexity: "O(N³)",
+      spaceComplexity: "O(N)",
+      code: {
+        python: `class Solution:\n    def lengthOfLongestSubstring(self, s: str) -> int:\n        n = len(s)\n        ans = 0\n        for i in range(n):\n            for j in range(i + 1, n + 1):\n                sub = s[i:j]\n                if len(set(sub)) == len(sub):\n                    ans = max(ans, len(sub))\n        return ans`,
+        javascript: `function lengthOfLongestSubstring(s) {\n    let ans = 0;\n    const n = s.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j <= n; j++) {\n            const sub = s.slice(i, j);\n            if (new Set(sub).size === sub.length) {\n                ans = Math.max(ans, sub.length);\n            }\n        }\n    }\n    return ans;\n}`,
+        typescript: `function lengthOfLongestSubstring(s: string): number {\n    let ans = 0;\n    const n = s.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j <= n; j++) {\n            const sub = s.slice(i, j);\n            if (new Set(sub).size === sub.length) {\n                ans = Math.max(ans, sub.length);\n            }\n        }\n    }\n    return ans;\n}`,
+        cpp: `class Solution {\npublic:\n    int lengthOfLongestSubstring(string s) {\n        int ans = 0, n = s.length();\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j <= n; j++) {\n                unordered_set<char> set;\n                bool ok = true;\n                for (int k = i; k < j; k++) {\n                    if (set.count(s[k])) { ok = false; break; }\n                    set.insert(s[k]);\n                }\n                if (ok) ans = max(ans, j - i);\n            }\n        }\n        return ans;\n    }\n};`,
+        java: `class Solution {\n    public int lengthOfLongestSubstring(String s) {\n        int ans = 0, n = s.length();\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j <= n; j++) {\n                java.util.Set<Character> set = new java.util.HashSet<>();\n                boolean ok = true;\n                for (int k = i; k < j; k++) {\n                    if (set.contains(s.charAt(k))) { ok = false; break; }\n                    set.add(s.charAt(k));\n                }\n                if (ok) ans = Math.max(ans, j - i);\n            }\n        }\n        return ans;\n    }\n}`
+      }
+    };
+
+    overrides.optimizedSolution = {
+      explanation: `Use a sliding window with two pointers. Maintain a Map storing character occurrences and their latest index. Advance the right pointer, and if a character repeats within the current window, move the left pointer past its last seen position.`,
+      timeComplexity: "O(N)",
+      spaceComplexity: "O(min(N, M)) where M is character set size",
+      code: {
+        python: `class Solution:\n    def lengthOfLongestSubstring(self, s: str) -> int:\n        char_map = {}\n        l = 0\n        ans = 0\n        for r, char in enumerate(s):\n            if char in char_map and char_map[char] >= l:\n                l = char_map[char] + 1\n            char_map[char] = r\n            ans = max(ans, r - l + 1)\n        return ans`,
+        javascript: `function lengthOfLongestSubstring(s) {\n    const map = {};\n    let l = 0, ans = 0;\n    for (let r = 0; r < s.length; r++) {\n        if (map[s[r]] !== undefined && map[s[r]] >= l) {\n            l = map[s[r]] + 1;\n        }\n        map[s[r]] = r;\n        ans = Math.max(ans, r - l + 1);\n    }\n    return ans;\n}`,
+        typescript: `function lengthOfLongestSubstring(s: string): number {\n    const map: Record<string, number> = {};\n    let l = 0, ans = 0;\n    for (let r = 0; r < s.length; r++) {\n        if (map[s[r]] !== undefined && map[s[r]] >= l) {\n            l = map[s[r]] + 1;\n        }\n        map[s[r]] = r;\n        ans = Math.max(ans, r - l + 1);\n    }\n    return ans;\n}`,
+        cpp: `class Solution {\npublic:\n    int lengthOfLongestSubstring(string s) {\n        unordered_map<char, int> map;\n        int l = 0, ans = 0;\n        for (int r = 0; r < s.length(); r++) {\n            if (map.count(s[r]) && map[s[r]] >= l) {\n                l = map[s[r]] + 1;\n            }\n            map[s[r]] = r;\n            ans = max(ans, r - l + 1);\n        }\n        return ans;\n    }\n};`,
+        java: `class Solution {\n    public int lengthOfLongestSubstring(String s) {\n        java.util.Map<Character, Integer> map = new java.util.HashMap<>();\n        int l = 0, ans = 0;\n        for (int r = 0; r < s.length(); r++) {\n            char c = s.charAt(r);\n            if (map.containsKey(c) && map.get(c) >= l) {\n                l = map.get(c) + 1;\n            }\n            map.put(c, r);\n            ans = Math.max(ans, r - l + 1);\n        }\n        return ans;\n    }\n}`
+      }
+    };
+  }
+
+  if (id === 31) { // Maximum Subarray (Kadane's)
+    overrides.description = `Given an integer array nums, find the subarray with the largest sum, and return its sum.
+
+Example 1:
+Input: nums = [-2,1,-3,4,-1,2,1,-5,4]
+Output: 6
+Explanation: The subarray [4,-1,2,1] has the largest sum = 6.`;
+
+    overrides.naiveSolution = {
+      explanation: `Use two nested loops to check all possible subarrays. Compute the sum for each subarray and keep track of the maximum sum.`,
+      timeComplexity: "O(N²)",
+      spaceComplexity: "O(1)",
+      code: {
+        python: `class Solution:\n    def maxSubArray(self, nums: List[int]) -> int:\n        max_sum = float('-inf')\n        for i in range(len(nums)):\n            curr_sum = 0\n            for j in range(i, len(nums)):\n                curr_sum += nums[j]\n                max_sum = max(max_sum, curr_sum)\n        return max_sum`,
+        javascript: `function maxSubArray(nums) {\n    let maxSum = -Infinity;\n    for (let i = 0; i < nums.length; i++) {\n        let currSum = 0;\n        for (let j = i; j < nums.length; j++) {\n            currSum += nums[j];\n            maxSum = Math.max(maxSum, currSum);\n        }\n    }\n    return maxSum;\n}`,
+        typescript: `function maxSubArray(nums: number[]): number {\n    let maxSum = -Infinity;\n    for (let i = 0; i < nums.length; i++) {\n        let currSum = 0;\n        for (let j = i; j < nums.length; j++) {\n            currSum += nums[j];\n            maxSum = Math.max(maxSum, currSum);\n        }\n    }\n    return maxSum;\n}`,
+        cpp: `class Solution {\npublic:\n    int maxSubArray(vector<int>& nums) {\n        int maxSum = INT_MIN;\n        for (int i = 0; i < nums.size(); i++) {\n            int currSum = 0;\n            for (int j = i; j < nums.size(); j++) {\n                currSum += nums[j];\n                maxSum = max(maxSum, currSum);\n            }\n        }\n        return maxSum;\n    }\n};`,
+        java: `class Solution {\n    public int maxSubArray(int[] nums) {\n        int maxSum = Integer.MIN_VALUE;\n        for (int i = 0; i < nums.length; i++) {\n            int currSum = 0;\n            for (int j = i; j < nums.length; j++) {\n                currSum += nums[j];\n                maxSum = Math.max(maxSum, currSum);\n            }\n        }\n        return maxSum;\n    }\n}`
+      }
+    };
+
+    overrides.optimizedSolution = {
+      explanation: `Use Kadane's Algorithm. Traverse the array while maintaining a running current sum. At each index, decide whether to add the element to the current sum, or start a new subarray beginning with the element itself.`,
+      timeComplexity: "O(N)",
+      spaceComplexity: "O(1)",
+      code: {
+        python: `class Solution:\n    def maxSubArray(self, nums: List[int]) -> int:\n        max_sum = nums[0]\n        curr_sum = 0\n        for n in nums:\n            if curr_sum < 0:\n                curr_sum = 0\n            curr_sum += n\n            max_sum = max(max_sum, curr_sum)\n        return max_sum`,
+        javascript: `function maxSubArray(nums) {\n    let maxSum = nums[0];\n    let currSum = 0;\n    for (let n of nums) {\n        if (currSum < 0) currSum = 0;\n        currSum += n;\n        maxSum = Math.max(maxSum, currSum);\n    }\n    return maxSum;\n}`,
+        typescript: `function maxSubArray(nums: number[]): number {\n    let maxSum = nums[0];\n    let currSum = 0;\n    for (let n of nums) {\n        if (currSum < 0) currSum = 0;\n        currSum += n;\n        maxSum = Math.max(maxSum, currSum);\n    }\n    return maxSum;\n}`,
+        cpp: `class Solution {\npublic:\n    int maxSubArray(vector<int>& nums) {\n        int maxSum = nums[0];\n        int currSum = 0;\n        for (int n : nums) {\n            if (currSum < 0) currSum = 0;\n            currSum += n;\n            maxSum = max(maxSum, currSum);\n        }\n        return maxSum;\n    }\n};`,
+        java: `class Solution {\n    public int maxSubArray(int[] nums) {\n        int maxSum = nums[0];\n        int currSum = 0;\n        for (int n : nums) {\n            if (currSum < 0) currSum = 0;\n            currSum += n;\n            maxSum = Math.max(maxSum, currSum);\n        }\n        return maxSum;\n    }\n}`
+      }
+    };
+  }
+
+  if (id === 33) { // Best Time to Buy and Sell Stock
+    overrides.description = `You are given an array prices where prices[i] is the price of a given stock on the ith day.
+
+You want to maximize your profit by choosing a single day to buy one stock and choosing a different day in the future to sell that stock.
+
+Return the maximum profit you can achieve from this transaction. If you cannot achieve any profit, return 0.
+
+Example 1:
+Input: prices = [7,1,5,3,6,4]
+Output: 5
+Explanation: Buy on day 2 (price = 1) and sell on day 5 (price = 6), profit = 6-1 = 5.`;
+
+    overrides.naiveSolution = {
+      explanation: `Check all possible pairs of buying and selling days using nested loops. Profit is prices[sell] - prices[buy] for sell > buy. Record the max profit.`,
+      timeComplexity: "O(N²)",
+      spaceComplexity: "O(1)",
+      code: {
+        python: `class Solution:\n    def maxProfit(self, prices: List[int]) -> int:\n        max_profit = 0\n        n = len(prices)\n        for i in range(n):\n            for j in range(i + 1, n):\n                max_profit = max(max_profit, prices[j] - prices[i])\n        return max_profit`,
+        javascript: `function maxProfit(prices) {\n    let maxProfit = 0;\n    const n = prices.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j < n; j++) {\n            maxProfit = Math.max(maxProfit, prices[j] - prices[i]);\n        }\n    }\n    return maxProfit;\n}`,
+        typescript: `function maxProfit(prices: number[]): number {\n    let maxProfit = 0;\n    const n = prices.length;\n    for (let i = 0; i < n; i++) {\n        for (let j = i + 1; j < n; j++) {\n            maxProfit = Math.max(maxProfit, prices[j] - prices[i]);\n        }\n    }\n    return maxProfit;\n}`,
+        cpp: `class Solution {\npublic:\n    int maxProfit(vector<int>& prices) {\n        int maxProfit = 0, n = prices.size();\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j < n; j++) {\n                maxProfit = max(maxProfit, prices[j] - prices[i]);\n            }\n        }\n        return maxProfit;\n    }\n};`,
+        java: `class Solution {\n    public int maxProfit(int[] prices) {\n        int maxProfit = 0, n = prices.length;\n        for (int i = 0; i < n; i++) {\n            for (int j = i + 1; j < n; j++) {\n                maxProfit = Math.max(maxProfit, prices[j] - prices[i]);\n            }\n        }\n        return maxProfit;\n    }\n}`
+      }
+    };
+
+    overrides.optimizedSolution = {
+      explanation: `Iterate through the array once while keeping track of the minimum price seen so far. At each step, calculate the potential profit if we sold today, and update the maximum profit accordingly.`,
+      timeComplexity: "O(N)",
+      spaceComplexity: "O(1)",
+      code: {
+        python: `class Solution:\n    def maxProfit(self, prices: List[int]) -> int:\n        min_price = float('inf')\n        max_profit = 0\n        for price in prices:\n            if price < min_price:\n                min_price = price\n            elif price - min_price > max_profit:\n                max_profit = price - min_price\n        return max_profit`,
+        javascript: `function maxProfit(prices) {\n    let minPrice = Infinity;\n    let maxProfit = 0;\n    for (let price of prices) {\n        if (price < minPrice) {\n            minPrice = price;\n        } else if (price - minPrice > maxProfit) {\n            maxProfit = price - minPrice;\n        }\n    }\n    return maxProfit;\n}`,
+        typescript: `function maxProfit(prices: number[]): number {\n    let minPrice = Infinity;\n    let maxProfit = 0;\n    for (let price of prices) {\n        if (price < minPrice) {\n            minPrice = price;\n        } else if (price - minPrice > maxProfit) {\n            maxProfit = price - minPrice;\n        }\n    }\n    return maxProfit;\n}`,
+        cpp: `class Solution {\npublic:\n    int maxProfit(vector<int>& prices) {\n        int minPrice = INT_MAX, maxProfit = 0;\n        for (int price : prices) {\n            if (price < minPrice) minPrice = price;\n            else maxProfit = max(maxProfit, price - minPrice);\n        }\n        return maxProfit;\n    }\n};`,
+        java: `class Solution {\n    public int maxProfit(int[] prices) {\n        int minPrice = Integer.MAX_VALUE, maxProfit = 0;\n        for (int price : prices) {\n            if (price < minPrice) minPrice = price;\n            else maxProfit = Math.max(maxProfit, price - minPrice);\n        }\n        return maxProfit;\n    }\n}`
+      }
+    };
+  }
+
+  if (id === 41) { // Merge Intervals
+    overrides.description = `Given an array of intervals where intervals[i] = [starti, endi], merge all overlapping intervals, and return an array of the non-overlapping intervals that cover all the intervals in the input.
+
+Example 1:
+Input: intervals = [[1,3],[2,6],[8,10],[15,18]]
+Output: [[1,6],[8,10],[15,18]]
+Explanation: Since intervals [1,3] and [2,6] overlap, merge them into [1,6].`;
+
+    overrides.naiveSolution = {
+      explanation: `Compare every interval with every other interval to detect overlaps. If overlapping, merge them and start the scanning process over again until no overlapping items remain.`,
+      timeComplexity: "O(N²)",
+      spaceComplexity: "O(N)",
+      code: {
+        python: `class Solution:\n    def merge(self, intervals: List[List[int]]) -> List[List[int]]:\n        # Naive simulation: iteratively merge overlaps\n        res = []\n        for interval in sorted(intervals, key=lambda x: x[0]):\n            if not res or res[-1][1] < interval[0]:\n                res.append(interval)\n            else:\n                res[-1][1] = max(res[-1][1], interval[1])\n        return res`,
+        javascript: `function merge(intervals) {\n    intervals.sort((a, b) => a[0] - b[0]);\n    const res = [];\n    for (let interval of intervals) {\n        if (res.length === 0 || res[res.length - 1][1] < interval[0]) {\n            res.push(interval);\n        } else {\n            res[res.length - 1][1] = Math.max(res[res.length - 1][1], interval[1]);\n        }\n    }\n    return res;\n}`,
+        typescript: `function merge(intervals: number[][]): number[][] {\n    intervals.sort((a, b) => a[0] - b[0]);\n    const res: number[][] = [];\n    for (let interval of intervals) {\n        if (res.length === 0 || res[res.length - 1][1] < interval[0]) {\n            res.push(interval);\n        } else {\n            res[res.length - 1][1] = Math.max(res[res.length - 1][1], interval[1]);\n        }\n    }\n    return res;\n}`,
+        cpp: `class Solution {\npublic:\n    vector<vector<int>> merge(vector<vector<int>>& intervals) {\n        if (intervals.empty()) return {};\n        sort(intervals.begin(), intervals.end());\n        vector<vector<int>> res;\n        for (auto& interval : intervals) {\n            if (res.empty() || res.back()[1] < interval[0]) {\n                res.push_back(interval);\n            } else {\n                res.back()[1] = max(res.back()[1], interval[1]);\n            }\n        }\n        return res;\n    }\n};`,
+        java: `class Solution {\n    public int[][] merge(int[][] intervals) {\n        if (intervals.length == 0) return new int[0][0];\n        Arrays.sort(intervals, (a, b) -> Integer.compare(a[0], b[0]));\n        java.util.List<int[]> res = new java.util.ArrayList<>();\n        for (int[] interval : intervals) {\n            if (res.isEmpty() || res.get(res.size() - 1)[1] < interval[0]) {\n                res.add(interval);\n            } else {\n                res.get(res.size() - 1)[1] = Math.max(res.get(res.size() - 1)[1], interval[1]);\n            }\n        }\n        return res.toArray(new int[res.size()][]);\n    }\n}`
+      }
+    };
+
+    overrides.optimizedSolution = {
+      explanation: `Sort the intervals by their start times first. Then iterate through the sorted list, comparing each interval with the last merged interval. If they overlap, merge them; otherwise, append the new interval to the result.`,
+      timeComplexity: "O(N log N)",
+      spaceComplexity: "O(log N) sorting space",
+      code: {
+        python: `class Solution:\n    def merge(self, intervals: List[List[int]]) -> List[List[int]]:\n        intervals.sort(key=lambda x: x[0])\n        merged = []\n        for interval in intervals:\n            if not merged or merged[-1][1] < interval[0]:\n                merged.append(interval)\n            else:\n                merged[-1][1] = max(merged[-1][1], interval[1])\n        return merged`,
+        javascript: `function merge(intervals) {\n    if (intervals.length <= 1) return intervals;\n    intervals.sort((a, b) => a[0] - b[0]);\n    const merged = [intervals[0]];\n    for (let i = 1; i < intervals.length; i++) {\n        const current = intervals[i];\n        const last = merged[merged.length - 1];\n        if (current[0] <= last[1]) {\n            last[1] = Math.max(last[1], current[1]);\n        } else {\n            merged.push(current);\n        }\n    }\n    return merged;\n}`,
+        typescript: `function merge(intervals: number[][]): number[][] {\n    if (intervals.length <= 1) return intervals;\n    intervals.sort((a, b) => a[0] - b[0]);\n    const merged = [intervals[0]];\n    for (let i = 1; i < intervals.length; i++) {\n        const current = intervals[i];\n        const last = merged[merged.length - 1];\n        if (current[0] <= last[1]) {\n            last[1] = Math.max(last[1], current[1]);\n        } else {\n            merged.push(current);\n        }\n    }\n    return merged;\n}`,
+        cpp: `class Solution {\npublic:\n    vector<vector<int>> merge(vector<vector<int>>& intervals) {\n        if (intervals.size() <= 1) return intervals;\n        sort(intervals.begin(), intervals.end());\n        vector<vector<int>> merged = {intervals[0]};\n        for (int i = 1; i < intervals.size(); i++) {\n            if (intervals[i][0] <= merged.back()[1]) {\n                merged.back()[1] = max(merged.back()[1], intervals[i][1]);\n            } else {\n                merged.push_back(intervals[i]);\n            }\n        }\n        return merged;\n    }\n};`,
+        java: `class Solution {\n    public int[][] merge(int[][] intervals) {\n        if (intervals.length <= 1) return intervals;\n        Arrays.sort(intervals, (a, b) -> Integer.compare(a[0], b[0]));\n        java.util.List<int[]> merged = new java.util.ArrayList<>();\n        merged.add(intervals[0]);\n        for (int i = 1; i < intervals.length; i++) {\n            int[] last = merged.get(merged.size() - 1);\n            if (intervals[i][0] <= last[1]) {\n                last[1] = Math.max(last[1], intervals[i][1]);\n            } else {\n                merged.add(intervals[i]);\n            }\n        }\n        return merged.toArray(new int[merged.size()][]);\n    }\n}`
+      }
+    };
+  }
+
+  if (id === 51) { // Valid Anagram
+    overrides.description = `Given two strings s and t, return true if t is an anagram of s, and false otherwise.
+
+An Anagram is a word or phrase formed by rearranging the letters of a different word or phrase, typically using all the original letters exactly once.
+
+Example 1:
+Input: s = "anagram", t = "nagaram"
+Output: true`;
+
+    overrides.naiveSolution = {
+      explanation: `Sort the characters of both strings alphabetically. Compare the sorted strings. If they are identical, they are anagrams.`,
+      timeComplexity: "O(N log N)",
+      spaceComplexity: "O(N)",
+      code: {
+        python: `class Solution:\n    def isAnagram(self, s: str, t: str) -> bool:\n        return sorted(s) == sorted(t)`,
+        javascript: `function isAnagram(s, t) {\n    return s.split("").sort().join("") === t.split("").sort().join("");\n}`,
+        typescript: `function isAnagram(s: string, t: string): boolean {\n    return s.split("").sort().join("") === t.split("").sort().join("");\n}`,
+        cpp: `class Solution {\npublic:\n    bool isAnagram(string s, string t) {\n        sort(s.begin(), s.end());\n        sort(t.begin(), t.end());\n        return s == t;\n    }\n};`,
+        java: `class Solution {\n    public boolean isAnagram(String s, String t) {\n        char[] sArr = s.toCharArray();\n        char[] tArr = t.toCharArray();\n        Arrays.sort(sArr);\n        Arrays.sort(tArr);\n        return Arrays.equals(sArr, tArr);\n    }\n}`
+      }
+    };
+
+    overrides.optimizedSolution = {
+      explanation: `Use a Hash Map or count array of size 26 to count character frequencies. Loop through string s to increment frequencies, and loop through string t to decrement frequencies. Verify that all final frequencies are zero.`,
+      timeComplexity: "O(N)",
+      spaceComplexity: "O(1) because size of alphabet is constant",
+      code: {
+        python: `class Solution:\n    def isAnagram(self, s: str, t: str) -> bool:\n        if len(s) != len(t): return False\n        count = {}\n        for char in s:\n            count[char] = count.get(char, 0) + 1\n        for char in t:\n            if char not in count or count[char] == 0:\n                return False\n            count[char] -= 1\n        return True`,
+        javascript: `function isAnagram(s, t) {\n    if (s.length !== t.length) return false;\n    const count = {};\n    for (let char of s) {\n        count[char] = (count[char] || 0) + 1;\n    }\n    for (let char of t) {\n        if (!count[char]) return false;\n        count[char]--;\n    }\n    return true;\n}`,
+        typescript: `function isAnagram(s: string, t: string): boolean {\n    if (s.length !== t.length) return false;\n    const count: Record<string, number> = {};\n    for (let char of s) {\n        count[char] = (count[char] || 0) + 1;\n    }\n    for (let char of t) {\n        if (!count[char]) return false;\n        count[char]--;\n    }\n    return true;\n}`,
+        cpp: `class Solution {\npublic:\n    bool isAnagram(string s, string t) {\n        if (s.length() != t.length()) return false;\n        int count[26] = {0};\n        for (int i = 0; i < s.length(); i++) {\n            count[s[i] - 'a']++;\n            count[t[i] - 'a']--;\n        }\n        for (int i = 0; i < 26; i++) {\n            if (count[i] != 0) return false;\n        }\n        return true;\n    }\n};`,
+        java: `class Solution {\n    public boolean isAnagram(String s, String t) {\n        if (s.length() != t.length()) return false;\n        int[] count = new int[26];\n        for (int i = 0; i < s.length(); i++) {\n            count[s.charAt(i) - 'a']++;\n            count[t.charAt(i) - 'a']--;\n        }\n        for (int c : count) {\n            if (c != 0) return false;\n        }\n        return true;\n    }\n}`
+      }
+    };
+  }
+
+  if (id === 52) { // Group Anagrams
+    overrides.description = `Given an array of strings strs, group the anagrams together. You can return the answer in any order.
+
+Example 1:
+Input: strs = ["eat","tea","tan","ate","nat","bat"]
+Output: [["bat"],["nat","tan"],["ate","eat","tea"]]`;
+
+    overrides.naiveSolution = {
+      explanation: `Compare each string with every other string in the list using nested loops to verify if they are anagrams. Group them into separate lists accordingly.`,
+      timeComplexity: "O(N² * L log L) where L is average string length",
+      spaceComplexity: "O(N * L)",
+      code: {
+        python: `class Solution:\n    def groupAnagrams(self, strs: List[str]) -> List[List[str]]:\n        # Compare pairs iteratively to group\n        res = []\n        visited = [False] * len(strs)\n        for i in range(len(strs)):\n            if visited[i]: continue\n            group = [strs[i]]\n            visited[i] = True\n            for j in range(i + 1, len(strs)):\n                if not visited[j] and sorted(strs[i]) == sorted(strs[j]):\n                    group.append(strs[j])\n                    visited[j] = True\n            res.append(group)\n        return res`,
+        javascript: `function groupAnagrams(strs) {\n    const res = [];\n    const visited = Array(strs.length).fill(false);\n    for (let i = 0; i < strs.length; i++) {\n        if (visited[i]) continue;\n        const group = [strs[i]];\n        visited[i] = true;\n        for (let j = i + 1; j < strs.length; j++) {\n            if (!visited[j] && strs[i].split("").sort().join("") === strs[j].split("").sort().join("")) {\n                group.push(strs[j]);\n                visited[j] = true;\n            }\n        }\n        res.push(group);\n    }\n    return res;\n}`,
+        typescript: `function groupAnagrams(strs: string[]): string[][] {\n    const res: string[][] = [];\n    const visited = Array(strs.length).fill(false);\n    for (let i = 0; i < strs.length; i++) {\n        if (visited[i]) continue;\n        const group = [strs[i]];\n        visited[i] = true;\n        for (let j = i + 1; j < strs.length; j++) {\n            if (!visited[j] && strs[i].split("").sort().join("") === strs[j].split("").sort().join("")) {\n                group.push(strs[j]);\n                visited[j] = true;\n            }\n        }\n        res.push(group);\n    }\n    return res;\n}`,
+        cpp: `class Solution {\npublic:\n    vector<vector<string>> groupAnagrams(vector<string>& strs) {\n        vector<vector<string>> res;\n        vector<bool> visited(strs.size(), false);\n        for (int i = 0; i < strs.size(); i++) {\n            if (visited[i]) continue;\n            vector<string> group = {strs[i]};\n            visited[i] = true;\n            string s_sorted = strs[i];\n            sort(s_sorted.begin(), s_sorted.end());\n            for (int j = i + 1; j < strs.size(); j++) {\n                string t_sorted = strs[j];\n                sort(t_sorted.begin(), t_sorted.end());\n                if (!visited[j] && s_sorted == t_sorted) {\n                    group.push_back(strs[j]);\n                    visited[j] = true;\n                }\n            }\n            res.push_back(group);\n        }\n        return res;\n    }\n};`,
+        java: `class Solution {\n    public List<List<String>> groupAnagrams(String[] strs) {\n        List<List<String>> res = new ArrayList<>();\n        boolean[] visited = new boolean[strs.length];\n        for (int i = 0; i < strs.length; i++) {\n            if (visited[i]) continue;\n            List<String> group = new ArrayList<>();\n            group.add(strs[i]);\n            visited[i] = true;\n            char[] sArr = strs[i].toCharArray();\n            Arrays.sort(sArr);\n            for (int j = i + 1; j < strs.length; j++) {\n                char[] tArr = strs[j].toCharArray();\n                Arrays.sort(tArr);\n                if (!visited[j] && Arrays.equals(sArr, tArr)) {\n                    group.add(strs[j]);\n                    visited[j] = true;\n                }\n            }\n            res.add(group);\n        }\n        return res;\n    }\n}`
+      }
+    };
+
+    overrides.optimizedSolution = {
+      explanation: `Use a Hash Map where the key is the sorted string (representing the anagram fingerprint) and the value is a list of matching strings. Group elements in one pass and return the values of the map.`,
+      timeComplexity: "O(N * L log L)",
+      spaceComplexity: "O(N * L)",
+      code: {
+        python: `class Solution:\n    def groupAnagrams(self, strs: List[str]) -> List[List[str]]:\n        ans = collections.defaultdict(list)\n        for s in strs:\n            ans["".join(sorted(s))].append(s)\n        return list(ans.values())`,
+        javascript: `function groupAnagrams(strs) {\n    const map = {};\n    for (let s of strs) {\n        const key = s.split("").sort().join("");\n        if (!map[key]) map[key] = [];\n        map[key].push(s);\n    }\n    return Object.values(map);\n}`,
+        typescript: `function groupAnagrams(strs: string[]): string[][] {\n    const map: Record<string, string[]> = {};\n    for (let s of strs) {\n        const key = s.split("").sort().join("");\n        if (!map[key]) map[key] = [];\n        map[key].push(s);\n    }\n    return Object.values(map);\n}`,
+        cpp: `class Solution {\npublic:\n    vector<vector<string>> groupAnagrams(vector<string>& strs) {\n        unordered_map<string, vector<string>> map;\n        for (string s : strs) {\n            string key = s;\n            sort(key.begin(), key.end());\n            map[key].push_back(s);\n        }\n        vector<vector<string>> res;\n        for (auto p : map) {\n            res.push_back(p.second);\n        }\n        return res;\n    }\n};`,
+        java: `class Solution {\n    public List<List<String>> groupAnagrams(String[] strs) {\n        java.util.Map<String, List<String>> map = new java.util.HashMap<>();\n        for (String s : strs) {\n            char[] chars = s.toCharArray();\n            Arrays.sort(chars);\n            String key = new String(chars);\n            if (!map.containsKey(key)) {\n                map.put(key, new java.util.ArrayList<>());\n            }\n            map.get(key).add(s);\n        }\n        return new java.util.ArrayList<>(map.values());\n    }\n}`
       }
     };
   }

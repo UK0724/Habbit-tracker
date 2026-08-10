@@ -1,5 +1,7 @@
 import { HydratedDocument, Schema, Types, model } from "mongoose";
 
+import type { ProfileData } from "./jobTracker.validation.js";
+
 // Subdocuments definitions
 
 const jobApplicationSchema = new Schema({
@@ -97,18 +99,10 @@ const userNoteSchema = new Schema({
 
 // Top Level Interface
 
-export interface JobSearchProfile {
+// Shapes come from the request schema so the model and the validator cannot
+// drift apart.
+export interface JobSearchProfile extends ProfileData {
   userId: Types.ObjectId;
-  applications: any[];
-  referrals: any[];
-  dailyTasks: any[];
-  weeklyGoals: any;
-  prepCategories: any[];
-  wishlist: any[];
-  resumes: any[];
-  resources: any[];
-  notes: any[];
-  streak: number;
   createdAt: Date;
   updatedAt: Date;
 }
