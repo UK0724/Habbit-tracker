@@ -283,7 +283,7 @@ const getHabitByIdOrThrow = async (id: string, userId: string) => {
 };
 
 export const listHabits = async (userId: string, selectedDate = getTodayDateString()) => {
-  const habits = await HabitModel.find({ archived: { $ne: true } }).sort({
+  const habits = await HabitModel.find({ userId, archived: { $ne: true } }).sort({
     createdAt: 1
   });
   if (habits.length === 0) {
@@ -358,8 +358,8 @@ export const getHabit = async (id: string, userId: string) => {
   return serializeHabit(habit);
 };
 
-export const listArchivedHabits = async (_userId: string) => {
-  const habits = await HabitModel.find({ archived: true }).sort({
+export const listArchivedHabits = async (userId: string) => {
+  const habits = await HabitModel.find({ userId, archived: true }).sort({
     updatedAt: -1
   });
   return habits.map(serializeHabit);
