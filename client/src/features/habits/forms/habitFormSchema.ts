@@ -17,6 +17,11 @@ const habitColorValues = habitColorOptions.map((option) => option.value) as [
 
 export const habitFormSchema = z
   .object({
+  schedule: z.enum(["daily", "weekdays", "weekly"]).optional(),
+  weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional(),
+  timesPerWeek: z.number().int().min(1).max(7).optional(),
+  targetMax: z.number().finite().nullable().optional(),
+  reminderTime: z.string().regex(/^$|^([01]\d|2[0-3]):[0-5]\d$/).optional(),
     title: z.string().trim().min(1, "Title is required").max(100),
     description: z
       .string()
@@ -34,13 +39,14 @@ export const habitFormSchema = z
     linkToDSAPrep: z.boolean().optional(),
     linkToExpenseTracker: z.boolean().optional(),
     color: z.enum(habitColorValues),
-    goalDirection: z.enum(["up", "down"]).optional(),
+    goalDirection: z.enum(["up", "down", "range", "record"]).optional(),
     target: z
       .number({ invalid_type_error: "Target must be a number" })
-      .positive("Target must be greater than zero")
+      .finite().nullable()
       .optional()
   })
   .superRefine((value, context) => {
+    if(value.goalDirection === "range" && (value.target == null || value.targetMax == null || value.targetMax < value.target)) context.addIssue({code:z.ZodIssueCode.custom,path:["target"],message:"Enter a minimum and maximum in ascending order"});
     if (value.type === "measurable" && !value.unit) {
       context.addIssue({
         code: z.ZodIssueCode.custom,

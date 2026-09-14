@@ -1,3 +1,5 @@
+import { AppError } from "../../utils/appError.js";
+import { syncWorkspaceActivity, userToday } from "../habits/workspaceSync.js";
 import { DsaPrepProfileModel, DsaProblemModel } from "./dsaPrep.model.js";
 
 export const dsaPrepService = {
@@ -21,6 +23,7 @@ export const dsaPrepService = {
   },
 
   markSolved: async (userId: string, problemId: number, language: string, notes?: string) => {
+    if (!await DsaProblemModel.exists({ id: problemId })) throw new AppError("Problem not found",404);
     let profile = await DsaPrepProfileModel.findOne({ userId });
     if (!profile) {
       profile = await DsaPrepProfileModel.create({
@@ -38,7 +41,7 @@ export const dsaPrepService = {
       const existing = profile.solvedProblems[solvedIndex];
       if (existing) {
         existing.language = language;
-        existing.solvedAt = new Date();
+        // Preserve the original completion date when editing notes.
         if (notes !== undefined) {
           existing.notes = notes;
         }
@@ -53,6 +56,7 @@ export const dsaPrepService = {
     }
 
     await profile.save();
+    if (solvedIndex < 0) await syncWorkspaceActivity(userId,"linkToDSAPrep",await userToday(userId),`Solved problem ${problemId}`);
     return profile;
   },
 

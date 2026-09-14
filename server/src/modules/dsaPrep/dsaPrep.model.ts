@@ -4,6 +4,8 @@ export interface SolvedProblem {
   problemId: number; // 1 to 500
   language: string;  // e.g. "python", "javascript"
   solvedAt: Date;
+  revisionDueDate?: string;
+  revisionDates?: string[];
   notes?: string;
 }
 
@@ -20,6 +22,8 @@ const solvedProblemSchema = new Schema<SolvedProblem>({
   problemId: { type: Number, required: true },
   language: { type: String, required: true },
   solvedAt: { type: Date, default: Date.now },
+  revisionDueDate: String,
+  revisionDates: { type: [String], default: [] },
   notes: { type: String, default: "" }
 }, { _id: false });
 

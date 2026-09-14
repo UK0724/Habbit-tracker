@@ -9,6 +9,11 @@ import {
 const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id");
 
 const baseHabitSchema = z.object({
+  schedule: z.enum(["daily", "weekdays", "weekly"]).optional(),
+  weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional(),
+  timesPerWeek: z.number().int().min(1).max(7).optional(),
+  targetMax: z.number().finite().nullable().optional(),
+  reminderTime: z.string().regex(/^$|^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   title: z.string().trim().min(1, "Title is required").max(100),
   description: z
     .string()
@@ -32,7 +37,7 @@ const baseHabitSchema = z.object({
   target: z
     .number({ invalid_type_error: "Target must be a number" })
     .finite()
-    .positive("Target must be greater than zero")
+    .nullable()
     .optional()
 });
 

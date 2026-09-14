@@ -4,6 +4,8 @@ export interface SolvedProblem {
   problemId: number;
   language: string;
   solvedAt: string;
+  revisionDueDate?: string;
+  revisionDates?: string[];
   notes?: string;
 }
 

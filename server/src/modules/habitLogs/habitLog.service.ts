@@ -1,10 +1,11 @@
+import { userToday } from "../habits/workspaceSync.js";
 import { HabitModel } from "../habits/habit.model.js";
 import {
   serializeHabit,
   serializeHabitLog
 } from "../habits/habit.service.js";
 import { AppError } from "../../utils/appError.js";
-import { getTodayDateString } from "../../utils/date.js";
+
 import {
   HabitLogDocument,
   HabitLogModel
@@ -12,7 +13,7 @@ import {
 
 type HabitLogPayload = {
   date?: string;
-  status?: "done" | "not_done" | null;
+  status?: "done" | "not_done" | "skipped" | null;
   value?: number | null;
   comment?: string;
 };
@@ -49,6 +50,8 @@ const normalizePayloadForHabit = (
     throw new AppError("Date is required", 400);
   }
 
+  if (nextStatus === "skipped") return { date: nextDate, status: "skipped" as const, value: null, comment: nextComment };
+
   if (habit.type === "action") {
     if (payload.value !== undefined && payload.value !== null) {
       throw new AppError("Action logs must use status, not value", 400);
@@ -70,7 +73,7 @@ const normalizePayloadForHabit = (
       date: nextDate,
       status: nextStatus,
       value: null,
-      comment: nextStatus === "done" ? nextComment : undefined
+      comment: nextComment
     };
   }
 
@@ -86,7 +89,7 @@ const normalizePayloadForHabit = (
     date: nextDate,
     status: null,
     value: nextValue,
-    comment: undefined
+    comment: nextComment
   };
 };
 
@@ -109,6 +112,7 @@ export const listHabitLogs = async (habitId: string, userId: string, limit = 10)
 
 export const createHabitLog = async (habitId: string, userId: string, payload: HabitLogPayload) => {
   const habit = await getHabitByIdOrThrow(habitId, userId);
+  if(payload.date && payload.date > await userToday(userId)) throw new AppError("Future check-ins are not available",400);
   const normalizedPayload = normalizePayloadForHabit(habit, payload);
 
   const existingLog = await HabitLogModel.findOne({
@@ -144,6 +148,7 @@ export const updateHabitLog = async (
     throw new AppError("Habit log not found", 404);
   }
 
+  if(payload.date && payload.date > await userToday(userId)) throw new AppError("Future check-ins are not available",400);
   const normalizedPayload = normalizePayloadForHabit(habit, payload, log);
 
   log.date = normalizedPayload.date;
@@ -157,7 +162,7 @@ export const updateHabitLog = async (
 };
 
 export const getTodayLogs = async (userId: string) => {
-  const today = getTodayDateString();
+  const today = await userToday(userId);
 
   const userHabits = await HabitModel.find({ userId }).select("_id");
   const userHabitIds = userHabits.map((h) => h._id);

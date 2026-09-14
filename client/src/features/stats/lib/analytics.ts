@@ -1,3 +1,4 @@
+import { summarize, type TrackedHabit } from "../../../shared/lib/rules";
 import {
   addDaysToDateString,
   getTodayDateString
@@ -88,6 +89,7 @@ const computeCurrentStreak = (doneDates: string[]) => {
   }
 
   const sorted = [...doneDates].sort((a, b) => b.localeCompare(a));
+  if (sorted[0]! < addDaysToDateString(getTodayDateString(),-1)) return 0;
   let streak = 1;
 
   for (let i = 1; i < sorted.length; i += 1) {
@@ -101,7 +103,8 @@ const computeCurrentStreak = (doneDates: string[]) => {
   return streak;
 };
 
-export const buildActionAnalytics = (logs: HabitLog[]): ActionAnalytics => {
+export const buildActionAnalytics = (logs: HabitLog[], habit?: TrackedHabit): ActionAnalytics => {
+  const summary = habit ? summarize(habit, logs, getTodayDateString(),180) : null;
   const byDate = indexLogsByDate(logs);
   const today = getTodayDateString();
 
@@ -137,11 +140,11 @@ export const buildActionAnalytics = (logs: HabitLog[]): ActionAnalytics => {
 
   return {
     type: "action",
-    currentStreak: computeCurrentStreak(doneDates),
-    longestStreak: computeLongestStreak(doneDates),
+    currentStreak: summary?.current ?? computeCurrentStreak(doneDates),
+    longestStreak: summary?.best ?? computeLongestStreak(doneDates),
     totalDone: doneDates.length,
     totalLogged,
-    completionRate: totalLogged === 0 ? 0 : doneDates.length / totalLogged,
+    completionRate: summary ? (summary.consistency ?? 0)/100 : totalLogged === 0 ? 0 : doneDates.length / totalLogged,
     last7,
     last30Done,
     lastCompletedDate

@@ -1,3 +1,4 @@
+import { useAuthStore } from "../../../stores/authStore";
 import { create } from "zustand";
 import {
   getDsaProfile,
@@ -34,8 +35,8 @@ export const useDsaPrepStore = create<DsaPrepState>((set, get) => ({
     try {
       const data = await getDsaProfile();
       set({ solvedProblems: data?.solvedProblems || [], isLoading: false });
-    } catch (err: any) {
-      set({ error: err?.message || "Failed to load DSA Profile", isLoading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : "Failed to load DSA Profile", isLoading: false });
     }
   },
 
@@ -46,8 +47,8 @@ export const useDsaPrepStore = create<DsaPrepState>((set, get) => ({
     try {
       const data = await getDsaProblems();
       set({ problems: data || [], isLoading: false });
-    } catch (err: any) {
-      set({ error: err?.message || "Failed to load DSA problems catalog", isLoading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : "Failed to load DSA problems catalog", isLoading: false });
     }
   },
 
@@ -69,8 +70,8 @@ export const useDsaPrepStore = create<DsaPrepState>((set, get) => ({
     try {
       const data = await markProblemSolved({ problemId, language, notes });
       set({ solvedProblems: data?.solvedProblems || [], isLoading: false });
-    } catch (err: any) {
-      set({ error: err?.message || "Failed to mark problem solved", isLoading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : "Failed to mark problem solved", isLoading: false });
       throw err;
     }
   },
@@ -80,8 +81,8 @@ export const useDsaPrepStore = create<DsaPrepState>((set, get) => ({
     try {
       const data = await unmarkProblemSolved({ problemId });
       set({ solvedProblems: data?.solvedProblems || [], isLoading: false });
-    } catch (err: any) {
-      set({ error: err?.message || "Failed to unmark problem solved", isLoading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : "Failed to unmark problem solved", isLoading: false });
       throw err;
     }
   },
@@ -90,3 +91,5 @@ export const useDsaPrepStore = create<DsaPrepState>((set, get) => ({
     set({ solvedProblems: [], problems: [], error: null, isLoading: false });
   }
 }));
+
+useAuthStore.subscribe((state,previous)=>{if(state.token!==previous.token) {  useDsaPrepStore.setState(useDsaPrepStore.getInitialState(),true); }});

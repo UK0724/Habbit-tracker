@@ -1,6 +1,7 @@
 import { HydratedDocument, Schema, model } from "mongoose";
 
 export interface User {
+  timezone?: string;
   email: string;
   passwordHash: string;
   createdAt: Date;
@@ -11,6 +12,7 @@ export type UserDocument = HydratedDocument<User>;
 
 const userSchema = new Schema<User>(
   {
+    timezone: { type: String },
     email: {
       type: String,
       required: true,

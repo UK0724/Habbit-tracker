@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -60,6 +61,13 @@ export const HabitForm = ({
   } = useForm<HabitFormValues>({
     resolver: zodResolver(habitFormSchema),
     defaultValues: {
+      schedule: defaultValues?.schedule ?? "daily",
+      weekdays: defaultValues?.weekdays ?? [1,2,3,4,5],
+      timesPerWeek: defaultValues?.timesPerWeek ?? 3,
+      targetMax: defaultValues?.targetMax,
+      reminderTime: defaultValues?.reminderTime ?? "",
+      linkToDSAPrep: defaultValues?.linkToDSAPrep ?? false,
+      linkToExpenseTracker: defaultValues?.linkToExpenseTracker ?? false,
       title: defaultValues?.title ?? "",
       description: defaultValues?.description ?? "",
       type: defaultValues?.type ?? "action",
@@ -101,7 +109,7 @@ export const HabitForm = ({
   const targetField = register("target", {
     setValueAs: (value) =>
       value === "" || value === null || value === undefined
-        ? undefined
+        ? null
         : Number(value)
   });
 
@@ -133,6 +141,7 @@ export const HabitForm = ({
               <button
                 key={option.value}
                 type="button"
+                aria-pressed={isActive}
                 disabled={typeDisabled}
                 onClick={() => setType(option.value)}
                 className={cn(
@@ -169,6 +178,15 @@ export const HabitForm = ({
         ) : null}
       </div>
 
+      <fieldset className="space-y-3"><legend className="field-label">Schedule</legend>
+        <label className="field-label" htmlFor="schedule">Repeat</label><select id="schedule" className="field-input" {...register("schedule")}><option value="daily">Every day</option><option value="weekdays">Selected weekdays</option><option value="weekly">Times per week</option></select>
+        {watch("schedule") === "weekdays" && <div className="flex flex-wrap gap-2">{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day,index)=><button key={day} type="button" className="rounded-xl border border-border-app p-3 aria-pressed:bg-accent aria-pressed:text-white" aria-pressed={watch("weekdays")?.includes(index)} onClick={()=>{const days=watch("weekdays") ?? []; setValue("weekdays",days.includes(index)?days.filter(d=>d!==index):[...days,index],{shouldValidate:true});}}>{day}</button>)}</div>}
+        {errors.weekdays && <p role="alert">Choose at least one weekday.</p>}
+        {watch("schedule") === "weekly" && <label className="field-label">Days per week<Input type="number" min="1" max="7" {...register("timesPerWeek",{valueAsNumber:true})}/></label>}
+        <p className="field-hint">Weeks run Monday–Sunday. One completion per date. Rest days and skipped days pause daily streaks; weekly streaks count completed weeks. Changes apply from today onward.</p>
+      </fieldset>
+      {selectedGoal === "range" && <label className="field-label">Upper target<Input type="number" step="any" {...register("targetMax",{setValueAs:v=>v===""?null:Number(v)})}/></label>}
+      <details><summary className="cursor-pointer font-semibold">Reminder</summary><label className="field-label">Time<Input type="time" {...register("reminderTime")}/></label><p className="field-hint">Enable reminders in Settings. Reminders appear only while Arc is open on this device.</p></details>
       {/* Conditional config */}
       {selectedType === "measurable" ? (
         <div className="space-y-5">
@@ -193,7 +211,9 @@ export const HabitForm = ({
               {(
                 [
                   { value: "up", label: "Higher is better", hint: "steps, water, pages" },
-                  { value: "down", label: "Lower is better", hint: "weight, screen time" }
+                  { value: "down", label: "Lower is better", hint: "screen time" },
+                  { value: "range", label: "Within a range", hint: "minimum to maximum" },
+                  { value: "record", label: "Record only", hint: "every entry counts" }
                 ] as const
               ).map((option) => {
                 const isActive = selectedGoal === option.value;
@@ -201,6 +221,7 @@ export const HabitForm = ({
                   <button
                     key={option.value}
                     type="button"
+                    aria-pressed={isActive}
                     onClick={() =>
                       setValue("goalDirection", option.value, {
                         shouldDirty: true,
@@ -245,7 +266,7 @@ export const HabitForm = ({
               {...targetField}
             />
             <p className="field-hint">
-              We&apos;ll show your progress toward this.
+              Daily target: the saved value must meet this rule. Leave blank to count any recorded value.
             </p>
             {errors.target ? (
               <p className="field-hint text-rose-600">{errors.target.message}</p>
@@ -310,7 +331,7 @@ export const HabitForm = ({
       ) : null}
 
       {selectedType === "action" ? (
-        <div className="space-y-3">
+        <details className="space-y-3"><summary className="cursor-pointer font-semibold">Optional comments and workspace connections</summary><p className="field-hint">Workspaces are always available. Linking adds a shortcut and automatically checks in when you record workspace activity. Existing check-ins and skips are kept.</p>
           <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-border-app bg-surface-2 p-4 transition hover:border-accent/40">
             <input
               type="checkbox"
@@ -339,7 +360,7 @@ export const HabitForm = ({
                 Link to Job Search Tracker
               </span>
               <span className="mt-1 block text-sm leading-6 text-content-muted">
-                Connect this habit to the Job Search workspace. The switcher and homepage card will only be visible when this habit exists.
+                Connect this habit to the Job Search workspace. Add a convenient shortcut to this workspace.
               </span>
             </span>
           </label>
@@ -355,7 +376,7 @@ export const HabitForm = ({
                 Link to DSA Prep Tracker
               </span>
               <span className="mt-1 block text-sm leading-6 text-content-muted">
-                Connect this habit to the DSA Prep workspace. The switcher and homepage card will only be visible when this habit exists.
+                Connect this habit to the DSA Prep workspace. Add a convenient shortcut to this workspace.
               </span>
             </span>
           </label>
@@ -371,11 +392,11 @@ export const HabitForm = ({
                 Link to Expense Tracker
               </span>
               <span className="mt-1 block text-sm leading-6 text-content-muted">
-                Connect this habit to the Expenses workspace. The switcher and homepage card will only be visible when this habit exists.
+                Connect this habit to the Expenses workspace. Add a convenient shortcut to this workspace.
               </span>
             </span>
           </label>
-        </div>
+        </details>
       ) : null}
 
       <div>
@@ -454,6 +475,7 @@ export const HabitForm = ({
           ) : null}
         </div>
 
+        <Link to="/habits" className="text-sm font-semibold text-content-2">Cancel</Link>
         <Button type="submit" disabled={isSubmitting || isDeleting}>
           {isSubmitting ? "Saving..." : submitLabel}
         </Button>

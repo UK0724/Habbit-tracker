@@ -31,6 +31,7 @@ const actionButtonClassName =
   "inline-flex min-w-28 items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-semibold transition focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-60";
 
 const statusText = {
+  skipped: "Skipped",
   done: "Done",
   not_done: "Not done"
 } as const;

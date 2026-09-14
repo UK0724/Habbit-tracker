@@ -1,3 +1,4 @@
+import { TrackingPreferences } from "../components/TrackingPreferences";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
@@ -52,6 +53,7 @@ export const SettingsPage = () => {
                 <button
                   key={option.value}
                   type="button"
+                  aria-pressed={mode === option.value}
                   onClick={() => setMode(option.value)}
                   className={cn(
                     "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition",
@@ -100,6 +102,7 @@ export const SettingsPage = () => {
         </div>
       </SectionCard>
 
+      <TrackingPreferences/>
       <SectionCard title="Account" description="Details tied to your login.">
         <div>
           <p className="field-label">Email</p>

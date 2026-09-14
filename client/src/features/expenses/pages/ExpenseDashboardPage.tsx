@@ -1,69 +1,42 @@
-import { useState, useEffect } from "react";
+import { useCallback, useRef } from "react";
+import { useDialog } from "../../../shared/hooks/useDialog";
+import { getTodayDateString } from "../../../shared/lib/date";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Search, Trash2, Edit, Calendar, CreditCard, Wallet, TrendingDown } from "lucide-react";
 import { useExpenseStore, Expense } from "../stores/expenseStore";
 import { CATEGORIES } from "../components/ExpenseLayout";
-import { useHabits } from "../../habits/hooks/useHabits";
-import { useSaveHabitLog } from "../../logs/hooks/useHabitLogs";
+
+
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
 
 const COLORS = ["#10b981", "#3b82f6", "#6366f1", "#f59e0b", "#ec4899", "#8b5cf6", "#64748b"];
 
 export const ExpenseDashboardPage = () => {
-  const { expenses, fetchExpenses, addExpense, updateExpense, deleteExpense } = useExpenseStore();
+  const { expenses, addExpense, updateExpense, deleteExpense } = useExpenseStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   
   // Add/Edit Modal states
   const [showModal, setShowModal] = useState(false);
+  const [saving,setSaving]=useState(false);
+  const [saveError,setSaveError]=useState("");
+  const savingRef=useRef(false);
+  const closeModal=useCallback(()=>{if(!savingRef.current)setShowModal(false);},[]);
+  useDialog(showModal,closeModal,'[data-expense-dialog]');
   const [editExpense, setEditExpense] = useState<Expense | null>(null);
   const [amountInput, setAmountInput] = useState("");
   const [categoryInput, setCategoryInput] = useState<string>(CATEGORIES[0]!);
-  const [dateInput, setDateInput] = useState(new Date().toISOString().split("T")[0] || "");
+  const [dateInput, setDateInput] = useState(getTodayDateString());
   const [descriptionInput, setDescriptionInput] = useState("");
   const [paymentMethodInput, setPaymentMethodInput] = useState("UPI");
 
-  const todayStr = new Date().toISOString().split("T")[0] || "";
-  const { data: habits } = useHabits(todayStr);
-  const saveLogMutation = useSaveHabitLog();
-
-  // Habit Sync observer
-  useEffect(() => {
-    if (!habits || !expenses) return;
-    const expenseHabit = habits.find((h) => h.linkToExpenseTracker);
-    if (!expenseHabit) return;
-
-    const hasTodayExpense = expenses.some((e) => e.date === todayStr);
-    const isCurrentlyDone = expenseHabit.selectedDateLog?.status === "done";
-
-    if (hasTodayExpense && !isCurrentlyDone) {
-      saveLogMutation.mutate({
-        habitId: expenseHabit.id,
-        logId: expenseHabit.selectedDateLog?.id,
-        input: {
-          date: todayStr,
-          status: "done",
-          comment: `Tracked daily expense logs`
-        }
-      });
-    } else if (!hasTodayExpense && isCurrentlyDone && expenseHabit.selectedDateLog?.comment?.includes("Tracked daily expense logs")) {
-      saveLogMutation.mutate({
-        habitId: expenseHabit.id,
-        logId: expenseHabit.selectedDateLog?.id,
-        input: {
-          date: todayStr,
-          status: "not_done",
-          comment: ""
-        }
-      });
-    }
-  }, [expenses, habits, todayStr]);
-
+  const todayStr = getTodayDateString();
   const handleOpenAdd = () => {
     setEditExpense(null);
     setAmountInput("");
     setCategoryInput(CATEGORIES[0]!);
-    setDateInput(new Date().toISOString().split("T")[0] || "");
+    setDateInput(getTodayDateString());
     setDescriptionInput("");
     setPaymentMethodInput("UPI");
     setShowModal(true);
@@ -81,6 +54,7 @@ export const ExpenseDashboardPage = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if(savingRef.current)return;
     const amount = parseFloat(amountInput);
     if (isNaN(amount) || amount <= 0) return;
 
@@ -92,24 +66,25 @@ export const ExpenseDashboardPage = () => {
       paymentMethod: paymentMethodInput
     };
 
+    savingRef.current=true;setSaving(true);setSaveError("");
+    try {
     if (editExpense) {
       await updateExpense(editExpense.id, payload);
     } else {
       await addExpense(payload);
     }
     setShowModal(false);
+    } catch(e) { setSaveError(e instanceof Error?e.message:"Could not save. Try again."); } finally { savingRef.current=false;setSaving(false); }
   };
 
   // Math Metrics
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  const monthlyExpenses = expenses.filter((e) => {
-    const d = new Date(e.date);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  });
+  const [month,setMonth]=useState(getTodayDateString().slice(0,7));
+  const currentMonth = Number(month.slice(5))-1;
+  const currentYear = Number(month.slice(0,4));
+  const monthlyExpenses = expenses.filter(e=>e.date.startsWith(month));
 
   const totalSpent = monthlyExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const dayOfMonth = new Date().getDate();
+  const dayOfMonth = month===getTodayDateString().slice(0,7)?Number(getTodayDateString().slice(8)):new Date(currentYear,currentMonth+1,0).getDate();
   const dailyAverage = totalSpent / (dayOfMonth || 1);
 
   // Recharts Trends Processors
@@ -119,7 +94,7 @@ export const ExpenseDashboardPage = () => {
     for (let i = 1; i <= daysInMonth; i++) dayTotals[i] = 0;
 
     monthlyExpenses.forEach((e) => {
-      const day = new Date(e.date).getDate();
+      const day = Number(e.date.slice(8));
       if (dayTotals[day] !== undefined) dayTotals[day] += e.amount;
     });
 
@@ -149,7 +124,7 @@ export const ExpenseDashboardPage = () => {
       e.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.category.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === "All" || e.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && e.date.startsWith(month);
   });
 
   return (
@@ -172,6 +147,7 @@ export const ExpenseDashboardPage = () => {
         </button>
       </section>
 
+      <label className="field-label">Month<input type="month" className="field-input mt-1 max-w-xs" value={month} onChange={e=>e.target.value&&setMonth(e.target.value)}/></label>
       {/* Summary Cards */}
       <section className="grid gap-4 sm:grid-cols-3">
         <div className="surface-card p-5 space-y-2 border border-emerald-500/20 bg-emerald-500/5">
@@ -373,7 +349,8 @@ export const ExpenseDashboardPage = () => {
               {editExpense ? "Edit Transaction Record" : "Log New Expense"}
             </h3>
 
-            <form onSubmit={handleSave} className="space-y-4">
+            {saveError && <p role="alert" className="text-sm text-rose-500">{saveError} Your entry has been kept.</p>}
+            <form data-expense-dialog role="dialog" aria-modal="true" aria-label="Expense" onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-content-2 mb-1">Amount (₹)</label>
@@ -448,10 +425,10 @@ export const ExpenseDashboardPage = () => {
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="submit" disabled={saving}
                   className="rounded-xl bg-accent px-4 py-2 text-xs font-bold text-accent-fg hover:bg-accent-hover shadow-sm"
                 >
-                  Save Record
+                  {saving?"Saving…":"Save expense"}
                 </button>
               </div>
             </form>

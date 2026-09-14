@@ -1,3 +1,5 @@
+import { syncWorkspaceActivity, userToday } from "../habits/workspaceSync.js";
+import { isValidDateString } from "../../utils/date.js";
 import { JobSearchProfileModel } from "./jobTracker.model.js";
 import type { UpdateProfileBody } from "./jobTracker.validation.js";
 
@@ -109,12 +111,19 @@ export const jobTrackerService = {
     userId: string,
     updateData: UpdateProfileBody
   ) => {
+    const before = await JobSearchProfileModel.findOne({ userId });
     const profile = await JobSearchProfileModel.findOneAndUpdate(
       { userId },
       { $set: updateData },
       { new: true, runValidators: true }
     );
-    
+    const today = await userToday(userId);
+    const weekday = new Intl.DateTimeFormat("en-US",{weekday:"long",timeZone:"UTC"}).format(new Date(`${today}T12:00:00Z`));
+    const todayTasks = updateData.dailyTasks?.filter(t=>t.dayOfWeek===weekday) ?? [];
+    if(todayTasks.length && todayTasks.every(t=>t.completed)) await syncWorkspaceActivity(userId,"linkToJobTracker",today,`Completed checklist for ${weekday}`);
+    for (const application of updateData.applications ?? []) {
+      if (application.status !== "Wishlist" && isValidDateString(application.appliedDate) && !before?.applications.some(a=>a.id===application.id && a.status!=="Wishlist")) await syncWorkspaceActivity(userId,"linkToJobTracker",application.appliedDate,"Recorded a job application");
+    }
     return profile;
   }
 };

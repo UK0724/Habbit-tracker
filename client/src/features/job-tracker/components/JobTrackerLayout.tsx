@@ -82,6 +82,7 @@ export const JobTrackerLayout = () => {
 
   // Automated warnings / Notifications
   const alerts: string[] = [];
+  applications.forEach(app=>{if(app.followUpDate && app.followUpDate<=todayStr && app.status!=="Rejected" && app.status!=="Offer") alerts.push(`Follow up with ${app.company}`);});
   referrals.forEach(ref => {
     if (!ref.replied && ref.followUpDate <= todayStr) {
       alerts.push(`Follow up with ${ref.personName} at ${ref.company}`);
@@ -301,7 +302,7 @@ export const JobTrackerLayout = () => {
 
       {saveError && (
         <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-600 shadow-lg">
-          Changes could not be saved: {saveError}
+          Changes could not be saved: {saveError}<button className="ml-2 underline" onClick={()=>useJobTrackerStore.getState().retrySave()}>Retry save</button>
         </div>
       )}
 

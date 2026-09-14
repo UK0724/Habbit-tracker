@@ -1,3 +1,4 @@
+import { trackingRouter } from "./modules/habits/tracking.routes.js";
 import cors from "cors";
 import express from "express";
 import morgan from "morgan";
@@ -34,6 +35,7 @@ app.get("/api/health", (_request, response) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api", trackingRouter);
 app.use("/api/habits", habitRouter);
 app.use("/api/job-tracker", jobTrackerRouter);
 app.use("/api/dsa-prep", dsaPrepRouter);

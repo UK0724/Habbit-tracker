@@ -59,6 +59,7 @@ export const EditHabitPage = () => {
       >
         <HabitForm
           defaultValues={{
+            ...habitQuery.data,
             title: habitQuery.data.title,
             description: habitQuery.data.description ?? "",
             type: habitQuery.data.type,

@@ -35,11 +35,13 @@ export const apiRequest = async <T>(
   path: string,
   init?: RequestInit
 ): Promise<T> => {
+  const sessionToken = useAuthStore.getState().token;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: buildHeaders(init)
   });
 
+  if (sessionToken !== useAuthStore.getState().token) throw new ApiError("Session changed. Please retry.", 409);
   const hasJson = response.headers
     .get("content-type")
     ?.includes("application/json");

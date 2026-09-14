@@ -24,6 +24,7 @@ const invalidateHabitCollections = async (
   habitId?: string
 ) => {
   await Promise.all([
+    queryClient.invalidateQueries({queryKey:["insights"]}),
     queryClient.invalidateQueries({
       queryKey: ["habits"]
     }),

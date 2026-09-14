@@ -1,3 +1,4 @@
+import { useAuthStore } from "../../../stores/authStore";
 import { create } from "zustand";
 import { apiRequest } from "../../../services/api";
 
@@ -42,8 +43,8 @@ export const useExpenseStore = create<ExpenseState>((set, get) => ({
     try {
       const data = await apiRequest<Expense[]>("/expenses");
       set({ expenses: data || [], isLoading: false });
-    } catch (err: any) {
-      set({ error: err.message || "Failed to load expenses", isLoading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : "Failed to load expenses", isLoading: false });
     }
   },
 
@@ -52,8 +53,8 @@ export const useExpenseStore = create<ExpenseState>((set, get) => ({
     try {
       const data = await apiRequest<Budget[]>("/expenses/budgets");
       set({ budgets: data || [], isLoading: false });
-    } catch (err: any) {
-      set({ error: err.message || "Failed to load budgets", isLoading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : "Failed to load budgets", isLoading: false });
     }
   },
 
@@ -68,8 +69,8 @@ export const useExpenseStore = create<ExpenseState>((set, get) => ({
         expenses: [newExpense, ...get().expenses],
         isLoading: false
       });
-    } catch (err: any) {
-      set({ error: err.message || "Failed to add expense", isLoading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : "Failed to add expense", isLoading: false });
       throw err;
     }
   },
@@ -85,8 +86,8 @@ export const useExpenseStore = create<ExpenseState>((set, get) => ({
         expenses: get().expenses.map((e) => (e.id === id ? updated : e)),
         isLoading: false
       });
-    } catch (err: any) {
-      set({ error: err.message || "Failed to update expense", isLoading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : "Failed to update expense", isLoading: false });
       throw err;
     }
   },
@@ -101,8 +102,8 @@ export const useExpenseStore = create<ExpenseState>((set, get) => ({
         expenses: get().expenses.filter((e) => e.id !== id),
         isLoading: false
       });
-    } catch (err: any) {
-      set({ error: err.message || "Failed to delete expense", isLoading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : "Failed to delete expense", isLoading: false });
       throw err;
     }
   },
@@ -121,9 +122,11 @@ export const useExpenseStore = create<ExpenseState>((set, get) => ({
           : [...get().budgets, updatedBudget],
         isLoading: false
       });
-    } catch (err: any) {
-      set({ error: err.message || "Failed to update budget limit", isLoading: false });
+    } catch (err: unknown) {
+      set({ error: err instanceof Error ? err.message : "Failed to update budget limit", isLoading: false });
       throw err;
     }
   }
 }));
+
+useAuthStore.subscribe((state,previous)=>{if(state.token!==previous.token) {  useExpenseStore.setState(useExpenseStore.getInitialState(),true); }});

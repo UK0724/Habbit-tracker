@@ -61,8 +61,8 @@ export const HabitDetailPage = () => {
   const habit = habitQuery.data;
 
   const actionAnalytics = useMemo(
-    () => (habit?.type === "action" ? buildActionAnalytics(logs) : null),
-    [habit?.type, logs]
+    () => (habit?.type === "action" ? buildActionAnalytics(logs, habit) : null),
+    [habit, logs]
   );
   const measurableAnalytics = useMemo(
     () =>
@@ -91,7 +91,7 @@ export const HabitDetailPage = () => {
 
   // Is the latest movement toward the goal? (green) or away from it? (rose)
   const trend = measurableAnalytics?.trend ?? "none";
-  const trendFavorable =
+  const trendFavorable = habit.goalDirection === "record" || habit.goalDirection === "range" ? null :
     trend === "up" ? !lowerIsBetter : trend === "down" ? lowerIsBetter : null;
   const trendBadgeClass =
     trendFavorable === true
@@ -344,7 +344,7 @@ export const HabitDetailPage = () => {
               data={measurableAnalytics.series.map((point) => point.value)}
               color={hex.base}
               height={140}
-              target={habit.target}
+              target={habit.target ?? undefined}
             />
             {measurableAnalytics.series.length ? (
               <div className="mt-3 flex justify-between text-xs font-semibold text-content-subtle">

@@ -1,9 +1,10 @@
+import { RevisionPanel } from "../components/RevisionPanel";
 import { useState, useMemo, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useDsaPrepStore } from "../stores/dsaPrepStore";
 import { AlgorithmVisualizer } from "../components/AlgorithmVisualizer";
-import { useHabits } from "../../habits/hooks/useHabits";
-import { useSaveHabitLog } from "../../logs/hooks/useHabitLogs";
+
+
 import { Button } from "../../../components/ui/Button";
 import { Confetti } from "../../../components/viz/Confetti";
 import {
@@ -19,7 +20,7 @@ import type { DsaProblem } from "../services/dsaPrepApi";
 
 export const DsaProblemDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+
   const problemId = Number(id);
 
   const [problem, setProblem] = useState<DsaProblem | null>(null);
@@ -34,11 +35,6 @@ export const DsaProblemDetailsPage = () => {
   const [copied, setCopied] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   const [activeTab, setActiveTab] = useState<"visualizer" | "naive" | "optimized">("visualizer");
-
-  // Fetch habits to perform automatic log completions
-  const todayStr = new Date().toISOString().split("T")[0] || "";
-  const habitsQuery = useHabits(todayStr);
-  const saveLogMutation = useSaveHabitLog();
 
   useEffect(() => {
     let active = true;
@@ -74,7 +70,7 @@ export const DsaProblemDetailsPage = () => {
   if (loadingDetail) {
     return (
       <div className="surface-card p-12 text-center text-content-muted">
-        <p className="text-sm font-semibold animate-pulse">Loading problem details from database...</p>
+        <p className="text-sm font-semibold animate-pulse">Loading problem details…</p>
       </div>
     );
   }
@@ -95,20 +91,6 @@ export const DsaProblemDetailsPage = () => {
       // 1. Submit progress to backend database
       await solveProblemMutation(problemId, language, notes);
       
-      // 2. Locate linked DSA habit and mark completed for today
-      const dsaHabit = habitsQuery.data?.find((h) => h.linkToDSAPrep);
-      if (dsaHabit && dsaHabit.selectedDateLog?.status !== "done") {
-        await saveLogMutation.mutateAsync({
-          habitId: dsaHabit.id,
-          logId: dsaHabit.selectedDateLog?.id,
-          input: {
-            date: todayStr,
-            status: "done",
-            comment: `Solved Q${problem.id}: ${problem.title}`
-          }
-        });
-      }
-
       setCelebrate(true);
       setTimeout(() => setCelebrate(false), 3000);
     } catch (err) {
@@ -134,6 +116,7 @@ export const DsaProblemDetailsPage = () => {
 
   return (
     <div className="space-y-6">
+      <RevisionPanel key={problemId} problemId={problemId}/>
       {celebrate && <Confetti />}
 
       {/* Back button */}

@@ -1,7 +1,8 @@
+import type { Rules } from "../lib/rules";
 export type HabitType = "action" | "measurable" | "expense";
-export type ActionStatus = "done" | "not_done";
+export type ActionStatus = "done" | "not_done" | "skipped";
 export type Trend = "up" | "down" | "same" | "none";
-export type GoalDirection = "up" | "down";
+export type GoalDirection = "up" | "down" | "range" | "record";
 
 export type ApiResponse<T> = {
   data: T;
@@ -20,7 +21,14 @@ export type Habit = {
   linkToDSAPrep?: boolean;
   linkToExpenseTracker?: boolean;
   goalDirection: GoalDirection;
-  target?: number;
+  target?: number | null;
+  schedule?: "daily" | "weekdays" | "weekly";
+  weekdays?: number[];
+  timesPerWeek?: number;
+  targetMax?: number | null;
+  reminderTime?: string;
+  ruleHistory?: (Rules & { effectiveDate: string })[];
+
   createdAt: string;
   updatedAt: string;
 };
@@ -81,7 +89,14 @@ export type CreateHabitInput = {
   linkToExpenseTracker?: boolean;
   color: string;
   goalDirection?: GoalDirection;
-  target?: number;
+  target?: number | null;
+  schedule?: "daily" | "weekdays" | "weekly";
+  weekdays?: number[];
+  timesPerWeek?: number;
+  targetMax?: number | null;
+  reminderTime?: string;
+  ruleHistory?: (Rules & { effectiveDate: string })[];
+
 };
 
 export type UpdateHabitInput = Partial<CreateHabitInput>;

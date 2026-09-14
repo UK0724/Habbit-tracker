@@ -1,0 +1,7 @@
+const fs=require('fs');const edit=(p,f)=>fs.writeFileSync(p,f(fs.readFileSync(p,'utf8').replace(/\r\n/g,'\n')));
+edit('client/src/app/AppLayout.tsx',s=>'import { ReminderWatcher } from "../components/ReminderWatcher";\n'+s.replace('{ready?<Outlet/>','{ready?<><ReminderWatcher/><Outlet/></>'));
+edit('server/src/modules/dsaPrep/dsaPrep.model.ts',s=>s.replace('  notes?: string;','  revisionDueDate?: string;\n  revisionDates?: string[];\n  notes?: string;').replace('  notes: { type: String','  revisionDueDate: String,\n  revisionDates: { type: [String], default: [] },\n  notes: { type: String'));
+edit('client/src/features/dsa-prep/services/dsaPrepApi.ts',s=>s.replace('  notes?: string;','  revisionDueDate?: string;\n  revisionDates?: string[];\n  notes?: string;'));
+edit('client/src/features/dsa-prep/pages/DsaProblemDetailsPage.tsx',s=>'import { RevisionPanel } from "../components/RevisionPanel";\n'+s.replace('      {celebrate', '      <RevisionPanel key={problemId} problemId={problemId}/>\n      {celebrate'));
+edit('server/src/modules/habits/habit.service.ts',s=>s.replace('summarize, rulesAt, type Rules','summarize, type Rules'));
+edit('client/src/features/job-tracker/stores/jobTrackerStore.ts',s=>s.replace('let saveTimer:', 'let saveChain = Promise.resolve();\nlet saveTimer:').replace('    jobTrackerStorage\n      .saveProfile(state)','    saveChain = saveChain.catch(()=>{}).then(async()=>{\n      if(token!==useAuthStore.getState().token)return;\n      await jobTrackerStorage.saveProfile(state);\n    })'));

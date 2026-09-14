@@ -1,3 +1,4 @@
+import { syncWorkspaceActivity } from "../habits/workspaceSync.js";
 import { ExpenseModel, BudgetModel, IExpense } from "./expense.model.js";
 
 export const expenseService = {
@@ -8,6 +9,7 @@ export const expenseService = {
   addExpense: async (userId: string, data: Omit<IExpense, "userId">) => {
     const expense = new ExpenseModel({ ...data, userId });
     await expense.save();
+    await syncWorkspaceActivity(userId, "linkToExpenseTracker", expense.date, "Logged expenses");
     return expense;
   },
 

@@ -11,8 +11,7 @@ import {
   WishlistCompany,
   ResumeVersion,
   ResourceBookmark,
-  UserNote,
-  ApplicationStatus
+  UserNote
 } from "../types";
 import { PRELOADED_SCHEDULE } from "../seedData";
 
@@ -28,6 +27,7 @@ interface JobTrackerState {
   notes: UserNote[];
   streak: number;
   saveError: string | null;
+  retrySave: () => void;
 
   // Actions
   loadAllData: () => Promise<void>;
@@ -97,6 +97,7 @@ const DEFAULT_WEEKLY_GOALS: WeeklyGoals = {
   linkedinCurrent: 0
 };
 
+let saveChain = Promise.resolve();
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
 // ponytail: every mutation PUTs the whole profile, so it is debounced rather
@@ -106,10 +107,14 @@ const queueSave = (
   state: JobTrackerState,
   set: (partial: Partial<JobTrackerState>) => void
 ) => {
+  const token = useAuthStore.getState().token;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    jobTrackerStorage
-      .saveProfile(state)
+    if(token !== useAuthStore.getState().token) return;
+    saveChain = saveChain.catch(()=>{}).then(async()=>{
+      if(token!==useAuthStore.getState().token)return;
+      await jobTrackerStorage.saveProfile(state);
+    })
       .then(() => set({ saveError: null }))
       .catch((err: unknown) =>
         set({
@@ -132,6 +137,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
   notes: [],
   streak: 0,
   saveError: null,
+  retrySave: () => queueSave(get(),set),
 
   loadAllData: async () => {
     try {
@@ -147,11 +153,11 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
           resumes: data.resumes || [],
           resources: data.resources || [],
           notes: data.notes || [],
-          streak: typeof data.streak === "number" ? data.streak : 8
+          streak: typeof data.streak === "number" ? data.streak : 0
         });
       }
     } catch (err) {
-      console.error("Failed to load Job Tracker data from backend:", err);
+      set({saveError: err instanceof Error ? err.message : "Could not load job search. Retry before editing."});
     }
   },
 
@@ -503,3 +509,5 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
     queueSave(get(), set);
   }
 }));
+
+useAuthStore.subscribe((state,previous)=>{if(state.token!==previous.token) { clearTimeout(saveTimer); useJobTrackerStore.setState(useJobTrackerStore.getInitialState(),true); }});

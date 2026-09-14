@@ -1,10 +1,11 @@
+import type { Rules } from "./rules.js";
 import { HydratedDocument, Schema, Types, model } from "mongoose";
 
 export const HABIT_TYPES = ["action", "measurable", "expense"] as const;
 
 export type HabitType = (typeof HABIT_TYPES)[number];
 
-export const GOAL_DIRECTIONS = ["up", "down"] as const;
+export const GOAL_DIRECTIONS = ["up", "down", "range", "record"] as const;
 
 export type GoalDirection = (typeof GOAL_DIRECTIONS)[number];
 
@@ -23,7 +24,14 @@ export interface Habit {
   /** For measurable/expense: is a higher or lower value "better". */
   goalDirection: GoalDirection;
   /** Optional target value (e.g. target weight, monthly budget). */
-  target?: number;
+  target?: number | null;
+  schedule?: "daily" | "weekdays" | "weekly";
+  weekdays?: number[];
+  timesPerWeek?: number;
+  targetMax?: number | null;
+  reminderTime?: string;
+  ruleHistory?: (Rules & { effectiveDate: string })[];
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -85,6 +93,12 @@ const habitSchema = new Schema<Habit>(
       enum: GOAL_DIRECTIONS,
       default: "up"
     },
+    schedule: { type: String, enum: ["daily", "weekdays", "weekly"], default: "daily" },
+    weekdays: { type: [Number], default: [1,2,3,4,5] },
+    timesPerWeek: { type: Number, default: 3 },
+    targetMax: Number,
+    reminderTime: String,
+    ruleHistory: { type: [Schema.Types.Mixed], default: [] },
     target: {
       type: Number
     }

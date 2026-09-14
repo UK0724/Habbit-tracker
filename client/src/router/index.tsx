@@ -1,3 +1,6 @@
+import { TodayPage } from "../pages/TodayPage";
+import { HabitsPage } from "../pages/HabitsPage";
+import { InsightsPage } from "../pages/InsightsPage";
 import { createBrowserRouter } from "react-router-dom";
 
 import { AppLayout } from "../app/AppLayout";
@@ -6,7 +9,7 @@ import { RequireAuth } from "../components/RequireAuth";
 import { CreateHabitPage } from "../pages/CreateHabitPage";
 import { EditHabitPage } from "../pages/EditHabitPage";
 import { HabitDetailPage } from "../pages/HabitDetailPage";
-import { HomePage } from "../pages/HomePage";
+
 import { LoginPage } from "../pages/LoginPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { RegisterPage } from "../pages/RegisterPage";
@@ -50,7 +53,9 @@ export const router = createBrowserRouter([
         path: "/",
         element: <AppLayout />,
         children: [
-          { index: true, element: <HomePage /> },
+          { index: true, element: <TodayPage /> },
+          { path: "habits", element: <HabitsPage /> },
+          { path: "insights", element: <InsightsPage /> },
           { path: "settings", element: <SettingsPage /> },
           { path: "habits/new", element: <CreateHabitPage /> },
           { path: "habits/:id", element: <HabitDetailPage /> },

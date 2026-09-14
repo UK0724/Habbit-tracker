@@ -15,6 +15,7 @@ const jobApplicationSchema = new Schema({
   appliedDate: { type: String, required: true },
   status: { type: String, required: true },
   notes: { type: String, default: "" },
+  followUpDate: { type: String, default: "" },
   resumeVersionUsed: { type: String, default: "" }
 }, { _id: false });
 

@@ -25,6 +25,7 @@ const invalidateLogQueries = async (
   variables: SaveLogVariables
 ) => {
   await Promise.all([
+    queryClient.invalidateQueries({queryKey:["insights"]}),
     queryClient.invalidateQueries({
       queryKey: ["habits"]
     }),

@@ -48,6 +48,7 @@ export const JobApplicationSchema = z.object({
     "Offer",
     "Rejected"
   ] as const),
+  followUpDate: z.string().optional(),
   notes: z.string().optional(),
   resumeVersionUsed: z.string().optional()
 });

@@ -1,6 +1,6 @@
 import { HydratedDocument, Schema, Types, model } from "mongoose";
 
-export const ACTION_STATUSES = ["done", "not_done"] as const;
+export const ACTION_STATUSES = ["done", "not_done", "skipped"] as const;
 
 export type ActionStatus = (typeof ACTION_STATUSES)[number];
 
@@ -9,6 +9,7 @@ export interface HabitLog {
   date: string;
   status: ActionStatus | null;
   value: number | null;
+  source?: string;
   comment?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -36,6 +37,7 @@ const habitLogSchema = new Schema<HabitLog>(
       type: Number,
       default: null
     },
+    source: String,
     comment: {
       type: String,
       trim: true

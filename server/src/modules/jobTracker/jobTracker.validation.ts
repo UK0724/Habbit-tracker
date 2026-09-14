@@ -1,3 +1,4 @@
+import { isValidDateString } from "../../utils/date.js";
 import { z } from "zod";
 
 // The client owns ids for every subdocument, so these are client-generated
@@ -19,6 +20,7 @@ const applicationSchema = z.object({
   appliedDate: text(20).default(""),
   status: text(40),
   notes: text(5000).default(""),
+  followUpDate: z.string().refine(v=>v===""||isValidDateString(v)).optional(),
   resumeVersionUsed: text(160).default("")
 });
 

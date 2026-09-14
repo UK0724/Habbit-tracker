@@ -310,3 +310,14 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Shared accessible surfaces */
+@layer base {
+  body { background-image: none; }
+  :root { --text-subtle: 100 116 139; }
+  :root[data-theme="dark"] { --text-subtle: 156 163 183; --bg: 14 15 21; --surface: 23 24 33; --surface-2: 29 30 41; --surface-3: 37 38 51; --border: 49 50 65; }
+  :focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 3px; }
+  button, a, input, select, textarea { touch-action: manipulation; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+}
+@layer components { .field-input { @apply w-full rounded-xl border border-border-app bg-surface px-3 py-2 text-sm text-content; } }

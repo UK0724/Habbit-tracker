@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+import { useDialog } from "../../../shared/hooks/useDialog";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useJobTrackerStore } from "../stores/jobTrackerStore";
@@ -47,6 +49,8 @@ export const ApplicationsPage = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [editingApp, setEditingApp] = useState<JobApplication | null>(null);
   
+  const closeForm = useCallback(()=>setFormOpen(false),[]);
+  useDialog(formOpen,closeForm,'[data-application-dialog]');
   // Drag and Drop active tracking
   const [draggedAppId, setDraggedAppId] = useState<string | null>(null);
 
@@ -111,6 +115,7 @@ export const ApplicationsPage = () => {
       location: app.location,
       appliedDate: app.appliedDate,
       status: app.status,
+      followUpDate: app.followUpDate || "",
       notes: app.notes || "",
       resumeVersionUsed: app.resumeVersionUsed || ""
     });
@@ -579,7 +584,7 @@ export const ApplicationsPage = () => {
               </button>
             </div>
             
-            <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-6 space-y-4">
+            <form data-application-dialog role="dialog" aria-modal="true" aria-label="Job application" onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 {/* Company */}
                 <div>
@@ -729,6 +734,7 @@ export const ApplicationsPage = () => {
               </div>
 
               {/* Submit Buttons */}
+<label className="field-label">Follow-up date<input type="date" className="field-input" {...register("followUpDate")}/></label>
               <div className="flex justify-end gap-3 pt-4 border-t border-border-app">
                 <button
                   type="button"

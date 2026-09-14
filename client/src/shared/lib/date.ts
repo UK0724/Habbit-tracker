@@ -7,7 +7,8 @@ const parseDateParts = (value: string): [number, number, number] => {
 
 export const getTodayDateString = () => {
   const date = new Date();
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const zone = localStorage.getItem("arc-timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return new Intl.DateTimeFormat("en-CA", {timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit"}).format(date);
 };
 
 export const addDaysToDateString = (value: string, amount: number) => {
