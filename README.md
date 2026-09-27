@@ -7,10 +7,6 @@ A full-stack personal productivity app built around habit tracking, with three a
 - `action` habits: log `done` or `not_done`
 - `measurable` habits: log a numeric value with a unit like `kg`, `₹`, or `liters`
 
-**Job Tracker** — applications, referrals, planner, interview prep, wishlist, notes, resumes, calendar, resources, analytics
-
-**DSA Prep** — 500 seeded problems with per-user solved tracking and an algorithm visualizer
-
 **Expenses** — expense log plus per-category budgets
 
 Auth is JWT-based; every feature route is scoped to the logged-in user.
