@@ -1,15 +1,10 @@
 import { userToday } from "../habits/workspaceSync.js";
 import { HabitModel } from "../habits/habit.model.js";
-import {
-  serializeHabit,
-  serializeHabitLog
-} from "../habits/habit.service.js";
+import { serializeHabit, serializeHabitLog } from "../habits/habit.service.js";
 import { AppError } from "../../utils/appError.js";
+import { handleHabitLogXP } from "../gamification/gamification.service.js";
 
-import {
-  HabitLogDocument,
-  HabitLogModel
-} from "./habitLog.model.js";
+import { HabitLogDocument, HabitLogModel } from "./habitLog.model.js";
 
 type HabitLogPayload = {
   date?: string;
@@ -38,9 +33,11 @@ const normalizePayloadForHabit = (
 ) => {
   const nextDate = payload.date ?? currentLog?.date;
   const nextStatus =
-    payload.status !== undefined ? payload.status : currentLog?.status ?? null;
+    payload.status !== undefined
+      ? payload.status
+      : (currentLog?.status ?? null);
   const nextValue =
-    payload.value !== undefined ? payload.value : currentLog?.value ?? null;
+    payload.value !== undefined ? payload.value : (currentLog?.value ?? null);
   const nextComment =
     payload.comment !== undefined
       ? normalizeOptionalString(payload.comment)
@@ -50,7 +47,13 @@ const normalizePayloadForHabit = (
     throw new AppError("Date is required", 400);
   }
 
-  if (nextStatus === "skipped") return { date: nextDate, status: "skipped" as const, value: null, comment: nextComment };
+  if (nextStatus === "skipped")
+    return {
+      date: nextDate,
+      status: "skipped" as const,
+      value: null,
+      comment: nextComment
+    };
 
   if (habit.type === "action") {
     if (payload.value !== undefined && payload.value !== null) {
@@ -98,7 +101,11 @@ const normalizeOptionalString = (value?: string) => {
   return normalizedValue ? normalizedValue : undefined;
 };
 
-export const listHabitLogs = async (habitId: string, userId: string, limit = 10) => {
+export const listHabitLogs = async (
+  habitId: string,
+  userId: string,
+  limit = 10
+) => {
   await getHabitByIdOrThrow(habitId, userId);
 
   const logs = await HabitLogModel.find({
@@ -110,9 +117,14 @@ export const listHabitLogs = async (habitId: string, userId: string, limit = 10)
   return logs.map(serializeHabitLog);
 };
 
-export const createHabitLog = async (habitId: string, userId: string, payload: HabitLogPayload) => {
+export const createHabitLog = async (
+  habitId: string,
+  userId: string,
+  payload: HabitLogPayload
+) => {
   const habit = await getHabitByIdOrThrow(habitId, userId);
-  if(payload.date && payload.date > await userToday(userId)) throw new AppError("Future check-ins are not available",400);
+  if (payload.date && payload.date > (await userToday(userId)))
+    throw new AppError("Future check-ins are not available", 400);
   const normalizedPayload = normalizePayloadForHabit(habit, payload);
 
   const existingLog = await HabitLogModel.findOne({
@@ -128,6 +140,8 @@ export const createHabitLog = async (habitId: string, userId: string, payload: H
     habitId: habit._id,
     ...normalizedPayload
   });
+
+  await handleHabitLogXP(userId, habit, undefined, log);
 
   return serializeHabitLog(log);
 };
@@ -148,17 +162,30 @@ export const updateHabitLog = async (
     throw new AppError("Habit log not found", 404);
   }
 
-  if(payload.date && payload.date > await userToday(userId)) throw new AppError("Future check-ins are not available",400);
   const normalizedPayload = normalizePayloadForHabit(habit, payload, log);
-
-  log.date = normalizedPayload.date;
-  log.status = normalizedPayload.status;
-  log.value = normalizedPayload.value;
-  log.comment = normalizedPayload.comment;
-
-  await log.save();
-
-  return serializeHabitLog(log);
+  if (normalizedPayload.date > (await userToday(userId)))
+    throw new AppError("Future check-ins are not available", 400);
+  const updated = await HabitLogModel.findOneAndUpdate(
+    {
+      _id: log._id,
+      habitId: habit._id,
+      updatedAt: log.updatedAt,
+      status: log.status,
+      value: log.value,
+      date: log.date
+    },
+    {
+      $set: normalizedPayload,
+      ...(normalizedPayload.comment === undefined
+        ? { $unset: { comment: 1 } }
+        : {})
+    },
+    { new: true, runValidators: true }
+  );
+  if (!updated)
+    throw new AppError("This log changed. Refresh and try again.", 409);
+  await handleHabitLogXP(userId, habit, log, updated);
+  return serializeHabitLog(updated);
 };
 
 export const getTodayLogs = async (userId: string) => {
@@ -192,3 +219,4 @@ export const getTodayLogs = async (userId: string) => {
     habit: habitsById.get(log.habitId.toString()) ?? null
   }));
 };
+

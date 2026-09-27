@@ -1,4 +1,4 @@
-import { templates } from "./TodayPage";
+import { templates } from "../features/habits/templates";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 
@@ -11,7 +11,9 @@ import { useCreateHabit } from "../features/habits/hooks/useHabits";
 export const CreateHabitPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const template = params.has("template") ? templates[Number(params.get("template"))] : undefined;
+  const template = params.has("template")
+    ? templates[Number(params.get("template"))]
+    : undefined;
   const createHabitMutation = useCreateHabit();
 
   const handleSubmit = async (values: HabitFormValues) => {

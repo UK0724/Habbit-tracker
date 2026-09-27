@@ -7,7 +7,10 @@ const parseDateParts = (value: string): [number, number, number] => {
 
 export const getTodayDateString = () => {
   const date = new Date();
-  const zone = localStorage.getItem("arc-timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const zone =
+    localStorage.getItem("pulse-timezone") ||
+    localStorage.getItem("arc-timezone") ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone;
   return new Intl.DateTimeFormat("en-CA", {timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit"}).format(date);
 };
 

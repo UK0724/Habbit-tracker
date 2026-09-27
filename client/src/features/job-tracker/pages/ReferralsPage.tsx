@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useJobTrackerStore } from "../stores/jobTrackerStore";
@@ -11,8 +12,7 @@ import {
   CheckCircle,
   X,
   Edit2,
-  Trash2,
-  ArrowRight
+  Trash2
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,7 +45,11 @@ export const ReferralsPage = () => {
     handleSubmit,
     reset,
     formState: { errors }
-  } = useForm<any>({
+  } = useForm<
+    z.input<typeof ReferralSchema>,
+    unknown,
+    z.output<typeof ReferralSchema>
+  >({
     resolver: zodResolver(ReferralSchema),
     defaultValues: {
       company: "",
@@ -53,7 +57,10 @@ export const ReferralsPage = () => {
       linkedin: "",
       dateSent: new Date().toISOString().split("T")[0] || "",
       replied: false,
-      followUpDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] || "", // default 5 days later
+      followUpDate:
+        new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0] || "", // default 5 days later
       notes: ""
     }
   });
@@ -66,7 +73,10 @@ export const ReferralsPage = () => {
       linkedin: "",
       dateSent: new Date().toISOString().split("T")[0] || "",
       replied: false,
-      followUpDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] || "",
+      followUpDate:
+        new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0] || "",
       notes: ""
     });
     setFormOpen(true);
@@ -86,7 +96,7 @@ export const ReferralsPage = () => {
     setFormOpen(true);
   };
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: z.output<typeof ReferralSchema>) => {
     if (editingReferral) {
       updateReferral({ ...data, id: editingReferral.id });
     } else {
@@ -120,7 +130,9 @@ export const ReferralsPage = () => {
             <Users className="h-6 w-6 text-accent" />
             Referral Tracker
           </h1>
-          <p className="text-xs text-content-muted mt-1">Track pending referrers, follow-up timelines, and outcomes</p>
+          <p className="text-xs text-content-muted mt-1">
+            Track pending referrers, follow-up timelines, and outcomes
+          </p>
         </div>
         <button
           onClick={openAddModal}
@@ -179,7 +191,9 @@ export const ReferralsPage = () => {
                             ? "text-emerald-500 hover:text-emerald-600"
                             : "text-content-muted hover:text-accent"
                         }`}
-                        title={ref.replied ? "Mark as Pending" : "Mark as Replied"}
+                        title={
+                          ref.replied ? "Mark as Pending" : "Mark as Replied"
+                        }
                       >
                         {ref.replied ? (
                           <CheckCircle className="h-5 w-5 fill-emerald-500/20" />
@@ -198,7 +212,15 @@ export const ReferralsPage = () => {
                           rel="noopener noreferrer"
                           className="text-accent hover:text-accent-hover inline-flex items-center gap-1"
                         >
-                          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
                             <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
                             <rect x="2" y="9" width="4" height="12" />
                             <circle cx="4" cy="4" r="2" />
@@ -221,8 +243,13 @@ export const ReferralsPage = () => {
                         )}
                       </div>
                     </td>
-                    <td className="p-4 text-content-2 text-xs max-w-xs truncate" title={ref.notes}>
-                      {ref.notes || <span className="text-content-subtle">No notes.</span>}
+                    <td
+                      className="p-4 text-content-2 text-xs max-w-xs truncate"
+                      title={ref.notes}
+                    >
+                      {ref.notes || (
+                        <span className="text-content-subtle">No notes.</span>
+                      )}
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -247,7 +274,10 @@ export const ReferralsPage = () => {
               })}
               {filteredReferrals.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-sm text-content-muted font-bold">
+                  <td
+                    colSpan={8}
+                    className="py-12 text-center text-sm text-content-muted font-bold"
+                  >
                     No referral requests tracked.
                   </td>
                 </tr>
@@ -272,7 +302,7 @@ export const ReferralsPage = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 {/* Company */}
@@ -285,7 +315,9 @@ export const ReferralsPage = () => {
                     className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                   />
                   {errors.company && (
-                    <p className="text-xs text-rose-500 mt-1">{String(errors.company.message || "")}</p>
+                    <p className="text-xs text-rose-500 mt-1">
+                      {String(errors.company.message || "")}
+                    </p>
                   )}
                 </div>
 
@@ -299,7 +331,9 @@ export const ReferralsPage = () => {
                     className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                   />
                   {errors.personName && (
-                    <p className="text-xs text-rose-500 mt-1">{String(errors.personName.message || "")}</p>
+                    <p className="text-xs text-rose-500 mt-1">
+                      {String(errors.personName.message || "")}
+                    </p>
                   )}
                 </div>
               </div>
@@ -314,7 +348,9 @@ export const ReferralsPage = () => {
                   className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                 />
                 {errors.linkedin && (
-                  <p className="text-xs text-rose-500 mt-1">{String(errors.linkedin.message || "")}</p>
+                  <p className="text-xs text-rose-500 mt-1">
+                    {String(errors.linkedin.message || "")}
+                  </p>
                 )}
               </div>
 
@@ -338,7 +374,9 @@ export const ReferralsPage = () => {
                     className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                   />
                   {errors.followUpDate && (
-                    <p className="text-xs text-rose-500 mt-1">{String(errors.followUpDate.message || "")}</p>
+                    <p className="text-xs text-rose-500 mt-1">
+                      {String(errors.followUpDate.message || "")}
+                    </p>
                   )}
                 </div>
               </div>

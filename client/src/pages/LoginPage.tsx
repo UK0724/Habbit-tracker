@@ -23,7 +23,13 @@ export const LoginPage = () => {
       setAuth(result.token, result.user);
       navigate("/");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Login failed");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Login failed"
+      );
     } finally {
       setLoading(false);
     }
@@ -35,7 +41,7 @@ export const LoginPage = () => {
         <div className="mb-8 text-center">
           <BrandMark className="mx-auto mb-4 h-14 w-14 rounded-2xl" />
           <h1 className="text-2xl font-bold tracking-tight text-content">
-            Welcome back to Arc
+            Welcome back to Pulse
           </h1>
           <p className="mt-1 text-sm text-content-muted">
             Sign in to keep your streaks going

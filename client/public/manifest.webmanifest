@@ -1,7 +1,7 @@
 {
-  "name": "Arc — daily tracker",
-  "short_name": "Arc",
-  "description": "Track your habits, streaks, and spending in one place.",
+  "name": "Pulse — Daily Habit & Routine Tracker",
+  "short_name": "Pulse",
+  "description": "Master your habits, streaks, and routines with effortless tracking.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -6,22 +6,24 @@ import { getMe, login, register } from "./auth.service.js";
 
 export const registerController = catchAsync(
   async (request: Request, response: Response) => {
-    const { email, password } = request.body as {
+    const { email, password, timezone } = request.body as {
       email: string;
       password: string;
+      timezone?: string;
     };
-    const result = await register(email, password);
+    const result = await register(email, password, timezone);
     response.status(201).json({ data: result });
   }
 );
 
 export const loginController = catchAsync(
   async (request: Request, response: Response) => {
-    const { email, password } = request.body as {
+    const { email, password, timezone } = request.body as {
       email: string;
       password: string;
+      timezone?: string;
     };
-    const result = await login(email, password);
+    const result = await login(email, password, timezone);
     response.json({ data: result });
   }
 );

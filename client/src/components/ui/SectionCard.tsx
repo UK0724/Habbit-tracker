@@ -17,7 +17,7 @@ export const SectionCard = ({
   children,
   className
 }: SectionCardProps) => (
-  <section className={cn("surface-card p-5 sm:p-6", className)}>
+  <section className={cn("py-5 sm:py-6", className)}>
     {title || description || action ? (
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>

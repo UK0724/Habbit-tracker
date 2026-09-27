@@ -1,46 +1,90 @@
-import { TodayPage } from "../pages/TodayPage";
-import { HabitsPage } from "../pages/HabitsPage";
-import { InsightsPage } from "../pages/InsightsPage";
+import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
+import { RouteErrorPage } from "../components/RouteErrorPage";
 
-import { AppLayout } from "../app/AppLayout";
+const HabitsPage = lazy(() =>
+  import("../pages/HabitsPage").then((module) => ({
+    default: module.HabitsPage
+  }))
+);
+const InsightsPage = lazy(() =>
+  import("../pages/InsightsPage").then((module) => ({
+    default: module.InsightsPage
+  }))
+);
+const AchievementsPage = lazy(() =>
+  import("../pages/AchievementsPage").then((module) => ({
+    default: module.AchievementsPage
+  }))
+);
+const ProfilePage = lazy(() =>
+  import("../pages/ProfilePage").then((module) => ({
+    default: module.ProfilePage
+  }))
+);
+
+const AppLayout = lazy(() =>
+  import("../app/AppLayout").then((module) => ({ default: module.AppLayout }))
+);
 import { RedirectIfAuthed } from "../components/RedirectIfAuthed";
 import { RequireAuth } from "../components/RequireAuth";
-import { CreateHabitPage } from "../pages/CreateHabitPage";
-import { EditHabitPage } from "../pages/EditHabitPage";
-import { HabitDetailPage } from "../pages/HabitDetailPage";
+const CreateHabitPage = lazy(() =>
+  import("../pages/CreateHabitPage").then((module) => ({
+    default: module.CreateHabitPage
+  }))
+);
+const EditHabitPage = lazy(() =>
+  import("../pages/EditHabitPage").then((module) => ({
+    default: module.EditHabitPage
+  }))
+);
+const HabitDetailPage = lazy(() =>
+  import("../pages/HabitDetailPage").then((module) => ({
+    default: module.HabitDetailPage
+  }))
+);
 
-import { LoginPage } from "../pages/LoginPage";
-import { NotFoundPage } from "../pages/NotFoundPage";
-import { RegisterPage } from "../pages/RegisterPage";
-import { SettingsPage } from "../pages/SettingsPage";
-
-// Job Tracker imports
-import { JobTrackerLayout } from "../features/job-tracker/components/JobTrackerLayout";
-import { DashboardPage } from "../features/job-tracker/pages/DashboardPage";
-import { ApplicationsPage } from "../features/job-tracker/pages/ApplicationsPage";
-import { ReferralsPage } from "../features/job-tracker/pages/ReferralsPage";
-import { PlannerPage } from "../features/job-tracker/pages/PlannerPage";
-import { InterviewPrepPage } from "../features/job-tracker/pages/InterviewPrepPage";
-import { WishlistPage } from "../features/job-tracker/pages/WishlistPage";
-import { NotesPage } from "../features/job-tracker/pages/NotesPage";
-import { ResumesPage } from "../features/job-tracker/pages/ResumesPage";
-import { CalendarPage } from "../features/job-tracker/pages/CalendarPage";
-import { ResourcesPage } from "../features/job-tracker/pages/ResourcesPage";
-import { AnalyticsPage } from "../features/job-tracker/pages/AnalyticsPage";
-
-// DSA Prep imports
-import { DsaPrepLayout } from "../features/dsa-prep/components/DsaPrepLayout";
-import { DsaPrepDashboardPage } from "../features/dsa-prep/pages/DsaPrepDashboardPage";
-import { DsaProblemDetailsPage } from "../features/dsa-prep/pages/DsaProblemDetailsPage";
+const LoginPage = lazy(() =>
+  import("../pages/LoginPage").then((module) => ({ default: module.LoginPage }))
+);
+const NotFoundPage = lazy(() =>
+  import("../pages/NotFoundPage").then((module) => ({
+    default: module.NotFoundPage
+  }))
+);
+const RegisterPage = lazy(() =>
+  import("../pages/RegisterPage").then((module) => ({
+    default: module.RegisterPage
+  }))
+);
+const SettingsPage = lazy(() =>
+  import("../pages/SettingsPage").then((module) => ({
+    default: module.SettingsPage
+  }))
+);
 
 // Expense Tracker imports
 import { ExpenseLayout } from "../features/expenses/components/ExpenseLayout";
-import { ExpenseDashboardPage } from "../features/expenses/pages/ExpenseDashboardPage";
+const ExpenseDashboardPage = lazy(() =>
+  import("../features/expenses/pages/ExpenseDashboardPage").then((module) => ({
+    default: module.ExpenseDashboardPage
+  }))
+);
 
 export const router = createBrowserRouter([
   {
-    element: <RedirectIfAuthed />,
+    errorElement: <RouteErrorPage />,
+    element: (
+      <Suspense
+        fallback={
+          <div role="status" className="p-6">
+            Loading…
+          </div>
+        }
+      >
+        <RedirectIfAuthed />
+      </Suspense>
+    ),
     children: [
       { path: "/login", element: <LoginPage /> },
       { path: "/register", element: <RegisterPage /> }
@@ -48,52 +92,36 @@ export const router = createBrowserRouter([
   },
   {
     element: <RequireAuth />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         path: "/",
-        element: <AppLayout />,
+        element: (
+          <Suspense
+            fallback={
+              <div role="status" className="p-6 text-content">
+                Loading…
+              </div>
+            }
+          >
+            <AppLayout />
+          </Suspense>
+        ),
         children: [
-          { index: true, element: <TodayPage /> },
+          { index: true, element: <HabitsPage /> },
           { path: "habits", element: <HabitsPage /> },
           { path: "insights", element: <InsightsPage /> },
+          { path: "achievements", element: <AchievementsPage /> },
+          { path: "profile", element: <ProfilePage /> },
           { path: "settings", element: <SettingsPage /> },
           { path: "habits/new", element: <CreateHabitPage /> },
           { path: "habits/:id", element: <HabitDetailPage /> },
           { path: "habits/:id/edit", element: <EditHabitPage /> },
-          // Nested Job Tracker Routes
-          {
-            path: "job-tracker",
-            element: <JobTrackerLayout />,
-            children: [
-              { index: true, element: <DashboardPage /> },
-              { path: "applications", element: <ApplicationsPage /> },
-              { path: "referrals", element: <ReferralsPage /> },
-              { path: "planner", element: <PlannerPage /> },
-              { path: "prep", element: <InterviewPrepPage /> },
-              { path: "wishlist", element: <WishlistPage /> },
-              { path: "notes", element: <NotesPage /> },
-              { path: "resumes", element: <ResumesPage /> },
-              { path: "calendar", element: <CalendarPage /> },
-              { path: "resources", element: <ResourcesPage /> },
-              { path: "analytics", element: <AnalyticsPage /> }
-            ]
-          },
-          // Nested DSA Prep Routes
-          {
-            path: "dsa-prep",
-            element: <DsaPrepLayout />,
-            children: [
-              { index: true, element: <DsaPrepDashboardPage /> },
-              { path: ":id", element: <DsaProblemDetailsPage /> }
-            ]
-          },
           // Nested Expense Tracker Routes
           {
             path: "expenses",
             element: <ExpenseLayout />,
-            children: [
-              { index: true, element: <ExpenseDashboardPage /> }
-            ]
+            children: [{ index: true, element: <ExpenseDashboardPage /> }]
           },
           { path: "*", element: <NotFoundPage /> }
         ]
@@ -101,4 +129,3 @@ export const router = createBrowserRouter([
     ]
   }
 ]);
-

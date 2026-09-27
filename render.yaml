@@ -3,11 +3,14 @@ services:
     name: habit-tracker-api
     runtime: node
     plan: free
-    rootDir: server
-    buildCommand: npm install && npm run build
-    startCommand: npm run start
+    buildCommand: npm ci --include=dev && npm run build:server
+    startCommand: npm --workspace server run start
     healthCheckPath: /api/health
     envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY_HOPS
+        value: 1
       - key: PORT
         value: 10000
       - key: MONGODB_URI

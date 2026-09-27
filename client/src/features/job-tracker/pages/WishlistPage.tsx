@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { useState } from "react";
 import { useJobTrackerStore } from "../stores/jobTrackerStore";
 import { WishlistCompany } from "../types";
@@ -7,11 +8,9 @@ import {
   Star,
   ExternalLink,
   Users,
-  CheckCircle,
   X,
   Edit2,
-  Trash2,
-  ArrowUpRight
+  Trash2
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,18 +19,28 @@ import { WishlistCompanySchema } from "../types";
 export const WishlistPage = () => {
   const wishlist = useJobTrackerStore((s) => s.wishlist);
   const addWishlistCompany = useJobTrackerStore((s) => s.addWishlistCompany);
-  const updateWishlistCompany = useJobTrackerStore((s) => s.updateWishlistCompany);
-  const deleteWishlistCompany = useJobTrackerStore((s) => s.deleteWishlistCompany);
+  const updateWishlistCompany = useJobTrackerStore(
+    (s) => s.updateWishlistCompany
+  );
+  const deleteWishlistCompany = useJobTrackerStore(
+    (s) => s.deleteWishlistCompany
+  );
 
   const [formOpen, setFormOpen] = useState(false);
-  const [editingCompany, setEditingCompany] = useState<WishlistCompany | null>(null);
+  const [editingCompany, setEditingCompany] = useState<WishlistCompany | null>(
+    null
+  );
 
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors }
-  } = useForm<any>({
+  } = useForm<
+    z.input<typeof WishlistCompanySchema>,
+    unknown,
+    z.output<typeof WishlistCompanySchema>
+  >({
     resolver: zodResolver(WishlistCompanySchema),
     defaultValues: {
       name: "",
@@ -69,7 +78,7 @@ export const WishlistPage = () => {
     setFormOpen(true);
   };
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: z.output<typeof WishlistCompanySchema>) => {
     if (editingCompany) {
       updateWishlistCompany({ ...data, id: editingCompany.id });
     } else {
@@ -87,7 +96,9 @@ export const WishlistPage = () => {
             <Building2 className="h-6 w-6 text-accent" />
             Company Wishlist
           </h1>
-          <p className="text-xs text-content-muted mt-1">Bookmark and track your dream tech employers</p>
+          <p className="text-xs text-content-muted mt-1">
+            Bookmark and track your dream tech employers
+          </p>
         </div>
         <button
           onClick={openAddModal}
@@ -120,8 +131,8 @@ export const WishlistPage = () => {
                       company.priority === "High"
                         ? "bg-rose-500/10 border-rose-500/30 text-rose-500"
                         : company.priority === "Medium"
-                        ? "bg-amber-500/10 border-amber-500/30 text-amber-600"
-                        : "bg-surface-3 border-border-app text-content-muted"
+                          ? "bg-amber-500/10 border-amber-500/30 text-amber-600"
+                          : "bg-surface-3 border-border-app text-content-muted"
                     }`}
                   >
                     {company.priority} Priority
@@ -148,14 +159,17 @@ export const WishlistPage = () => {
               <div className="mt-4 space-y-2 border-t border-border-app/40 pt-3 text-xs font-semibold text-content-2">
                 <div className="flex items-center justify-between">
                   <span className="text-content-muted flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5 text-content-subtle" /> Referral Available:
+                    <Users className="h-3.5 w-3.5 text-content-subtle" />{" "}
+                    Referral Available:
                   </span>
                   <span>{company.referralAvailable ? "✅ Yes" : "❌ No"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-content-muted">Last Applied:</span>
                   <span className="text-content">
-                    {company.lastAppliedDate ? company.lastAppliedDate : "Not applied yet"}
+                    {company.lastAppliedDate
+                      ? company.lastAppliedDate
+                      : "Not applied yet"}
                   </span>
                 </div>
               </div>
@@ -174,7 +188,9 @@ export const WishlistPage = () => {
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               ) : (
-                <span className="text-xs text-content-subtle italic">No career link.</span>
+                <span className="text-xs text-content-subtle italic">
+                  No career link.
+                </span>
               )}
             </div>
           </div>
@@ -201,7 +217,7 @@ export const WishlistPage = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
               <div>
                 <label className="field-label">Company Name *</label>
@@ -211,7 +227,11 @@ export const WishlistPage = () => {
                   placeholder="Atlassian"
                   className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                 />
-                {errors.name && <p className="text-xs text-rose-500 mt-1">{String(errors.name.message || "")}</p>}
+                {errors.name && (
+                  <p className="text-xs text-rose-500 mt-1">
+                    {String(errors.name.message || "")}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -223,7 +243,9 @@ export const WishlistPage = () => {
                   className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                 />
                 {errors.careerPage && (
-                  <p className="text-xs text-rose-500 mt-1">{String(errors.careerPage.message || "")}</p>
+                  <p className="text-xs text-rose-500 mt-1">
+                    {String(errors.careerPage.message || "")}
+                  </p>
                 )}
               </div>
 

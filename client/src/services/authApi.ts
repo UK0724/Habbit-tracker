@@ -8,13 +8,21 @@ type AuthResponse = {
 export const registerApi = (email: string, password: string) =>
   apiRequest<AuthResponse>("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({
+      email,
+      password,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    })
   });
 
 export const loginApi = (email: string, password: string) =>
   apiRequest<AuthResponse>("/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({
+      email,
+      password,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    })
   });
 
 export const getMeApi = () =>

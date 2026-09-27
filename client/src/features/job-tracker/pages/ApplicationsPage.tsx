@@ -3,11 +3,14 @@ import { useDialog } from "../../../shared/hooks/useDialog";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useJobTrackerStore } from "../stores/jobTrackerStore";
-import { JobApplication, ApplicationStatus, APPLICATION_STATUSES } from "../types";
+import {
+  JobApplication,
+  ApplicationStatus,
+  APPLICATION_STATUSES
+} from "../types";
 import {
   Briefcase,
   Search,
-  SlidersHorizontal,
   Plus,
   Copy,
   Edit2,
@@ -26,31 +29,34 @@ import { JobApplicationSchema } from "../types";
 
 export const ApplicationsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   const applications = useJobTrackerStore((s) => s.applications);
   const addApplication = useJobTrackerStore((s) => s.addApplication);
   const updateApplication = useJobTrackerStore((s) => s.updateApplication);
   const deleteApplication = useJobTrackerStore((s) => s.deleteApplication);
-  const duplicateApplication = useJobTrackerStore((s) => s.duplicateApplication);
+  const duplicateApplication = useJobTrackerStore(
+    (s) => s.duplicateApplication
+  );
   const resumes = useJobTrackerStore((s) => s.resumes);
 
   // Layout View: kanban or list
   const [view, setView] = useState<"kanban" | "list">("kanban");
-  
+
   // Search & Filters state
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [locationFilter, setLocationFilter] = useState("");
   const [techFilter, setTechFilter] = useState("");
-  const [sortField, setSortField] = useState<keyof JobApplication>("appliedDate");
+  const [sortField, setSortField] =
+    useState<keyof JobApplication>("appliedDate");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Modals state
   const [formOpen, setFormOpen] = useState(false);
   const [editingApp, setEditingApp] = useState<JobApplication | null>(null);
-  
-  const closeForm = useCallback(()=>setFormOpen(false),[]);
-  useDialog(formOpen,closeForm,'[data-application-dialog]');
+
+  const closeForm = useCallback(() => setFormOpen(false), []);
+  useDialog(formOpen, closeForm, "[data-application-dialog]");
   // Drag and Drop active tracking
   const [draggedAppId, setDraggedAppId] = useState<string | null>(null);
 
@@ -146,7 +152,7 @@ export const ApplicationsPage = () => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain") || draggedAppId;
     if (!id) return;
-    
+
     const app = applications.find((a) => a.id === id);
     if (app && app.status !== status) {
       updateApplication({ ...app, status });
@@ -156,7 +162,17 @@ export const ApplicationsPage = () => {
 
   // CSV Export
   const handleExportCSV = () => {
-    const headers = ["Company", "Role", "Tech Stack", "Job URL", "Salary", "Location", "Applied Date", "Status", "Notes"];
+    const headers = [
+      "Company",
+      "Role",
+      "Tech Stack",
+      "Job URL",
+      "Salary",
+      "Location",
+      "Applied Date",
+      "Status",
+      "Notes"
+    ];
     const rows = applications.map((app) => [
       `"${app.company.replace(/"/g, '""')}"`,
       `"${app.role.replace(/"/g, '""')}"`,
@@ -175,7 +191,10 @@ export const ApplicationsPage = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `job_applications_${new Date().toISOString().split("T")[0]}.csv`);
+    link.setAttribute(
+      "download",
+      `job_applications_${new Date().toISOString().split("T")[0]}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -191,23 +210,30 @@ export const ApplicationsPage = () => {
       const text = event.target?.result as string;
       if (!text) return;
 
-      const lines = text.split("\n").map(line => line.trim()).filter(Boolean);
+      const lines = text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
       // Skip header line
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
         if (!line) continue;
         // simple parsing of csv line (splitting by commas, ignoring quotes for simplistic load)
-        const parts = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(",");
-        const cleanParts = parts.map(p => p.replace(/^"|"$/g, "").trim());
+        const parts =
+          line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(",");
+        const cleanParts = parts.map((p) => p.replace(/^"|"$/g, "").trim());
 
         if (cleanParts.length >= 7) {
           const company = cleanParts[0] || "Unknown Company";
           const role = cleanParts[1] || "Software Engineer";
-          const techStack = cleanParts[2] ? cleanParts[2].split(";").map(t => t.trim()) : ["React"];
+          const techStack = cleanParts[2]
+            ? cleanParts[2].split(";").map((t) => t.trim())
+            : ["React"];
           const jobUrl = cleanParts[3] || "";
           const salary = cleanParts[4] || "";
           const location = cleanParts[5] || "Remote";
-          const appliedDate = cleanParts[6] || new Date().toISOString().split("T")[0] || "";
+          const appliedDate =
+            cleanParts[6] || new Date().toISOString().split("T")[0] || "";
           const status = (cleanParts[7] as ApplicationStatus) || "Wishlist";
           const notes = cleanParts[8] || "";
 
@@ -235,12 +261,16 @@ export const ApplicationsPage = () => {
       const matchesSearch =
         app.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
         app.role.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === "all" || app.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "all" || app.status === statusFilter;
       const matchesLocation =
-        !locationFilter || app.location.toLowerCase().includes(locationFilter.toLowerCase());
+        !locationFilter ||
+        app.location.toLowerCase().includes(locationFilter.toLowerCase());
       const matchesTech =
         !techFilter ||
-        app.techStack.some((t) => t.toLowerCase().includes(techFilter.toLowerCase()));
+        app.techStack.some((t) =>
+          t.toLowerCase().includes(techFilter.toLowerCase())
+        );
 
       return matchesSearch && matchesStatus && matchesLocation && matchesTech;
     })
@@ -249,7 +279,7 @@ export const ApplicationsPage = () => {
       const bVal = b[sortField];
       if (!aVal) return 1;
       if (!bVal) return -1;
-      
+
       const order = sortOrder === "asc" ? 1 : -1;
       return aVal > bVal ? order : -order;
     });
@@ -272,7 +302,9 @@ export const ApplicationsPage = () => {
             <Briefcase className="h-6 w-6 text-accent" />
             Job Applications
           </h1>
-          <p className="text-xs text-content-muted mt-1">Manage and track your active job pipelines</p>
+          <p className="text-xs text-content-muted mt-1">
+            Manage and track your active job pipelines
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Import/Export */}
@@ -283,7 +315,7 @@ export const ApplicationsPage = () => {
             <FileSpreadsheet className="h-4 w-4" />
             Export CSV
           </button>
-          
+
           <label className="flex items-center gap-1.5 rounded-xl border border-border-app bg-surface px-3.5 py-2 text-xs font-bold text-content-2 hover:bg-surface-2 cursor-pointer">
             <Upload className="h-4 w-4" />
             Import CSV
@@ -358,7 +390,9 @@ export const ApplicationsPage = () => {
             <button
               onClick={() => setView("kanban")}
               className={`rounded-lg p-1.5 transition ${
-                view === "kanban" ? "bg-accent text-accent-fg" : "text-content-muted hover:text-content"
+                view === "kanban"
+                  ? "bg-accent text-accent-fg"
+                  : "text-content-muted hover:text-content"
               }`}
               title="Kanban Board"
             >
@@ -367,7 +401,9 @@ export const ApplicationsPage = () => {
             <button
               onClick={() => setView("list")}
               className={`rounded-lg p-1.5 transition ${
-                view === "list" ? "bg-accent text-accent-fg" : "text-content-muted hover:text-content"
+                view === "list"
+                  ? "bg-accent text-accent-fg"
+                  : "text-content-muted hover:text-content"
               }`}
               title="List View"
             >
@@ -382,7 +418,9 @@ export const ApplicationsPage = () => {
         /* Kanban Board rendering */
         <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin max-h-[70vh]">
           {APPLICATION_STATUSES.map((status) => {
-            const statusApps = filteredApps.filter((app) => app.status === status);
+            const statusApps = filteredApps.filter(
+              (app) => app.status === status
+            );
             return (
               <div
                 key={status}
@@ -392,7 +430,9 @@ export const ApplicationsPage = () => {
               >
                 {/* Column header */}
                 <div className="flex items-center justify-between px-1.5">
-                  <span className="text-xs font-extrabold text-content">{status}</span>
+                  <span className="text-xs font-extrabold text-content">
+                    {status}
+                  </span>
                   <span className="rounded-full bg-surface-3 border border-border-app/60 px-2 py-0.5 text-[10px] font-bold text-content-muted">
                     {statusApps.length}
                   </span>
@@ -409,8 +449,12 @@ export const ApplicationsPage = () => {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="font-extrabold text-sm tracking-tight text-content">{app.company}</p>
-                          <p className="text-xs font-bold text-content-2 mt-0.5">{app.role}</p>
+                          <p className="font-extrabold text-sm tracking-tight text-content">
+                            {app.company}
+                          </p>
+                          <p className="text-xs font-bold text-content-2 mt-0.5">
+                            {app.role}
+                          </p>
                         </div>
                         {app.jobUrl && (
                           <a
@@ -423,7 +467,7 @@ export const ApplicationsPage = () => {
                           </a>
                         )}
                       </div>
-                      
+
                       {/* Tech badges */}
                       <div className="mt-3 flex flex-wrap gap-1">
                         {app.techStack.slice(0, 3).map((tech) => (
@@ -485,20 +529,35 @@ export const ApplicationsPage = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-2 border-b border-border-app text-xs font-extrabold text-content-muted uppercase tracking-wider">
-                  <th className="p-4 cursor-pointer" onClick={() => toggleSort("company")}>
+                  <th
+                    className="p-4 cursor-pointer"
+                    onClick={() => toggleSort("company")}
+                  >
                     Company <ArrowUpDown className="inline h-3.5 w-3.5 ml-1" />
                   </th>
-                  <th className="p-4 cursor-pointer" onClick={() => toggleSort("role")}>
+                  <th
+                    className="p-4 cursor-pointer"
+                    onClick={() => toggleSort("role")}
+                  >
                     Role <ArrowUpDown className="inline h-3.5 w-3.5 ml-1" />
                   </th>
                   <th className="p-4">Tech Stack</th>
-                  <th className="p-4 cursor-pointer" onClick={() => toggleSort("location")}>
+                  <th
+                    className="p-4 cursor-pointer"
+                    onClick={() => toggleSort("location")}
+                  >
                     Location <ArrowUpDown className="inline h-3.5 w-3.5 ml-1" />
                   </th>
-                  <th className="p-4 cursor-pointer" onClick={() => toggleSort("appliedDate")}>
+                  <th
+                    className="p-4 cursor-pointer"
+                    onClick={() => toggleSort("appliedDate")}
+                  >
                     Applied <ArrowUpDown className="inline h-3.5 w-3.5 ml-1" />
                   </th>
-                  <th className="p-4 cursor-pointer" onClick={() => toggleSort("status")}>
+                  <th
+                    className="p-4 cursor-pointer"
+                    onClick={() => toggleSort("status")}
+                  >
                     Status <ArrowUpDown className="inline h-3.5 w-3.5 ml-1" />
                   </th>
                   <th className="p-4 text-right">Actions</th>
@@ -506,7 +565,10 @@ export const ApplicationsPage = () => {
               </thead>
               <tbody className="divide-y divide-border-app">
                 {filteredApps.map((app) => (
-                  <tr key={app.id} className="hover:bg-surface-2/40 text-sm font-semibold">
+                  <tr
+                    key={app.id}
+                    className="hover:bg-surface-2/40 text-sm font-semibold"
+                  >
                     <td className="p-4 font-bold">{app.company}</td>
                     <td className="p-4 text-content-2">{app.role}</td>
                     <td className="p-4">
@@ -522,7 +584,9 @@ export const ApplicationsPage = () => {
                       </div>
                     </td>
                     <td className="p-4 text-content-muted">{app.location}</td>
-                    <td className="p-4 text-content-muted">{app.appliedDate}</td>
+                    <td className="p-4 text-content-muted">
+                      {app.appliedDate}
+                    </td>
                     <td className="p-4">
                       <span className="rounded-full bg-accent/10 border border-accent/20 px-2.5 py-1 text-xs text-accent">
                         {app.status}
@@ -557,7 +621,10 @@ export const ApplicationsPage = () => {
                 ))}
                 {filteredApps.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-sm text-content-muted font-bold">
+                    <td
+                      colSpan={7}
+                      className="py-12 text-center text-sm text-content-muted font-bold"
+                    >
                       No applications found matching search parameters.
                     </td>
                   </tr>
@@ -583,8 +650,15 @@ export const ApplicationsPage = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
-            <form data-application-dialog role="dialog" aria-modal="true" aria-label="Job application" onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-6 space-y-4">
+
+            <form
+              data-application-dialog
+              role="dialog"
+              aria-modal="true"
+              aria-label="Job application"
+              onSubmit={handleSubmit(onSubmit)}
+              className="flex-1 overflow-y-auto p-6 space-y-4"
+            >
               <div className="grid grid-cols-2 gap-4">
                 {/* Company */}
                 <div>
@@ -596,7 +670,9 @@ export const ApplicationsPage = () => {
                     className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                   />
                   {errors.company && (
-                    <p className="text-xs text-rose-500 mt-1">{errors.company.message}</p>
+                    <p className="text-xs text-rose-500 mt-1">
+                      {errors.company.message}
+                    </p>
                   )}
                 </div>
 
@@ -610,26 +686,35 @@ export const ApplicationsPage = () => {
                     className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                   />
                   {errors.role && (
-                    <p className="text-xs text-rose-500 mt-1">{errors.role.message}</p>
+                    <p className="text-xs text-rose-500 mt-1">
+                      {errors.role.message}
+                    </p>
                   )}
                 </div>
               </div>
 
               {/* Tech stack */}
               <div>
-                <label className="field-label">Tech Stack (comma-separated)</label>
+                <label className="field-label">
+                  Tech Stack (comma-separated)
+                </label>
                 <input
                   type="text"
                   placeholder="React, TypeScript, CSS"
                   onChange={(e) => {
-                    const tags = e.target.value.split(",").map(t => t.trim()).filter(Boolean);
+                    const tags = e.target.value
+                      .split(",")
+                      .map((t) => t.trim())
+                      .filter(Boolean);
                     setValue("techStack", tags);
                   }}
                   defaultValue={editingApp?.techStack.join(", ")}
                   className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                 />
                 {errors.techStack && (
-                  <p className="text-xs text-rose-500 mt-1">{errors.techStack.message}</p>
+                  <p className="text-xs text-rose-500 mt-1">
+                    {errors.techStack.message}
+                  </p>
                 )}
               </div>
 
@@ -644,7 +729,9 @@ export const ApplicationsPage = () => {
                     className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                   />
                   {errors.location && (
-                    <p className="text-xs text-rose-500 mt-1">{errors.location.message}</p>
+                    <p className="text-xs text-rose-500 mt-1">
+                      {errors.location.message}
+                    </p>
                   )}
                 </div>
 
@@ -663,14 +750,18 @@ export const ApplicationsPage = () => {
               <div className="grid grid-cols-2 gap-4">
                 {/* Applied Date */}
                 <div>
-                  <label className="field-label">Date Applied / Wishlist Date *</label>
+                  <label className="field-label">
+                    Date Applied / Wishlist Date *
+                  </label>
                   <input
                     type="date"
                     {...register("appliedDate")}
                     className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                   />
                   {errors.appliedDate && (
-                    <p className="text-xs text-rose-500 mt-1">{errors.appliedDate.message}</p>
+                    <p className="text-xs text-rose-500 mt-1">
+                      {errors.appliedDate.message}
+                    </p>
                   )}
                 </div>
 
@@ -701,7 +792,9 @@ export const ApplicationsPage = () => {
                     className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                   />
                   {errors.jobUrl && (
-                    <p className="text-xs text-rose-500 mt-1">{errors.jobUrl.message}</p>
+                    <p className="text-xs text-rose-500 mt-1">
+                      {errors.jobUrl.message}
+                    </p>
                   )}
                 </div>
 
@@ -724,7 +817,9 @@ export const ApplicationsPage = () => {
 
               {/* Notes */}
               <div>
-                <label className="field-label">Comments &amp; Follow-up Info</label>
+                <label className="field-label">
+                  Comments &amp; Follow-up Info
+                </label>
                 <textarea
                   {...register("notes")}
                   rows={3}
@@ -734,7 +829,14 @@ export const ApplicationsPage = () => {
               </div>
 
               {/* Submit Buttons */}
-<label className="field-label">Follow-up date<input type="date" className="field-input" {...register("followUpDate")}/></label>
+              <label className="field-label">
+                Follow-up date
+                <input
+                  type="date"
+                  className="field-input"
+                  {...register("followUpDate")}
+                />
+              </label>
               <div className="flex justify-end gap-3 pt-4 border-t border-border-app">
                 <button
                   type="button"

@@ -4,7 +4,6 @@ import { useParams, Link } from "react-router-dom";
 import { useDsaPrepStore } from "../stores/dsaPrepStore";
 import { AlgorithmVisualizer } from "../components/AlgorithmVisualizer";
 
-
 import { Button } from "../../../components/ui/Button";
 import { Confetti } from "../../../components/viz/Confetti";
 import {
@@ -14,9 +13,37 @@ import {
   Check,
   Code,
   BookOpen,
-  LineChart
+  LineChart,
+  ExternalLink,
+  Video,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import type { DsaProblem } from "../services/dsaPrepApi";
+
+/** Build NeetCode.io URL from problem title */
+const toNeetcodeUrl = (title: string) => {
+  const slug = title
+    .toLowerCase()
+    .replace(/[''`]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `https://neetcode.io/problems/${slug}`;
+};
+
+/** Build TakeUForward URL from problem title */
+const toTufUrl = (title: string) => {
+  const slug = title
+    .toLowerCase()
+    .replace(/[''`]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `https://takeuforward.org/problems/${slug}`;
+};
+
+/** NeetCode YouTube search for any problem */
+const toYoutubeSearchUrl = (title: string) =>
+  `https://www.youtube.com/results?search_query=neetcode+${encodeURIComponent(title)}`;
 
 export const DsaProblemDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +53,7 @@ export const DsaProblemDetailsPage = () => {
   const [problem, setProblem] = useState<DsaProblem | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
   const fetchProblemDetail = useDsaPrepStore((s) => s.fetchProblemDetail);
+  const allProblems = useDsaPrepStore((s) => s.problems);
 
   const solvedProblems = useDsaPrepStore((s) => s.solvedProblems);
   const solveProblemMutation = useDsaPrepStore((s) => s.solveProblem);
@@ -34,7 +62,9 @@ export const DsaProblemDetailsPage = () => {
   const [language, setLanguage] = useState<string>("python");
   const [copied, setCopied] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
-  const [activeTab, setActiveTab] = useState<"visualizer" | "naive" | "optimized">("visualizer");
+  const [activeTab, setActiveTab] = useState<
+    "visualizer" | "naive" | "optimized"
+  >("visualizer");
 
   useEffect(() => {
     let active = true;
@@ -70,7 +100,9 @@ export const DsaProblemDetailsPage = () => {
   if (loadingDetail) {
     return (
       <div className="surface-card p-12 text-center text-content-muted">
-        <p className="text-sm font-semibold animate-pulse">Loading problem details…</p>
+        <p className="text-sm font-semibold animate-pulse">
+          Loading problem details…
+        </p>
       </div>
     );
   }
@@ -78,7 +110,9 @@ export const DsaProblemDetailsPage = () => {
   if (!problem) {
     return (
       <div className="surface-card p-6 text-center text-rose-600">
-        <p className="text-sm font-semibold">Problem Q{id} not found in preparation list.</p>
+        <p className="text-sm font-semibold">
+          Problem Q{id} not found in preparation list.
+        </p>
         <Button asChild className="mt-4" size="sm">
           <Link to="/dsa-prep">Back to Dashboard</Link>
         </Button>
@@ -88,9 +122,7 @@ export const DsaProblemDetailsPage = () => {
 
   const handleMarkSolved = async () => {
     try {
-      // 1. Submit progress to backend database
       await solveProblemMutation(problemId, language, notes);
-      
       setCelebrate(true);
       setTimeout(() => setCelebrate(false), 3000);
     } catch (err) {
@@ -98,9 +130,17 @@ export const DsaProblemDetailsPage = () => {
     }
   };
 
-  const codeString = activeTab === "naive"
-    ? problem.naiveSolution.code[language] || ""
-    : problem.optimizedSolution.code[language] || "";
+  // Prev / Next problem navigation
+  const sortedIds = allProblems.map((p) => p.id).sort((a, b) => a - b);
+  const currentIdx = sortedIds.indexOf(problemId);
+  const prevId = currentIdx > 0 ? sortedIds[currentIdx - 1] : null;
+  const nextId =
+    currentIdx < sortedIds.length - 1 ? sortedIds[currentIdx + 1] : null;
+
+  const codeString =
+    activeTab === "naive"
+      ? problem.naiveSolution.code[language] || ""
+      : problem.optimizedSolution.code[language] || "";
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(codeString);
@@ -116,46 +156,139 @@ export const DsaProblemDetailsPage = () => {
 
   return (
     <div className="space-y-6">
-      <RevisionPanel key={problemId} problemId={problemId}/>
+      <RevisionPanel key={problemId} problemId={problemId} />
       {celebrate && <Confetti />}
 
-      {/* Back button */}
-      <div>
-        <Link to="/dsa-prep" className="inline-flex items-center gap-1.5 text-sm font-semibold text-content-2 hover:text-content">
+      {/* Back + Prev/Next navigation row */}
+      <div className="flex items-center justify-between gap-2">
+        <Link
+          to="/dsa-prep"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-content-2 hover:text-content"
+        >
           <ArrowLeft className="h-4 w-4" />
-          Back to Problem Catalog
+          <span className="hidden sm:inline">Back to Catalog</span>
         </Link>
+        <div className="flex items-center gap-2">
+          {prevId ? (
+            <Link
+              to={`/dsa-prep/${prevId}`}
+              className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-2 hover:bg-surface-3 text-content-2 hover:text-content ring-1 ring-border-app transition-colors"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />Q{prevId}
+            </Link>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-surface-2 text-content-muted ring-1 ring-border-app opacity-40 cursor-not-allowed">
+              <ChevronLeft className="h-3.5 w-3.5" />
+              First
+            </span>
+          )}
+          <span className="text-xs font-bold text-content-muted">
+            Q{problemId}
+          </span>
+          {nextId ? (
+            <Link
+              to={`/dsa-prep/${nextId}`}
+              className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-2 hover:bg-surface-3 text-content-2 hover:text-content ring-1 ring-border-app transition-colors"
+            >
+              Q{nextId}
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-surface-2 text-content-muted ring-1 ring-border-app opacity-40 cursor-not-allowed">
+              Last
+              <ChevronRight className="h-3.5 w-3.5" />
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Hero header info */}
-      <div className="surface-card p-6 flex flex-col md:flex-row justify-between md:items-center gap-4 relative overflow-hidden">
+      <div className="surface-card p-6 flex flex-col gap-4 relative overflow-hidden">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-br from-violet-500/10 via-violet-500/10 to-transparent" />
-        <div className="relative">
-          <span className="text-xs font-mono font-bold text-violet-600 dark:text-violet-400">Question {problem.id} — {problem.subSection}</span>
-          <h1 className="font-display text-2xl font-extrabold text-content mt-1.5">{problem.title}</h1>
-          <div className="flex flex-wrap items-center gap-2 mt-3">
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${diffColors[problem.difficulty.toLowerCase()] || ""}`}>
-              {problem.difficulty}
+        <div className="relative flex flex-col md:flex-row justify-between md:items-start gap-4">
+          <div>
+            <span className="text-xs font-mono font-bold text-violet-600 dark:text-violet-400">
+              Question {problem.id} — {problem.subSection}
             </span>
-            <span className="rounded-full bg-surface-3 px-2.5 py-0.5 text-xs font-semibold text-content-2 ring-1 ring-border-app">
-              Pattern: {problem.pattern}
-            </span>
-            {isSolved && (
-              <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-600 ring-1 ring-emerald-500/30 flex items-center gap-1">
-                <CheckCircle className="h-3 w-3" /> Solved
+            <h1 className="font-display text-2xl font-extrabold text-content mt-1.5">
+              {problem.title}
+            </h1>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${diffColors[problem.difficulty.toLowerCase()] || ""}`}
+              >
+                {problem.difficulty}
               </span>
-            )}
+              <span className="rounded-full bg-surface-3 px-2.5 py-0.5 text-xs font-semibold text-content-2 ring-1 ring-border-app">
+                Pattern: {problem.pattern}
+              </span>
+              {isSolved && (
+                <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-600 ring-1 ring-emerald-500/30 flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3" /> Solved
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="shrink-0">
+            <Button
+              onClick={handleMarkSolved}
+              disabled={isSolving}
+              className="w-full md:w-auto bg-violet-600 hover:bg-violet-700 text-white flex items-center gap-2 font-bold rounded-xl"
+            >
+              {isSolved ? <CheckCircle className="h-4 w-4" /> : null}
+              {isSolving
+                ? "Saving..."
+                : isSolved
+                  ? "Solved Again"
+                  : "Mark as Solved"}
+            </Button>
           </div>
         </div>
-        <div className="shrink-0 relative">
-          <Button
-            onClick={handleMarkSolved}
-            disabled={isSolving}
-            className="w-full md:w-auto bg-violet-600 hover:bg-violet-700 text-white flex items-center gap-2 font-bold rounded-xl"
+
+        {/* Reference links row — NeetCode / TUF / YouTube */}
+        <div className="relative flex flex-wrap gap-2 pt-1 border-t border-border-app">
+          <span className="self-center text-xs font-semibold text-content-muted mr-1">
+            Study on:
+          </span>
+          <a
+            href={toNeetcodeUrl(problem.title)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-700 dark:text-green-400 ring-1 ring-green-500/30 transition-colors"
           >
-            {isSolved ? <CheckCircle className="h-4 w-4" /> : null}
-            {isSolving ? "Saving..." : isSolved ? "Solved Again" : "Mark as Solved"}
-          </Button>
+            <ExternalLink className="h-3 w-3" />
+            NeetCode
+          </a>
+          <a
+            href={toTufUrl(problem.title)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-700 dark:text-orange-400 ring-1 ring-orange-500/30 transition-colors"
+          >
+            <ExternalLink className="h-3 w-3" />
+            TakeUForward
+          </a>
+          <a
+            href={toYoutubeSearchUrl(problem.title)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-400 ring-1 ring-red-500/30 transition-colors"
+          >
+            <Video className="h-3 w-3" />
+            NeetCode Video
+          </a>
+          <a
+            href={`https://leetcode.com/problems/${problem.title
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, "")}/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 ring-1 ring-yellow-500/30 transition-colors"
+          >
+            <ExternalLink className="h-3 w-3" />
+            LeetCode
+          </a>
         </div>
       </div>
 
@@ -182,17 +315,41 @@ export const DsaProblemDetailsPage = () => {
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl bg-surface-2 p-4 border border-border-app/65">
-                <p className="text-xs font-bold text-content-muted uppercase tracking-wider">Naive Approach</p>
+                <p className="text-xs font-bold text-content-muted uppercase tracking-wider">
+                  Naive Approach
+                </p>
                 <div className="mt-2.5 space-y-1">
-                  <p className="text-sm font-semibold text-content">Time: <span className="font-mono text-xs font-bold text-rose-600">{problem.naiveSolution.timeComplexity}</span></p>
-                  <p className="text-sm font-semibold text-content">Space: <span className="font-mono text-xs font-bold text-content-2">{problem.naiveSolution.spaceComplexity}</span></p>
+                  <p className="text-sm font-semibold text-content">
+                    Time:{" "}
+                    <span className="font-mono text-xs font-bold text-rose-600">
+                      {problem.naiveSolution.timeComplexity}
+                    </span>
+                  </p>
+                  <p className="text-sm font-semibold text-content">
+                    Space:{" "}
+                    <span className="font-mono text-xs font-bold text-content-2">
+                      {problem.naiveSolution.spaceComplexity}
+                    </span>
+                  </p>
                 </div>
               </div>
               <div className="rounded-2xl bg-violet-500/5 p-4 border border-violet-500/10">
-                <p className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">Optimized Approach</p>
+                <p className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
+                  Optimized Approach
+                </p>
                 <div className="mt-2.5 space-y-1">
-                  <p className="text-sm font-semibold text-content">Time: <span className="font-mono text-xs font-bold text-emerald-600">{problem.optimizedSolution.timeComplexity}</span></p>
-                  <p className="text-sm font-semibold text-content">Space: <span className="font-mono text-xs font-bold text-content-2">{problem.optimizedSolution.spaceComplexity}</span></p>
+                  <p className="text-sm font-semibold text-content">
+                    Time:{" "}
+                    <span className="font-mono text-xs font-bold text-emerald-600">
+                      {problem.optimizedSolution.timeComplexity}
+                    </span>
+                  </p>
+                  <p className="text-sm font-semibold text-content">
+                    Space:{" "}
+                    <span className="font-mono text-xs font-bold text-content-2">
+                      {problem.optimizedSolution.spaceComplexity}
+                    </span>
+                  </p>
                 </div>
               </div>
             </div>
@@ -200,7 +357,10 @@ export const DsaProblemDetailsPage = () => {
 
           {/* Notes area */}
           <div className="surface-card p-6 space-y-4">
-            <label htmlFor="notes" className="font-display font-bold text-base text-content block">
+            <label
+              htmlFor="notes"
+              className="font-display font-bold text-base text-content block"
+            >
               Personal Study Notes
             </label>
             <textarea
@@ -262,13 +422,18 @@ export const DsaProblemDetailsPage = () => {
 
             {activeTab === "visualizer" ? (
               <div className="p-6 space-y-4">
-                <h4 className="font-display font-bold text-sm text-content">Solution Strategy</h4>
+                <h4 className="font-display font-bold text-sm text-content">
+                  Solution Strategy
+                </h4>
                 <p className="text-xs text-content-2 leading-relaxed font-medium">
                   {problem.optimizedSolution.explanation}
                 </p>
                 <div className="border-t border-border-app/60 pt-4 space-y-2">
                   <p className="text-xs text-content-2 leading-relaxed font-medium">
-                    <span className="font-bold text-content">Naive Approach:</span> {problem.naiveSolution.explanation}
+                    <span className="font-bold text-content">
+                      Naive Approach:
+                    </span>{" "}
+                    {problem.naiveSolution.explanation}
                   </p>
                 </div>
               </div>
@@ -277,26 +442,32 @@ export const DsaProblemDetailsPage = () => {
                 {/* Language bar */}
                 <div className="flex border-b border-border-app px-4 py-2 justify-between items-center bg-surface-3/30">
                   <div className="flex gap-2">
-                    {["python", "javascript", "typescript", "cpp", "java"].map((lang) => (
-                      <button
-                        key={lang}
-                        onClick={() => setLanguage(lang)}
-                        className={`text-[10px] font-bold uppercase px-2 py-1 rounded transition ${
-                          language === lang
-                            ? "bg-violet-500/10 text-violet-600 dark:text-violet-400"
-                            : "text-content-muted hover:text-content"
-                        }`}
-                      >
-                        {lang === "cpp" ? "C++" : lang}
-                      </button>
-                    ))}
+                    {["python", "javascript", "typescript", "cpp", "java"].map(
+                      (lang) => (
+                        <button
+                          key={lang}
+                          onClick={() => setLanguage(lang)}
+                          className={`text-[10px] font-bold uppercase px-2 py-1 rounded transition ${
+                            language === lang
+                              ? "bg-violet-500/10 text-violet-600 dark:text-violet-400"
+                              : "text-content-muted hover:text-content"
+                          }`}
+                        >
+                          {lang === "cpp" ? "C++" : lang}
+                        </button>
+                      )
+                    )}
                   </div>
                   <button
                     onClick={handleCopyCode}
                     className="p-1.5 rounded-lg border border-border-app hover:bg-surface-2 transition text-content-muted hover:text-content"
                     title="Copy Code"
                   >
-                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
                   </button>
                 </div>
 

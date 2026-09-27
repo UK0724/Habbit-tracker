@@ -9,7 +9,7 @@ type NumberInputProps = InputHTMLAttributes<HTMLInputElement> & {
 
 export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(
   ({ className, unit, ...props }, ref) => (
-    <div className="relative">
+    <div className="relative w-full max-w-full min-w-0">
       <Input
         ref={ref}
         type="number"

@@ -1,6 +1,13 @@
 // Runnable check for the validation schemas and the expense id transform.
 // No DB connection needed. Run: npm run check --workspace server
 import assert from "node:assert/strict";
+import { ACHIEVEMENTS } from "./modules/gamification/gamification.constants.js";
+
+// Native clients render this API field directly; an omitted icon leaves a blank badge.
+assert.equal(new Set(ACHIEVEMENTS.map((badge) => badge.id)).size, ACHIEVEMENTS.length);
+for (const badge of ACHIEVEMENTS) {
+  assert.ok(badge.emoji?.trim(), `Achievement ${badge.id} needs an icon`);
+}
 
 import { ExpenseModel } from "./modules/expenses/expense.model.js";
 import {

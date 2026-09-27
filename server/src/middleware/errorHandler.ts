@@ -32,16 +32,19 @@ export const errorHandler = (
 
     if (mongooseError.code === 11000) {
       return response.status(409).json({
-        message: "A log already exists for this habit and date"
+        message: "A record with these details already exists"
       });
     }
   }
 
-  if (error instanceof Error) {
-    return response.status(500).json({
-      message: error.message || "Internal server error"
-    });
+  if (error instanceof Error && (error.name === "CastError" || error.name === "ValidationError")) {
+    return response.status(400).json({ message: "Invalid request data" });
   }
+  if (typeof error === "object" && error !== null && "type" in error) {
+    if (error.type === "entity.parse.failed") return response.status(400).json({ message: "Invalid JSON body" });
+    if (error.type === "entity.too.large") return response.status(413).json({ message: "Request body is too large" });
+  }
+  console.error("Unhandled request error", error);
 
   return response.status(500).json({
     message: "Internal server error"

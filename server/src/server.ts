@@ -1,9 +1,11 @@
 import { app } from "./app.js";
 import { connectDatabase, disconnectDatabase } from "./config/database.js";
 import { env } from "./config/env.js";
+import { startPushScheduler } from "./modules/gamification/push.scheduler.js";
 
 const startServer = async () => {
   await connectDatabase();
+  startPushScheduler();
 
   const server = app.listen(env.PORT, () => {
     console.log(`Server listening on http://localhost:${env.PORT}`);

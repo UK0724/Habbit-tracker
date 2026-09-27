@@ -16,7 +16,7 @@ import {
 export const listHabitsController = catchAsync(
   async (request: Request, response: Response) => {
     const { userId } = request as AuthRequest;
-    const habits = await listHabits(userId, request.query.date as string | undefined);
+    const habits = await listHabits(userId, request.query.date as string | undefined, request.query.includeArchived === "true");
     response.json({ data: habits });
   }
 );

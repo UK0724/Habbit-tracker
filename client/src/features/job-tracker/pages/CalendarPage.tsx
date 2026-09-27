@@ -3,11 +3,7 @@ import { useJobTrackerStore } from "../stores/jobTrackerStore";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
-  ChevronRight,
-  Briefcase,
-  Users,
-  Video,
-  FileCheck
+  ChevronRight
 } from "lucide-react";
 
 export const CalendarPage = () => {
@@ -19,8 +15,18 @@ export const CalendarPage = () => {
   const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed
 
   const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
   ];
 
   const handlePrevMonth = () => {
@@ -45,7 +51,8 @@ export const CalendarPage = () => {
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay(); // 0 = Sun, 1 = Mon ...
 
-  const calendarCells: { dayNum: number | null; dateString: string | null }[] = [];
+  const calendarCells: { dayNum: number | null; dateString: string | null }[] =
+    [];
 
   // Padding cells for previous month
   for (let i = 0; i < firstDayIndex; i++) {
@@ -62,7 +69,10 @@ export const CalendarPage = () => {
 
   // Helper to filter events on a day
   const getEventsForDate = (dateStr: string) => {
-    const events: { type: "apply" | "referral" | "interview" | "oa"; label: string }[] = [];
+    const events: {
+      type: "apply" | "referral" | "interview" | "oa";
+      label: string;
+    }[] = [];
 
     // Applications submitted on this date
     applications.forEach((app) => {
@@ -70,7 +80,10 @@ export const CalendarPage = () => {
         events.push({ type: "apply", label: `Applied: ${app.company}` });
       }
       // Interviews or OAs scheduled (just mapping using dates/comments or status for presentation)
-      if (app.appliedDate === dateStr && ["Interview 1", "Interview 2", "Final Round"].includes(app.status)) {
+      if (
+        app.appliedDate === dateStr &&
+        ["Interview 1", "Interview 2", "Final Round"].includes(app.status)
+      ) {
         events.push({ type: "interview", label: `Interview: ${app.company}` });
       }
       if (app.appliedDate === dateStr && app.status === "OA") {
@@ -81,10 +94,16 @@ export const CalendarPage = () => {
     // Referrals requested/follow-ups
     referrals.forEach((ref) => {
       if (ref.dateSent === dateStr) {
-        events.push({ type: "referral", label: `Referral sent: ${ref.company}` });
+        events.push({
+          type: "referral",
+          label: `Referral sent: ${ref.company}`
+        });
       }
       if (ref.followUpDate === dateStr && !ref.replied) {
-        events.push({ type: "referral", label: `Follow-up: ${ref.personName} (${ref.company})` });
+        events.push({
+          type: "referral",
+          label: `Follow-up: ${ref.personName} (${ref.company})`
+        });
       }
     });
 
@@ -102,7 +121,9 @@ export const CalendarPage = () => {
             <CalendarIcon className="h-6 w-6 text-accent" />
             Calendar Workspace
           </h1>
-          <p className="text-xs text-content-muted mt-1">Review deadlines, schedule events, and check status history</p>
+          <p className="text-xs text-content-muted mt-1">
+            Review deadlines, schedule events, and check status history
+          </p>
         </div>
 
         {/* Date Selector Header */}
@@ -127,22 +148,36 @@ export const CalendarPage = () => {
 
       {/* Legend */}
       <section className="flex flex-wrap gap-4 text-xs font-semibold text-content-muted px-1.5">
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-accent" /> Applications</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Referrals</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> OAs</span>
-        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-indigo-400" /> Interviews</span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-accent" /> Applications
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Referrals
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> OAs
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-indigo-400" /> Interviews
+        </span>
       </section>
 
       {/* Month Grid */}
       <div className="surface-card p-3">
         <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-content-muted uppercase tracking-wider mb-2 border-b border-border-app/40 pb-2">
-          {weekdays.map(w => <div key={w} className="py-1">{w}</div>)}
+          {weekdays.map((w) => (
+            <div key={w} className="py-1">
+              {w}
+            </div>
+          ))}
         </div>
 
         <div className="grid grid-cols-7 gap-1.5 min-h-[45vh]">
           {calendarCells.map((cell, index) => {
             const hasDay = cell.dayNum !== null;
-            const events = cell.dateString ? getEventsForDate(cell.dateString) : [];
+            const events = cell.dateString
+              ? getEventsForDate(cell.dateString)
+              : [];
             const isTodayDate =
               cell.dateString === today.toISOString().split("T")[0];
 
@@ -161,7 +196,9 @@ export const CalendarPage = () => {
                   <div className="flex justify-between items-center">
                     <span
                       className={`text-xs font-bold ${
-                        isTodayDate ? "text-accent text-sm font-black" : "text-content-muted"
+                        isTodayDate
+                          ? "text-accent text-sm font-black"
+                          : "text-content-muted"
                       }`}
                     >
                       {cell.dayNum}
@@ -177,11 +214,11 @@ export const CalendarPage = () => {
                         ev.type === "apply"
                           ? "bg-accent/15 border-accent/30 text-accent"
                           : ev.type === "referral"
-                          ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600"
-                          : ev.type === "oa"
-                          ? "bg-amber-500/15 border-amber-500/30 text-amber-600"
-                          : "bg-indigo-400/15 border-indigo-400/30 text-indigo-400";
-                      
+                            ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600"
+                            : ev.type === "oa"
+                              ? "bg-amber-500/15 border-amber-500/30 text-amber-600"
+                              : "bg-indigo-400/15 border-indigo-400/30 text-indigo-400";
+
                       return (
                         <div
                           key={idx}

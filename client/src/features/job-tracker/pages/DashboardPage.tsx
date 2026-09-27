@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useJobTrackerStore } from "../stores/jobTrackerStore";
 import { useAuthStore } from "../../../stores/authStore";
 import { useHabits } from "../../habits/hooks/useHabits";
@@ -14,9 +14,7 @@ import {
   CheckCircle2,
   Calendar,
   Flame,
-  Award,
-  BookOpen,
-  ArrowUpRight
+  Award
 } from "lucide-react";
 import {
   BarChart,
@@ -27,14 +25,12 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell,
-  Legend
+  Cell
 } from "recharts";
 import { ContributionGrid } from "../../../components/viz/ContributionGrid";
 import type { DayCell } from "../../stats/lib/analytics";
 
 export const DashboardPage = () => {
-  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
 
   const applications = useJobTrackerStore((s) => s.applications);
@@ -46,7 +42,7 @@ export const DashboardPage = () => {
 
   const todayStr = new Date().toISOString().split("T")[0] || "";
   const { data: habits } = useHabits(todayStr);
-  const saveLogMutation = useSaveHabitLog();
+  const { mutate: saveLog } = useSaveHabitLog();
 
   const linkedHabit = habits?.find((h) => h.linkToJobTracker);
   const activeStreak = linkedHabit
@@ -59,7 +55,15 @@ export const DashboardPage = () => {
   useEffect(() => {
     if (!habits || !dailyTasks) return;
     const todayName = (() => {
-      const daysMap = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const daysMap = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+      ];
       return daysMap[new Date().getDay()] || "Monday";
     })();
     const todayTasks = dailyTasks.filter((t) => t.dayOfWeek === todayName);
@@ -71,7 +75,7 @@ export const DashboardPage = () => {
     if (jobHabit) {
       const isCurrentlyDone = jobHabit.selectedDateLog?.status === "done";
       if (allDone && !isCurrentlyDone) {
-        saveLogMutation.mutate({
+        saveLog({
           habitId: jobHabit.id,
           logId: jobHabit.selectedDateLog?.id,
           input: {
@@ -80,8 +84,14 @@ export const DashboardPage = () => {
             comment: `Completed all checklist tasks for ${todayName}`
           }
         });
-      } else if (!allDone && isCurrentlyDone && jobHabit.selectedDateLog?.comment?.includes("Completed all checklist tasks")) {
-        saveLogMutation.mutate({
+      } else if (
+        !allDone &&
+        isCurrentlyDone &&
+        jobHabit.selectedDateLog?.comment?.includes(
+          "Completed all checklist tasks"
+        )
+      ) {
+        saveLog({
           habitId: jobHabit.id,
           logId: jobHabit.selectedDateLog?.id,
           input: {
@@ -92,26 +102,38 @@ export const DashboardPage = () => {
         });
       }
     }
-  }, [dailyTasks, habits, todayStr]);
+  }, [dailyTasks, habits, todayStr, saveLog]);
 
   // Compute counts
-  const appsSentCount = applications.filter(a => a.status !== "Wishlist").length;
-  const referralsRequested = referrals.length;
-  const recruiterReplies = referrals.filter(r => r.replied).length;
-  const interviewsCount = applications.filter(
-    a => ["Interview 1", "Interview 2", "Final Round"].includes(a.status)
+  const appsSentCount = applications.filter(
+    (a) => a.status !== "Wishlist"
   ).length;
-  const oaCount = applications.filter(a => a.status === "OA").length;
-  const rejectionsCount = applications.filter(a => a.status === "Rejected").length;
-  const offersCount = applications.filter(a => a.status === "Offer").length;
+  const referralsRequested = referrals.length;
+  const recruiterReplies = referrals.filter((r) => r.replied).length;
+  const interviewsCount = applications.filter((a) =>
+    ["Interview 1", "Interview 2", "Final Round"].includes(a.status)
+  ).length;
+  const oaCount = applications.filter((a) => a.status === "OA").length;
+  const rejectionsCount = applications.filter(
+    (a) => a.status === "Rejected"
+  ).length;
+  const offersCount = applications.filter((a) => a.status === "Offer").length;
 
   // Streak/Checklist completion
   const todayDayName = (() => {
-    const daysMap = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const daysMap = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday"
+    ];
     return daysMap[new Date().getDay()] || "Monday";
   })();
-  const todayTasks = dailyTasks.filter(t => t.dayOfWeek === todayDayName);
-  
+  const todayTasks = dailyTasks.filter((t) => t.dayOfWeek === todayDayName);
+
   // Weekly Target Calculation
   const completionPercent = Math.round(
     ((weeklyGoals.appsCurrent + weeklyGoals.referralsCurrent) /
@@ -120,7 +142,9 @@ export const DashboardPage = () => {
   );
 
   // Chart Data: Applications per Week (last 4 weeks dynamically)
-  const getAppsForPastWeek = (weeksAgo: number): { apps: number; interviews: number } => {
+  const getAppsForPastWeek = (
+    weeksAgo: number
+  ): { apps: number; interviews: number } => {
     const today = new Date();
     const start = new Date();
     start.setDate(today.getDate() - (weeksAgo + 1) * 7);
@@ -173,12 +197,16 @@ export const DashboardPage = () => {
         const dateObj = new Date();
         dateObj.setDate(today.getDate() - (w * 7 + d));
         const dateString = dateObj.toISOString().split("T")[0] || "";
-        
+
         // Count activity (applications or referrals sent on this date)
-        const appsOnDate = applications.filter(a => a.appliedDate === dateString).length;
-        const refsOnDate = referrals.filter(r => r.dateSent === dateString).length;
+        const appsOnDate = applications.filter(
+          (a) => a.appliedDate === dateString
+        ).length;
+        const refsOnDate = referrals.filter(
+          (r) => r.dateSent === dateString
+        ).length;
         const hasLog = appsOnDate > 0 || refsOnDate > 0;
-        
+
         col.push({
           date: dateString,
           hasLog,
@@ -206,16 +234,14 @@ export const DashboardPage = () => {
   // Handle study goal decrement
   const handleSubtractStudyHour = () => {
     updateWeeklyGoals({
-      studyHoursCurrent: Math.max(
-        0,
-        weeklyGoals.studyHoursCurrent - 0.5
-      )
+      studyHoursCurrent: Math.max(0, weeklyGoals.studyHoursCurrent - 0.5)
     });
   };
 
   // Profile greeting details
   const nameLabel = user?.email?.split("@")[0] || "Uday";
-  const capitalizedName = nameLabel.charAt(0).toUpperCase() + nameLabel.slice(1);
+  const capitalizedName =
+    nameLabel.charAt(0).toUpperCase() + nameLabel.slice(1);
 
   return (
     <div className="space-y-6">
@@ -228,22 +254,31 @@ export const DashboardPage = () => {
               Good Evening, {capitalizedName} 👋
             </h1>
             <p className="mt-2 text-sm text-content-2 max-w-xl">
-              Your job search pipeline is looking healthy. You have a final round interview coming up soon and 1 pending offer details.
+              Your job search pipeline is looking healthy. You have a final
+              round interview coming up soon and 1 pending offer details.
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <div className="rounded-2xl bg-surface-2 px-4 py-3 border border-border-app/40 flex items-center gap-2.5">
               <Flame className="h-6 w-6 text-amber-500 animate-flame" />
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-content-muted">Current Streak</p>
-                <p className="text-lg font-extrabold text-amber-500">{activeStreak} Days</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-content-muted">
+                  Current Streak
+                </p>
+                <p className="text-lg font-extrabold text-amber-500">
+                  {activeStreak} Days
+                </p>
               </div>
             </div>
             <div className="rounded-2xl bg-surface-2 px-4 py-3 border border-border-app/40 flex items-center gap-2.5">
               <Award className="h-6 w-6 text-emerald-500" />
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-content-muted">Completion</p>
-                <p className="text-lg font-extrabold text-emerald-500">{completionPercent}%</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-content-muted">
+                  Completion
+                </p>
+                <p className="text-lg font-extrabold text-emerald-500">
+                  {completionPercent}%
+                </p>
               </div>
             </div>
           </div>
@@ -261,7 +296,8 @@ export const DashboardPage = () => {
                 Today's Plan ({todayDayName})
               </h2>
               <span className="text-xs font-semibold text-content-muted">
-                {todayTasks.filter(t => t.completed).length} of {todayTasks.length} done
+                {todayTasks.filter((t) => t.completed).length} of{" "}
+                {todayTasks.length} done
               </span>
             </div>
             <div className="space-y-2">
@@ -322,7 +358,9 @@ export const DashboardPage = () => {
                 <div className="h-2 w-full bg-surface-3 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-accent transition-all duration-300"
-                    style={{ width: `${Math.min(100, (weeklyGoals.appsCurrent / weeklyGoals.appsTarget) * 100)}%` }}
+                    style={{
+                      width: `${Math.min(100, (weeklyGoals.appsCurrent / weeklyGoals.appsTarget) * 100)}%`
+                    }}
                   />
                 </div>
               </div>
@@ -332,13 +370,16 @@ export const DashboardPage = () => {
                 <div className="flex justify-between text-xs font-semibold mb-1">
                   <span className="text-content-2">Referrals Sent</span>
                   <span className="text-content font-bold">
-                    {weeklyGoals.referralsCurrent} / {weeklyGoals.referralsTarget}
+                    {weeklyGoals.referralsCurrent} /{" "}
+                    {weeklyGoals.referralsTarget}
                   </span>
                 </div>
                 <div className="h-2 w-full bg-surface-3 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-emerald-500 transition-all duration-300"
-                    style={{ width: `${Math.min(100, (weeklyGoals.referralsCurrent / weeklyGoals.referralsTarget) * 100)}%` }}
+                    style={{
+                      width: `${Math.min(100, (weeklyGoals.referralsCurrent / weeklyGoals.referralsTarget) * 100)}%`
+                    }}
                   />
                 </div>
               </div>
@@ -348,13 +389,16 @@ export const DashboardPage = () => {
                 <div className="flex justify-between text-xs font-semibold mb-1">
                   <span className="text-content-2">Study Hours</span>
                   <span className="text-content font-bold">
-                    {weeklyGoals.studyHoursCurrent} / {weeklyGoals.studyHoursTarget} hrs
+                    {weeklyGoals.studyHoursCurrent} /{" "}
+                    {weeklyGoals.studyHoursTarget} hrs
                   </span>
                 </div>
                 <div className="h-2 w-full bg-surface-3 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-amber-500 transition-all duration-300"
-                    style={{ width: `${Math.min(100, (weeklyGoals.studyHoursCurrent / weeklyGoals.studyHoursTarget) * 100)}%` }}
+                    style={{
+                      width: `${Math.min(100, (weeklyGoals.studyHoursCurrent / weeklyGoals.studyHoursTarget) * 100)}%`
+                    }}
                   />
                 </div>
               </div>
@@ -370,7 +414,9 @@ export const DashboardPage = () => {
                 <div className="h-2 w-full bg-surface-3 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-indigo-400 transition-all duration-300"
-                    style={{ width: `${Math.min(100, (weeklyGoals.linkedinCurrent / weeklyGoals.linkedinTarget) * 100)}%` }}
+                    style={{
+                      width: `${Math.min(100, (weeklyGoals.linkedinCurrent / weeklyGoals.linkedinTarget) * 100)}%`
+                    }}
                   />
                 </div>
               </div>
@@ -393,7 +439,9 @@ export const DashboardPage = () => {
                 +0.5h Study Hour
               </button>
             </div>
-            <span className="text-[10px] text-content-muted">Target changes reset weekly</span>
+            <span className="text-[10px] text-content-muted">
+              Target changes reset weekly
+            </span>
           </div>
         </div>
       </div>
@@ -401,17 +449,57 @@ export const DashboardPage = () => {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
         {[
-          { label: "Sent", value: appsSentCount, icon: Briefcase, color: "text-accent bg-accent/10" },
-          { label: "Referrals", value: referralsRequested, icon: Users, color: "text-emerald-500 bg-emerald-500/10" },
-          { label: "Replies", value: recruiterReplies, icon: MessageSquare, color: "text-amber-500 bg-amber-500/10" },
-          { label: "Interviews", value: interviewsCount, icon: Video, color: "text-indigo-400 bg-indigo-400/10" },
-          { label: "OAs", value: oaCount, icon: FileCheck, color: "text-cyan-400 bg-cyan-400/10" },
-          { label: "Rejections", value: rejectionsCount, icon: Ban, color: "text-rose-500 bg-rose-500/10" },
-          { label: "Offers", value: offersCount, icon: CheckCircle2, color: "text-emerald-400 bg-emerald-400/10" }
+          {
+            label: "Sent",
+            value: appsSentCount,
+            icon: Briefcase,
+            color: "text-accent bg-accent/10"
+          },
+          {
+            label: "Referrals",
+            value: referralsRequested,
+            icon: Users,
+            color: "text-emerald-500 bg-emerald-500/10"
+          },
+          {
+            label: "Replies",
+            value: recruiterReplies,
+            icon: MessageSquare,
+            color: "text-amber-500 bg-amber-500/10"
+          },
+          {
+            label: "Interviews",
+            value: interviewsCount,
+            icon: Video,
+            color: "text-indigo-400 bg-indigo-400/10"
+          },
+          {
+            label: "OAs",
+            value: oaCount,
+            icon: FileCheck,
+            color: "text-cyan-400 bg-cyan-400/10"
+          },
+          {
+            label: "Rejections",
+            value: rejectionsCount,
+            icon: Ban,
+            color: "text-rose-500 bg-rose-500/10"
+          },
+          {
+            label: "Offers",
+            value: offersCount,
+            icon: CheckCircle2,
+            color: "text-emerald-400 bg-emerald-400/10"
+          }
         ].map((kpi) => (
-          <div key={kpi.label} className="surface-card p-4 flex flex-col justify-between hover:scale-[1.02] transition-transform duration-200">
+          <div
+            key={kpi.label}
+            className="surface-card p-4 flex flex-col justify-between hover:scale-[1.02] transition-transform duration-200"
+          >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-content-muted">{kpi.label}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-content-muted">
+                {kpi.label}
+              </span>
               <span className={`rounded-lg p-1.5 ${kpi.color}`}>
                 <kpi.icon className="h-4 w-4" />
               </span>
@@ -426,7 +514,10 @@ export const DashboardPage = () => {
         <div className="flex items-center justify-between mb-4 border-b border-border-app/40 pb-3">
           <div>
             <h2 className="text-base font-bold">Daily Activity Heatmap</h2>
-            <p className="text-xs text-content-muted mt-0.5">Aggregates applications submitted and referrals requested over the last 12 weeks</p>
+            <p className="text-xs text-content-muted mt-0.5">
+              Aggregates applications submitted and referrals requested over the
+              last 12 weeks
+            </p>
           </div>
           <span className="text-xs font-bold text-accent">Active tracking</span>
         </div>
@@ -445,11 +536,21 @@ export const DashboardPage = () => {
       <div className="grid gap-6 md:grid-cols-2">
         {/* Weekly Chart */}
         <div className="surface-card p-6">
-          <h2 className="text-base font-bold mb-4 border-b border-border-app/40 pb-3">Applications per Week</h2>
+          <h2 className="text-base font-bold mb-4 border-b border-border-app/40 pb-3">
+            Applications per Week
+          </h2>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={appPerWeekData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
+              <BarChart
+                data={appPerWeekData}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <XAxis
+                  dataKey="name"
+                  stroke="#64748b"
+                  fontSize={11}
+                  tickLine={false}
+                />
                 <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
                 <Tooltip
                   contentStyle={{
@@ -459,8 +560,18 @@ export const DashboardPage = () => {
                     color: "var(--text)"
                   }}
                 />
-                <Bar dataKey="apps" fill="#6366f1" radius={[4, 4, 0, 0]} name="Applications" />
-                <Bar dataKey="interviews" fill="#10b981" radius={[4, 4, 0, 0]} name="Interviews" />
+                <Bar
+                  dataKey="apps"
+                  fill="#6366f1"
+                  radius={[4, 4, 0, 0]}
+                  name="Applications"
+                />
+                <Bar
+                  dataKey="interviews"
+                  fill="#10b981"
+                  radius={[4, 4, 0, 0]}
+                  name="Interviews"
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -468,7 +579,9 @@ export const DashboardPage = () => {
 
         {/* Company Distribution Chart */}
         <div className="surface-card p-6">
-          <h2 className="text-base font-bold mb-4 border-b border-border-app/40 pb-3">Applications by Company</h2>
+          <h2 className="text-base font-bold mb-4 border-b border-border-app/40 pb-3">
+            Applications by Company
+          </h2>
           <div className="h-64 w-full flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="h-full w-full sm:w-1/2">
               <ResponsiveContainer width="100%" height="100%">
@@ -483,7 +596,10 @@ export const DashboardPage = () => {
                     dataKey="value"
                   >
                     {appByCompanyData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -492,19 +608,28 @@ export const DashboardPage = () => {
             </div>
             <div className="w-full sm:w-1/2 space-y-2 text-xs">
               {appByCompanyData.map((item, idx) => (
-                <div key={item.name} className="flex items-center justify-between">
+                <div
+                  key={item.name}
+                  className="flex items-center justify-between"
+                >
                   <div className="flex items-center gap-2">
                     <span
                       className="h-3 w-3 rounded-full shrink-0"
                       style={{ backgroundColor: COLORS[idx % COLORS.length] }}
                     />
-                    <span className="font-semibold truncate max-w-[120px]">{item.name}</span>
+                    <span className="font-semibold truncate max-w-[120px]">
+                      {item.name}
+                    </span>
                   </div>
-                  <span className="font-bold text-content-muted">{item.value} applications</span>
+                  <span className="font-bold text-content-muted">
+                    {item.value} applications
+                  </span>
                 </div>
               ))}
               {appByCompanyData.length === 0 && (
-                <p className="text-center text-content-muted py-8">No applications to show.</p>
+                <p className="text-center text-content-muted py-8">
+                  No applications to show.
+                </p>
               )}
             </div>
           </div>

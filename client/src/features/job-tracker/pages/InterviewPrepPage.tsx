@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useJobTrackerStore } from "../stores/jobTrackerStore";
-import { PrepCategory, PrepTopic } from "../types";
+import { PrepTopic } from "../types";
 import {
   BookOpen,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Plus,
@@ -25,9 +24,14 @@ export const InterviewPrepPage = () => {
   const setTopicDifficulty = useJobTrackerStore((s) => s.setTopicDifficulty);
 
   // Active accordion state
-  const [expandedCat, setExpandedCat] = useState<string | null>(prepCategories[0]?.id || null);
+  const [expandedCat, setExpandedCat] = useState<string | null>(
+    prepCategories[0]?.id || null
+  );
   // Edit notes state
-  const [activeEditingTopic, setActiveEditingTopic] = useState<{ catId: string; topicId: string } | null>(null);
+  const [activeEditingTopic, setActiveEditingTopic] = useState<{
+    catId: string;
+    topicId: string;
+  } | null>(null);
   const [tempNotes, setTempNotes] = useState("");
 
   // Add Category (Module) Form State
@@ -35,8 +39,12 @@ export const InterviewPrepPage = () => {
   const [newCategoryName, setNewCategoryName] = useState("");
 
   // Add Topic (Subtopic) Inline Form State (indexed by Category ID)
-  const [newTopicNames, setNewTopicNames] = useState<Record<string, string>>({});
-  const [newTopicDifficulties, setNewTopicDifficulties] = useState<Record<string, "Easy" | "Medium" | "Hard">>({});
+  const [newTopicNames, setNewTopicNames] = useState<Record<string, string>>(
+    {}
+  );
+  const [newTopicDifficulties, setNewTopicDifficulties] = useState<
+    Record<string, "Easy" | "Medium" | "Hard">
+  >({});
 
   const toggleCategory = (id: string) => {
     setExpandedCat(expandedCat === id ? null : id);
@@ -49,7 +57,11 @@ export const InterviewPrepPage = () => {
 
   const handleSaveNotes = () => {
     if (!activeEditingTopic) return;
-    updateTopicNotes(activeEditingTopic.catId, activeEditingTopic.topicId, tempNotes);
+    updateTopicNotes(
+      activeEditingTopic.catId,
+      activeEditingTopic.topicId,
+      tempNotes
+    );
     setActiveEditingTopic(null);
   };
 
@@ -62,7 +74,11 @@ export const InterviewPrepPage = () => {
   };
 
   const handleDeleteCategory = (catId: string, name: string) => {
-    if (confirm(`Are you sure you want to delete the "${name}" study module and all its topics?`)) {
+    if (
+      confirm(
+        `Are you sure you want to delete the "${name}" study module and all its topics?`
+      )
+    ) {
       deletePrepCategory(catId);
       if (expandedCat === catId) {
         setExpandedCat(null);
@@ -75,9 +91,9 @@ export const InterviewPrepPage = () => {
     const topicName = newTopicNames[catId] || "";
     if (!topicName.trim()) return;
     const diff = newTopicDifficulties[catId] || "Medium";
-    
+
     addPrepTopic(catId, topicName.trim(), diff);
-    
+
     // Reset values
     setNewTopicNames((prev) => ({ ...prev, [catId]: "" }));
     setNewTopicDifficulties((prev) => ({ ...prev, [catId]: "Medium" }));
@@ -92,15 +108,22 @@ export const InterviewPrepPage = () => {
             <BookOpen className="h-6 w-6 text-accent" />
             Interview Preparation
           </h1>
-          <p className="text-xs text-content-muted mt-1">Review specific topics, count revisions, and log study notes</p>
+          <p className="text-xs text-content-muted mt-1">
+            Review specific topics, count revisions, and log study notes
+          </p>
         </div>
       </section>
 
       {/* Add Module Block */}
       <div className="animate-fade-in-up">
         {addCategoryOpen ? (
-          <form onSubmit={handleAddCategory} className="surface-card p-5 space-y-3 border border-accent/40 animate-pop-in">
-            <h3 className="text-sm font-bold text-content">Create New Study Module</h3>
+          <form
+            onSubmit={handleAddCategory}
+            className="surface-card p-5 space-y-3 border border-accent/40 animate-pop-in"
+          >
+            <h3 className="text-sm font-bold text-content">
+              Create New Study Module
+            </h3>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
@@ -141,13 +164,21 @@ export const InterviewPrepPage = () => {
       {/* Accordions */}
       <div className="space-y-3">
         {prepCategories.map((category) => {
-          const completedCount = category.topics ? category.topics.filter((t) => t.completed).length : 0;
+          const completedCount = category.topics
+            ? category.topics.filter((t) => t.completed).length
+            : 0;
           const totalCount = category.topics ? category.topics.length : 0;
-          const percent = totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
+          const percent =
+            totalCount === 0
+              ? 0
+              : Math.round((completedCount / totalCount) * 100);
           const isExpanded = expandedCat === category.id;
 
           return (
-            <div key={category.id} className="surface-card overflow-hidden transition-all duration-200">
+            <div
+              key={category.id}
+              className="surface-card overflow-hidden transition-all duration-200"
+            >
               {/* Category trigger block */}
               <button
                 onClick={() => toggleCategory(category.id)}
@@ -156,9 +187,12 @@ export const InterviewPrepPage = () => {
                 <div className="flex items-center gap-3">
                   <BookMarked className="h-5 w-5 text-accent shrink-0" />
                   <div>
-                    <h2 className="text-base font-extrabold text-content">{category.name}</h2>
+                    <h2 className="text-base font-extrabold text-content">
+                      {category.name}
+                    </h2>
                     <p className="text-[10px] text-content-muted font-bold uppercase tracking-wider mt-0.5">
-                      {completedCount} of {totalCount} topics completed ({percent}%)
+                      {completedCount} of {totalCount} topics completed (
+                      {percent}%)
                     </p>
                   </div>
                 </div>
@@ -181,7 +215,11 @@ export const InterviewPrepPage = () => {
                   >
                     <Trash2 className="h-4.5 w-4.5" />
                   </button>
-                  {isExpanded ? <ChevronUp className="h-5 w-5 text-content-muted" /> : <ChevronDown className="h-5 w-5 text-content-muted" />}
+                  {isExpanded ? (
+                    <ChevronUp className="h-5 w-5 text-content-muted" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-content-muted" />
+                  )}
                 </div>
               </button>
 
@@ -196,18 +234,25 @@ export const InterviewPrepPage = () => {
                           activeEditingTopic?.topicId === topic.id;
 
                         return (
-                          <div key={topic.id} className="pt-4 first:pt-0 space-y-3">
+                          <div
+                            key={topic.id}
+                            className="pt-4 first:pt-0 space-y-3"
+                          >
                             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                               {/* Checked checkbox */}
                               <label className="flex items-start gap-3 cursor-pointer select-none">
                                 <input
                                   type="checkbox"
                                   checked={topic.completed}
-                                  onChange={() => toggleTopic(category.id, topic.id)}
+                                  onChange={() =>
+                                    toggleTopic(category.id, topic.id)
+                                  }
                                   className="mt-0.5 h-4.5 w-4.5 rounded border-border-app text-accent focus:ring-accent"
                                 />
                                 <div>
-                                  <p className={`text-sm font-bold ${topic.completed ? "line-through text-content-muted" : "text-content"}`}>
+                                  <p
+                                    className={`text-sm font-bold ${topic.completed ? "line-through text-content-muted" : "text-content"}`}
+                                  >
                                     {topic.name}
                                   </p>
                                   <div className="flex flex-wrap gap-2 items-center mt-1.5">
@@ -218,15 +263,18 @@ export const InterviewPrepPage = () => {
                                         setTopicDifficulty(
                                           category.id,
                                           topic.id,
-                                          e.target.value as "Easy" | "Medium" | "Hard"
+                                          e.target.value as
+                                            | "Easy"
+                                            | "Medium"
+                                            | "Hard"
                                         )
                                       }
                                       className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded border outline-none cursor-pointer ${
                                         topic.difficulty === "Easy"
                                           ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
                                           : topic.difficulty === "Medium"
-                                          ? "bg-amber-500/10 border-amber-500/30 text-amber-600"
-                                          : "bg-rose-500/10 border-rose-500/30 text-rose-500"
+                                            ? "bg-amber-500/10 border-amber-500/30 text-amber-600"
+                                            : "bg-rose-500/10 border-rose-500/30 text-rose-500"
                                       }`}
                                     >
                                       <option value="Easy">Easy</option>
@@ -245,7 +293,9 @@ export const InterviewPrepPage = () => {
                               {/* Quick topic actions */}
                               <div className="flex items-center gap-1.5 self-end sm:self-auto">
                                 <button
-                                  onClick={() => incrementRevision(category.id, topic.id)}
+                                  onClick={() =>
+                                    incrementRevision(category.id, topic.id)
+                                  }
                                   className="flex items-center gap-1.5 rounded-lg border border-border-app bg-surface px-2.5 py-1.5 text-[10px] font-extrabold text-content-2 hover:bg-surface-2 cursor-pointer"
                                 >
                                   <RefreshCcw className="h-3 w-3" />
@@ -261,8 +311,14 @@ export const InterviewPrepPage = () => {
                                   }}
                                   className="flex items-center gap-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 px-2.5 py-1.5 text-[10px] font-extrabold text-accent cursor-pointer"
                                 >
-                                  {isNotesEditing ? <Save className="h-3 w-3" /> : <MessageSquare className="h-3 w-3" />}
-                                  {isNotesEditing ? "Save Notes" : "Write Notes"}
+                                  {isNotesEditing ? (
+                                    <Save className="h-3 w-3" />
+                                  ) : (
+                                    <MessageSquare className="h-3 w-3" />
+                                  )}
+                                  {isNotesEditing
+                                    ? "Save Notes"
+                                    : "Write Notes"}
                                 </button>
                               </div>
                             </div>
@@ -303,23 +359,41 @@ export const InterviewPrepPage = () => {
                         );
                       })
                     ) : (
-                      <p className="text-xs text-content-muted py-2">No topics added in this module yet.</p>
+                      <p className="text-xs text-content-muted py-2">
+                        No topics added in this module yet.
+                      </p>
                     )}
                   </div>
 
                   {/* Inline Form to Add a Topic */}
-                  <form onSubmit={(e) => handleAddTopicSubmit(e, category.id)} className="pt-4 border-t border-border-app/40 flex flex-col sm:flex-row items-center gap-3">
+                  <form
+                    onSubmit={(e) => handleAddTopicSubmit(e, category.id)}
+                    className="pt-4 border-t border-border-app/40 flex flex-col sm:flex-row items-center gap-3"
+                  >
                     <input
                       type="text"
                       value={newTopicNames[category.id] || ""}
-                      onChange={(e) => setNewTopicNames(prev => ({ ...prev, [category.id]: e.target.value }))}
+                      onChange={(e) =>
+                        setNewTopicNames((prev) => ({
+                          ...prev,
+                          [category.id]: e.target.value
+                        }))
+                      }
                       placeholder="Add subtopic (e.g. Redux Toolkit or closures)"
                       className="w-full sm:flex-1 bg-surface-2 border border-border-app/80 rounded-xl px-3 py-2 text-xs outline-none focus:border-accent text-content"
                     />
                     <div className="w-full sm:w-auto flex gap-2">
                       <select
                         value={newTopicDifficulties[category.id] || "Medium"}
-                        onChange={(e) => setNewTopicDifficulties(prev => ({ ...prev, [category.id]: e.target.value as any }))}
+                        onChange={(e) =>
+                          setNewTopicDifficulties((prev) => ({
+                            ...prev,
+                            [category.id]: e.target.value as
+                              | "Easy"
+                              | "Medium"
+                              | "Hard"
+                          }))
+                        }
                         className="flex-1 sm:flex-initial bg-surface-2 border border-border-app/80 rounded-xl px-3 py-2 text-xs outline-none text-content font-bold cursor-pointer"
                       >
                         <option value="Easy">Easy</option>

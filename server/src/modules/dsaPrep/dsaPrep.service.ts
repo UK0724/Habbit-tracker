@@ -61,7 +61,7 @@ export const dsaPrepService = {
   },
 
   unmarkSolved: async (userId: string, problemId: number) => {
-    let profile = await DsaPrepProfileModel.findOne({ userId });
+    const profile = await DsaPrepProfileModel.findOne({ userId });
     if (profile) {
       if (!profile.solvedProblems) {
         profile.solvedProblems = [];

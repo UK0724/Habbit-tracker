@@ -1,7 +1,13 @@
 import { Link } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import {
+  CircleCheck,
+  ChartNoAxesColumnIncreasing,
+  Bell,
+  ChevronDown
+} from "lucide-react";
 
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
@@ -14,6 +20,7 @@ import {
 } from "./habitFormSchema";
 
 type HabitFormProps = {
+  scrollable?: boolean;
   defaultValues?: Partial<HabitFormValues>;
   submitLabel: string;
   isSubmitting?: boolean;
@@ -22,19 +29,20 @@ type HabitFormProps = {
   onSubmit: (values: HabitFormValues) => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
   isDeleting?: boolean;
+  onCancel?: () => void;
 };
 
 const TYPE_OPTIONS = [
   {
     value: "action",
     label: "Action",
-    emoji: "✅",
+    icon: CircleCheck,
     desc: "Done / not done each day"
   },
   {
     value: "measurable",
     label: "Measurable",
-    emoji: "📊",
+    icon: ChartNoAxesColumnIncreasing,
     desc: "Track a number — kg, km, hrs"
   }
 ] as const;
@@ -42,6 +50,7 @@ const TYPE_OPTIONS = [
 const CURRENCIES = ["₹", "$", "€", "£"] as const;
 
 export const HabitForm = ({
+  scrollable = false,
   defaultValues,
   submitLabel,
   isSubmitting,
@@ -49,7 +58,8 @@ export const HabitForm = ({
   typeDisabled,
   onSubmit,
   onDelete,
-  isDeleting
+  isDeleting,
+  onCancel
 }: HabitFormProps) => {
   const {
     register,
@@ -57,12 +67,12 @@ export const HabitForm = ({
     setValue,
     getValues,
     handleSubmit,
-    formState: { errors }
+    formState: { errors, isSubmitting: formSubmitting }
   } = useForm<HabitFormValues>({
     resolver: zodResolver(habitFormSchema),
     defaultValues: {
       schedule: defaultValues?.schedule ?? "daily",
-      weekdays: defaultValues?.weekdays ?? [1,2,3,4,5],
+      weekdays: defaultValues?.weekdays ?? [1, 2, 3, 4, 5],
       timesPerWeek: defaultValues?.timesPerWeek ?? 3,
       targetMax: defaultValues?.targetMax,
       reminderTime: defaultValues?.reminderTime ?? "",
@@ -72,7 +82,8 @@ export const HabitForm = ({
       description: defaultValues?.description ?? "",
       type: defaultValues?.type ?? "action",
       unit: defaultValues?.unit ?? "",
-      requireCompletionComment: defaultValues?.requireCompletionComment ?? false,
+      requireCompletionComment:
+        defaultValues?.requireCompletionComment ?? false,
       linkToJobTracker: defaultValues?.linkToJobTracker ?? false,
       color: defaultValues?.color ?? "violet",
       goalDirection: defaultValues?.goalDirection ?? "up",
@@ -84,10 +95,23 @@ export const HabitForm = ({
   const selectedColor = watch("color");
   const selectedUnit = watch("unit");
   const selectedGoal = watch("goalDirection");
+  const selectedSchedule = watch("schedule");
+  const [submissionError, setSubmissionError] = useState<string>();
+  const saving = Boolean(isSubmitting || formSubmitting);
+
+  useEffect(() => {
+    if (selectedSchedule !== "weekdays")
+      setValue("weekdays", [1, 2, 3, 4, 5], { shouldValidate: true });
+    if (selectedSchedule !== "weekly")
+      setValue("timesPerWeek", 3, { shouldValidate: true });
+  }, [selectedSchedule, setValue]);
 
   useEffect(() => {
     if (selectedType === "action") {
       setValue("unit", "", { shouldDirty: true, shouldValidate: true });
+      setValue("goalDirection", "up", { shouldValidate: true });
+      setValue("target", null, { shouldValidate: true });
+      setValue("targetMax", null, { shouldValidate: true });
     } else if (selectedType === "expense") {
       const current = getValues("unit") ?? "";
       if (!CURRENCIES.includes(current as (typeof CURRENCIES)[number])) {
@@ -114,370 +138,490 @@ export const HabitForm = ({
   });
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-      <div>
-        <label className="field-label" htmlFor="title">
-          Title
-        </label>
-        <Input
-          id="title"
-          placeholder={
-            selectedType === "expense" ? "e.g. Food, Rent, Fuel" : "e.g. Workout"
-          }
-          {...register("title")}
-        />
-        {errors.title ? (
-          <p className="field-hint text-rose-600">{errors.title.message}</p>
-        ) : null}
-      </div>
-
-      {/* Type selector */}
-      <div>
-        <p className="field-label">Habit type</p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {TYPE_OPTIONS.map((option) => {
-            const isActive = selectedType === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={isActive}
-                disabled={typeDisabled}
-                onClick={() => setType(option.value)}
-                className={cn(
-                  "flex flex-col gap-1 rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
-                  isActive
-                    ? "border-accent bg-accent/10 ring-1 ring-accent"
-                    : "border-border-app bg-surface hover:border-content-subtle"
-                )}
-              >
-                <span className="flex items-center gap-2">
-                  <span aria-hidden className="text-xl">
-                    {option.emoji}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-sm font-bold",
-                      isActive ? "text-accent" : "text-content"
-                    )}
-                  >
-                    {option.label}
-                  </span>
-                </span>
-                <span className="text-xs leading-5 text-content-muted">
-                  {option.desc}
-                </span>
-              </button>
-            );
-          })}
+    <form
+      className={
+        scrollable
+          ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+          : "space-y-6"
+      }
+      aria-busy={saving}
+      onSubmit={handleSubmit(async (values) => {
+        setSubmissionError(undefined);
+        try {
+          await onSubmit(values);
+        } catch (error) {
+          setSubmissionError(
+            error instanceof Error
+              ? error.message
+              : "Could not save. Please try again."
+          );
+        }
+      })}
+    >
+      <div
+        className={cn(
+          "space-y-6",
+          scrollable &&
+            "min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:px-7 sm:py-6"
+        )}
+      >
+        <div>
+          <label className="field-label" htmlFor="title">
+            Title
+          </label>
+          <Input
+            id="title"
+            placeholder={
+              selectedType === "expense"
+                ? "e.g. Food, Rent, Fuel"
+                : "e.g. Workout"
+            }
+            {...register("title")}
+          />
+          {errors.title ? (
+            <p className="field-hint text-rose-600">{errors.title.message}</p>
+          ) : null}
         </div>
-        {typeDisabled ? (
-          <p className="field-hint">
-            Type can&apos;t change once a habit has logs.
-          </p>
-        ) : null}
-      </div>
 
-      <fieldset className="space-y-3"><legend className="field-label">Schedule</legend>
-        <label className="field-label" htmlFor="schedule">Repeat</label><select id="schedule" className="field-input" {...register("schedule")}><option value="daily">Every day</option><option value="weekdays">Selected weekdays</option><option value="weekly">Times per week</option></select>
-        {watch("schedule") === "weekdays" && <div className="flex flex-wrap gap-2">{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day,index)=><button key={day} type="button" className="rounded-xl border border-border-app p-3 aria-pressed:bg-accent aria-pressed:text-white" aria-pressed={watch("weekdays")?.includes(index)} onClick={()=>{const days=watch("weekdays") ?? []; setValue("weekdays",days.includes(index)?days.filter(d=>d!==index):[...days,index],{shouldValidate:true});}}>{day}</button>)}</div>}
-        {errors.weekdays && <p role="alert">Choose at least one weekday.</p>}
-        {watch("schedule") === "weekly" && <label className="field-label">Days per week<Input type="number" min="1" max="7" {...register("timesPerWeek",{valueAsNumber:true})}/></label>}
-        <p className="field-hint">Weeks run Monday–Sunday. One completion per date. Rest days and skipped days pause daily streaks; weekly streaks count completed weeks. Changes apply from today onward.</p>
-      </fieldset>
-      {selectedGoal === "range" && <label className="field-label">Upper target<Input type="number" step="any" {...register("targetMax",{setValueAs:v=>v===""?null:Number(v)})}/></label>}
-      <details><summary className="cursor-pointer font-semibold">Reminder</summary><label className="field-label">Time<Input type="time" {...register("reminderTime")}/></label><p className="field-hint">Enable reminders in Settings. Reminders appear only while Arc is open on this device.</p></details>
-      {/* Conditional config */}
-      {selectedType === "measurable" ? (
-        <div className="space-y-5">
+        {/* Type selector */}
+        <div>
+          <p id="habit-type-label" className="field-label">
+            Habit type
+          </p>
+          <div
+            role="group"
+            aria-labelledby="habit-type-label"
+            className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1"
+          >
+            {TYPE_OPTIONS.map((option) => {
+              const isActive = selectedType === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={isActive}
+                  disabled={typeDisabled}
+                  onClick={() => setType(option.value)}
+                  className={cn(
+                    "flex min-h-12 items-center justify-center gap-2 rounded-lg px-2 py-3 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-60",
+                    isActive
+                      ? "bg-accent text-white shadow-sm"
+                      : "text-content-muted hover:bg-surface hover:text-content"
+                  )}
+                >
+                  <option.icon aria-hidden className="h-4 w-4 shrink-0" />
+                  <span>{option.label}</span>
+                  <span className="sr-only">{option.desc}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs leading-5 text-content-muted">
+            {selectedType === "measurable"
+              ? "Track an amount, like minutes, steps or pages."
+              : "A simple daily check-in. Did you do it?"}
+          </p>
+          {typeDisabled ? (
+            <p className="field-hint">
+              Type can&apos;t change once a habit has logs.
+            </p>
+          ) : null}
+        </div>
+
+        {/* Schedule Picker */}
+        <div className="space-y-3">
+          <label className="field-label" htmlFor="schedule">
+            Repeat frequency
+          </label>
+          <select
+            id="schedule"
+            className="field-input font-medium"
+            {...register("schedule")}
+          >
+            <option value="daily">Every day</option>
+            <option value="weekdays">Specific days of the week</option>
+            <option value="weekly">Target days per week</option>
+          </select>
+
+          {watch("schedule") === "weekdays" && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                (day, index) => {
+                  const isSelected = watch("weekdays")?.includes(index);
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      aria-pressed={isSelected}
+                      className={cn(
+                        "h-10 px-3.5 rounded-xl border text-xs font-bold transition",
+                        isSelected
+                          ? "border-accent bg-accent text-white shadow-sm shadow-accent/20"
+                          : "border-border-app bg-surface-2 text-content-2 hover:border-content-subtle"
+                      )}
+                      onClick={() => {
+                        const days = watch("weekdays") ?? [];
+                        setValue(
+                          "weekdays",
+                          days.includes(index)
+                            ? days.filter((d) => d !== index)
+                            : [...days, index],
+                          { shouldValidate: true }
+                        );
+                      }}
+                    >
+                      {day}
+                    </button>
+                  );
+                }
+              )}
+            </div>
+          )}
+
+          {errors.weekdays && (
+            <p role="alert" className="text-xs text-rose-500 font-semibold">
+              Choose at least one day.
+            </p>
+          )}
+
+          {watch("schedule") === "weekly" && (
+            <div className="pt-1">
+              <label className="field-label" htmlFor="timesPerWeek">
+                Target completions per week
+              </label>
+              <Input
+                id="timesPerWeek"
+                type="number"
+                min="1"
+                max="7"
+                className="w-32"
+                {...register("timesPerWeek", { valueAsNumber: true })}
+              />
+              {errors.timesPerWeek && (
+                <p role="alert" className="field-hint text-rose-600">
+                  Choose between 1 and 7 days.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {selectedType === "measurable" && selectedGoal === "range" && (
           <div>
-            <label className="field-label" htmlFor="unit">
-              Unit
+            <label className="field-label" htmlFor="targetMax">
+              Upper Target Limit
             </label>
             <Input
-              id="unit"
-              placeholder="kg, km, hrs, pages…"
-              {...register("unit")}
+              id="targetMax"
+              type="number"
+              step="any"
+              placeholder="e.g. 100"
+              {...register("targetMax", {
+                setValueAs: (v) => (v === "" ? null : Number(v))
+              })}
             />
-            <p className="field-hint">The unit for the number you log each day.</p>
-            {errors.unit ? (
-              <p className="field-hint text-rose-600">{errors.unit.message}</p>
-            ) : null}
           </div>
+        )}
 
+        {/* Optional Daily Reminder */}
+        <details className="group border-y border-border-app/60 py-3">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-medium text-content [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2">
+              <Bell aria-hidden className="h-4 w-4 text-content-muted" />
+              Daily reminder{" "}
+              <span className="text-xs text-content-muted">Optional</span>
+            </span>
+            <ChevronDown
+              aria-hidden
+              className="h-4 w-4 text-content-muted transition group-open:rotate-180"
+            />
+          </summary>
+          <div className="mt-3">
+            <div className="w-full min-w-0 max-w-full sm:w-48">
+              <Input type="time" aria-label="Daily reminder time" className="reminder-time-input" {...register("reminderTime")} />
+            </div>
+            <p className="field-hint mt-1.5">
+              You will receive a notification to complete your habit at this
+              time.
+            </p>
+          </div>
+        </details>
+        {/* Conditional config */}
+        {selectedType === "measurable" ? (
+          <div className="space-y-5">
+            <div>
+              <label className="field-label" htmlFor="unit">
+                Unit
+              </label>
+              <Input
+                id="unit"
+                placeholder="kg, km, hrs, pages…"
+                {...register("unit")}
+              />
+              <p className="field-hint">
+                The unit for the number you log each day.
+              </p>
+              {errors.unit ? (
+                <p className="field-hint text-rose-600">
+                  {errors.unit.message}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <p className="field-label">Goal</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    {
+                      value: "up",
+                      label: "Higher is better",
+                      hint: "steps, water, pages"
+                    },
+                    {
+                      value: "down",
+                      label: "Lower is better",
+                      hint: "screen time"
+                    },
+                    {
+                      value: "range",
+                      label: "Within a range",
+                      hint: "minimum to maximum"
+                    },
+                    {
+                      value: "record",
+                      label: "Record only",
+                      hint: "every entry counts"
+                    }
+                  ] as const
+                ).map((option) => {
+                  const isActive = selectedGoal === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() =>
+                        setValue("goalDirection", option.value, {
+                          shouldDirty: true,
+                          shouldValidate: true
+                        })
+                      }
+                      className={cn(
+                        "rounded-xl p-3 text-left transition focus-visible:ring-2 focus-visible:ring-accent",
+                        isActive
+                          ? "bg-accent/10 ring-1 ring-accent/30"
+                          : "hover:bg-surface-2"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "block text-sm font-bold",
+                          isActive ? "text-accent" : "text-content"
+                        )}
+                      >
+                        {option.value === "up" ? "↑ " : "↓ "}
+                        {option.label}
+                      </span>
+                      <span className="text-xs text-content-muted">
+                        e.g. {option.hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="field-label" htmlFor="target">
+                Target {selectedUnit ? `(${selectedUnit})` : ""} — optional
+              </label>
+              <Input
+                id="target"
+                type="number"
+                inputMode="decimal"
+                step="any"
+                placeholder="e.g. 75"
+                {...targetField}
+              />
+              <p className="field-hint">
+                Daily target: the saved value must meet this rule. Leave blank
+                to count any recorded value.
+              </p>
+              {errors.target ? (
+                <p className="field-hint text-rose-600">
+                  {errors.target.message}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {selectedType === "expense" ? (
           <div>
-            <p className="field-label">Goal</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {(
-                [
-                  { value: "up", label: "Higher is better", hint: "steps, water, pages" },
-                  { value: "down", label: "Lower is better", hint: "screen time" },
-                  { value: "range", label: "Within a range", hint: "minimum to maximum" },
-                  { value: "record", label: "Record only", hint: "every entry counts" }
-                ] as const
-              ).map((option) => {
-                const isActive = selectedGoal === option.value;
+            <p className="field-label">Currency</p>
+            <div className="flex gap-2">
+              {CURRENCIES.map((currency) => {
+                const isActive = selectedUnit === currency;
                 return (
                   <button
-                    key={option.value}
+                    key={currency}
                     type="button"
-                    aria-pressed={isActive}
                     onClick={() =>
-                      setValue("goalDirection", option.value, {
+                      setValue("unit", currency, {
                         shouldDirty: true,
                         shouldValidate: true
                       })
                     }
                     className={cn(
-                      "rounded-2xl border p-3 text-left transition",
+                      "h-11 w-14 rounded-xl border text-lg font-bold transition",
                       isActive
-                        ? "border-accent bg-accent/10"
-                        : "border-border-app bg-surface hover:border-content-subtle"
+                        ? "border-accent bg-accent/10 text-accent"
+                        : "border-border-app bg-surface text-content-2 hover:border-content-subtle"
                     )}
                   >
-                    <span
-                      className={cn(
-                        "block text-sm font-bold",
-                        isActive ? "text-accent" : "text-content"
-                      )}
-                    >
-                      {option.value === "up" ? "↑ " : "↓ "}
-                      {option.label}
-                    </span>
-                    <span className="text-xs text-content-muted">
-                      e.g. {option.hint}
-                    </span>
+                    {currency}
                   </button>
                 );
               })}
             </div>
-          </div>
-
-          <div>
-            <label className="field-label" htmlFor="target">
-              Target {selectedUnit ? `(${selectedUnit})` : ""} — optional
-            </label>
-            <Input
-              id="target"
-              type="number"
-              inputMode="decimal"
-              step="any"
-              placeholder="e.g. 75"
-              {...targetField}
-            />
             <p className="field-hint">
-              Daily target: the saved value must meet this rule. Leave blank to count any recorded value.
+              You&apos;ll log an amount each time you spend on this. Lower spend
+              is always better here.
             </p>
-            {errors.target ? (
-              <p className="field-hint text-rose-600">{errors.target.message}</p>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
 
-      {selectedType === "expense" ? (
+            <div className="mt-4">
+              <label className="field-label" htmlFor="target">
+                Monthly budget {selectedUnit ?? "₹"} — optional
+              </label>
+              <Input
+                id="target"
+                type="number"
+                inputMode="decimal"
+                step="any"
+                placeholder="e.g. 5000"
+                {...targetField}
+              />
+              <p className="field-hint">
+                We&apos;ll warn you as you approach it.
+              </p>
+              {errors.target ? (
+                <p className="field-hint text-rose-600">
+                  {errors.target.message}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Clean, simplified habit creation — no multi-checkbox clutter */}
+
         <div>
-          <p className="field-label">Currency</p>
-          <div className="flex gap-2">
-            {CURRENCIES.map((currency) => {
-              const isActive = selectedUnit === currency;
+          <label className="field-label" htmlFor="description">
+            Description
+          </label>
+          <Textarea
+            id="description"
+            placeholder="Optional note to make the habit clearer."
+            {...register("description")}
+          />
+          {errors.description ? (
+            <p className="field-hint text-rose-600">
+              {errors.description.message}
+            </p>
+          ) : null}
+        </div>
+
+        {/* Color picker */}
+        <div>
+          <p className="field-label">Color</p>
+          <div className="flex flex-wrap gap-3">
+            {habitColorOptions.map((option) => {
+              const isSelected = selectedColor === option.value;
               return (
                 <button
-                  key={currency}
+                  key={option.value}
                   type="button"
+                  aria-label={option.label}
+                  aria-pressed={isSelected}
                   onClick={() =>
-                    setValue("unit", currency, {
+                    setValue("color", option.value, {
                       shouldDirty: true,
                       shouldValidate: true
                     })
                   }
                   className={cn(
-                    "h-11 w-14 rounded-xl border text-lg font-bold transition",
-                    isActive
-                      ? "border-accent bg-accent/10 text-accent"
-                      : "border-border-app bg-surface text-content-2 hover:border-content-subtle"
+                    "relative flex h-11 w-11 items-center justify-center rounded-full ring-2 ring-offset-2 ring-offset-surface transition",
+                    option.swatch,
+                    isSelected
+                      ? "ring-content scale-105"
+                      : "ring-transparent hover:scale-105"
                   )}
                 >
-                  {currency}
+                  {isSelected ? (
+                    <span className="text-lg font-bold text-white drop-shadow">
+                      ✓
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
           </div>
-          <p className="field-hint">
-            You&apos;ll log an amount each time you spend on this. Lower spend
-            is always better here.
-          </p>
-
-          <div className="mt-4">
-            <label className="field-label" htmlFor="target">
-              Monthly budget {selectedUnit ?? "₹"} — optional
-            </label>
-            <Input
-              id="target"
-              type="number"
-              inputMode="decimal"
-              step="any"
-              placeholder="e.g. 5000"
-              {...targetField}
-            />
-            <p className="field-hint">
-              We&apos;ll warn you as you approach it.
-            </p>
-            {errors.target ? (
-              <p className="field-hint text-rose-600">{errors.target.message}</p>
-            ) : null}
-          </div>
+          {errors.color ? (
+            <p className="field-hint text-rose-600">{errors.color.message}</p>
+          ) : null}
         </div>
-      ) : null}
-
-      {selectedType === "action" ? (
-        <details className="space-y-3"><summary className="cursor-pointer font-semibold">Optional comments and workspace connections</summary><p className="field-hint">Workspaces are always available. Linking adds a shortcut and automatically checks in when you record workspace activity. Existing check-ins and skips are kept.</p>
-          <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-border-app bg-surface-2 p-4 transition hover:border-accent/40">
-            <input
-              type="checkbox"
-              className="mt-1 h-5 w-5 rounded border-border-app text-accent focus:ring-accent/30"
-              {...register("requireCompletionComment")}
-            />
-            <span>
-              <span className="block text-sm font-semibold text-content">
-                Ask for a comment when marking Done
-              </span>
-              <span className="mt-1 block text-sm leading-6 text-content-muted">
-                Useful for habits like job applications, outreach, or reading —
-                anything where the completed item matters.
-              </span>
-            </span>
-          </label>
-
-          <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-border-app bg-surface-2 p-4 transition hover:border-accent/40">
-            <input
-              type="checkbox"
-              className="mt-1 h-5 w-5 rounded border-border-app text-accent focus:ring-accent/30"
-              {...register("linkToJobTracker")}
-            />
-            <span>
-              <span className="block text-sm font-semibold text-content">
-                Link to Job Search Tracker
-              </span>
-              <span className="mt-1 block text-sm leading-6 text-content-muted">
-                Connect this habit to the Job Search workspace. Add a convenient shortcut to this workspace.
-              </span>
-            </span>
-          </label>
-
-          <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-border-app bg-surface-2 p-4 transition hover:border-accent/40">
-            <input
-              type="checkbox"
-              className="mt-1 h-5 w-5 rounded border-border-app text-accent focus:ring-accent/30"
-              {...register("linkToDSAPrep")}
-            />
-            <span>
-              <span className="block text-sm font-semibold text-content">
-                Link to DSA Prep Tracker
-              </span>
-              <span className="mt-1 block text-sm leading-6 text-content-muted">
-                Connect this habit to the DSA Prep workspace. Add a convenient shortcut to this workspace.
-              </span>
-            </span>
-          </label>
-
-          <label className="flex cursor-pointer items-start gap-4 rounded-2xl border border-border-app bg-surface-2 p-4 transition hover:border-accent/40">
-            <input
-              type="checkbox"
-              className="mt-1 h-5 w-5 rounded border-border-app text-accent focus:ring-accent/30"
-              {...register("linkToExpenseTracker")}
-            />
-            <span>
-              <span className="block text-sm font-semibold text-content">
-                Link to Expense Tracker
-              </span>
-              <span className="mt-1 block text-sm leading-6 text-content-muted">
-                Connect this habit to the Expenses workspace. Add a convenient shortcut to this workspace.
-              </span>
-            </span>
-          </label>
-        </details>
-      ) : null}
-
-      <div>
-        <label className="field-label" htmlFor="description">
-          Description
-        </label>
-        <Textarea
-          id="description"
-          placeholder="Optional note to make the habit clearer."
-          {...register("description")}
-        />
-        {errors.description ? (
-          <p className="field-hint text-rose-600">
-            {errors.description.message}
-          </p>
-        ) : null}
       </div>
 
-      {/* Color picker */}
-      <div>
-        <p className="field-label">Color</p>
-        <div className="flex flex-wrap gap-3">
-          {habitColorOptions.map((option) => {
-            const isSelected = selectedColor === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                aria-label={option.label}
-                aria-pressed={isSelected}
-                onClick={() =>
-                  setValue("color", option.value, {
-                    shouldDirty: true,
-                    shouldValidate: true
-                  })
-                }
-                className={cn(
-                  "relative flex h-11 w-11 items-center justify-center rounded-2xl ring-2 ring-offset-2 ring-offset-surface transition",
-                  option.swatch,
-                  isSelected
-                    ? "ring-content scale-105"
-                    : "ring-transparent hover:scale-105"
-                )}
-              >
-                {isSelected ? (
-                  <span className="text-lg font-bold text-white drop-shadow">
-                    ✓
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
+      {(submissionError || errorMessage) && (
+        <div
+          role="alert"
+          className="shrink-0 border-t border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-600"
+        >
+          {submissionError || errorMessage}
         </div>
-        {errors.color ? (
-          <p className="field-hint text-rose-600">{errors.color.message}</p>
-        ) : null}
-      </div>
+      )}
 
-      {errorMessage ? (
-        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-600">
-          {errorMessage}
-        </div>
-      ) : null}
-
-      <div className="flex flex-col-reverse gap-3 border-t border-border-app pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          {onDelete ? (
+      <div
+        className={cn(
+          "flex gap-3 border-t border-border-app",
+          scrollable
+            ? "shrink-0 items-center justify-end bg-surface p-4 sm:px-7"
+            : "flex-col-reverse pt-4 sm:flex-row sm:items-center sm:justify-between"
+        )}
+      >
+        {onDelete ? (
+          <div>
             <Button
               type="button"
               variant="danger"
               onClick={() => void onDelete()}
-              disabled={isDeleting || isSubmitting}
+              disabled={isDeleting || saving}
             >
               {isDeleting ? "Deleting..." : "Delete habit"}
             </Button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
-        <Link to="/habits" className="text-sm font-semibold text-content-2">Cancel</Link>
-        <Button type="submit" disabled={isSubmitting || isDeleting}>
-          {isSubmitting ? "Saving..." : submitLabel}
+        {onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="min-h-11 px-3 text-sm font-semibold text-content-2 hover:text-content transition"
+          >
+            Cancel
+          </button>
+        ) : (
+          <Link
+            to="/habits"
+            className="text-sm font-semibold text-content-2 hover:text-content transition"
+          >
+            Cancel
+          </Link>
+        )}
+        <Button type="submit" disabled={saving || isDeleting}>
+          {saving ? "Saving..." : submitLabel}
         </Button>
       </div>
     </form>

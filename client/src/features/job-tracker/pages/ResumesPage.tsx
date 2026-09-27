@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { useState } from "react";
 import { useJobTrackerStore } from "../stores/jobTrackerStore";
 import { ResumeVersion } from "../types";
@@ -5,8 +6,6 @@ import {
   FileSpreadsheet,
   Plus,
   ArrowUpRight,
-  Sparkles,
-  Award,
   Edit2,
   Trash2,
   X,
@@ -23,14 +22,20 @@ export const ResumesPage = () => {
   const deleteResumeVersion = useJobTrackerStore((s) => s.deleteResumeVersion);
 
   const [formOpen, setFormOpen] = useState(false);
-  const [editingResume, setEditingResume] = useState<ResumeVersion | null>(null);
+  const [editingResume, setEditingResume] = useState<ResumeVersion | null>(
+    null
+  );
 
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors }
-  } = useForm<any>({
+  } = useForm<
+    z.input<typeof ResumeVersionSchema>,
+    unknown,
+    z.output<typeof ResumeVersionSchema>
+  >({
     resolver: zodResolver(ResumeVersionSchema),
     defaultValues: {
       name: "",
@@ -65,7 +70,7 @@ export const ResumesPage = () => {
     setFormOpen(true);
   };
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: z.output<typeof ResumeVersionSchema>) => {
     if (editingResume) {
       updateResumeVersion({ ...data, id: editingResume.id });
     } else {
@@ -93,7 +98,10 @@ export const ResumesPage = () => {
     updateResumeVersion({
       ...resume,
       usageCount: Math.max(0, resume.usageCount - 1),
-      successCount: Math.min(Math.max(0, resume.usageCount - 1), resume.successCount)
+      successCount: Math.min(
+        Math.max(0, resume.usageCount - 1),
+        resume.successCount
+      )
     });
   };
 
@@ -113,7 +121,10 @@ export const ResumesPage = () => {
             <FileSpreadsheet className="h-6 w-6 text-accent" />
             Resume Manager
           </h1>
-          <p className="text-xs text-content-muted mt-1">Track specific resume drafts and measure their callback success rates</p>
+          <p className="text-xs text-content-muted mt-1">
+            Track specific resume drafts and measure their callback success
+            rates
+          </p>
         </div>
         <button
           onClick={openAddModal}
@@ -140,8 +151,12 @@ export const ResumesPage = () => {
               <div>
                 <div className="flex items-start justify-between gap-2 border-b border-border-app/40 pb-3 mb-4">
                   <div>
-                    <h3 className="font-extrabold text-sm text-content truncate max-w-[130px]">{resume.name}</h3>
-                    <p className="text-[10px] text-content-muted mt-1 font-semibold">Created: {resume.dateCreated}</p>
+                    <h3 className="font-extrabold text-sm text-content truncate max-w-[130px]">
+                      {resume.name}
+                    </h3>
+                    <p className="text-[10px] text-content-muted mt-1 font-semibold">
+                      Created: {resume.dateCreated}
+                    </p>
                   </div>
                   <div className="flex gap-1">
                     <button
@@ -165,15 +180,21 @@ export const ResumesPage = () => {
                     <Target className="h-5 w-5 text-accent" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-content-muted">Callback Rate</p>
-                    <p className="text-xl font-extrabold text-accent">{successRate}%</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-content-muted">
+                      Callback Rate
+                    </p>
+                    <p className="text-xl font-extrabold text-accent">
+                      {successRate}%
+                    </p>
                   </div>
                 </div>
 
                 {/* Tracking numbers */}
                 <div className="mt-5 space-y-3.5">
                   <div className="flex items-center justify-between text-xs font-semibold text-content-2">
-                    <span className="text-content-muted">Applications Sent:</span>
+                    <span className="text-content-muted">
+                      Applications Sent:
+                    </span>
                     <div className="flex items-center gap-1.5 font-extrabold text-content">
                       <button
                         onClick={() => handleDecrementUsage(resume)}
@@ -192,7 +213,9 @@ export const ResumesPage = () => {
                   </div>
 
                   <div className="flex items-center justify-between text-xs font-semibold text-content-2">
-                    <span className="text-content-muted">Interviews / Hits:</span>
+                    <span className="text-content-muted">
+                      Interviews / Hits:
+                    </span>
                     <div className="flex items-center gap-1.5 font-extrabold text-content">
                       <button
                         onClick={() => handleDecrementSuccess(resume)}
@@ -250,7 +273,7 @@ export const ResumesPage = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
               <div>
                 <label className="field-label">Version Name *</label>
@@ -260,7 +283,11 @@ export const ResumesPage = () => {
                   placeholder="React Resume (v2)"
                   className="w-full rounded-xl border border-border-app bg-surface-2 px-4 py-2.5 text-sm outline-none focus:border-accent"
                 />
-                {errors.name && <p className="text-xs text-rose-500 mt-1">{String(errors.name.message || "")}</p>}
+                {errors.name && (
+                  <p className="text-xs text-rose-500 mt-1">
+                    {String(errors.name.message || "")}
+                  </p>
+                )}
               </div>
 
               <div>

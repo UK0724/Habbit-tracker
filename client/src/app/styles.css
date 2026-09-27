@@ -90,14 +90,25 @@
 
   html {
     scroll-behavior: smooth;
+    overflow-x: clip;
+    max-width: 100vw;
   }
 
   body {
+    /* Clip horizontal decoration without creating an ancestor scroll container
+       that prevents the progress header from sticking in Safari. */
+    overflow-x: clip;
+    max-width: 100vw;
     @apply min-h-screen bg-shell font-sans text-content antialiased;
     background-image:
       radial-gradient(circle at 18% 0%, var(--grad-a), transparent 30%),
       radial-gradient(circle at 82% 12%, var(--grad-b), transparent 28%),
-      linear-gradient(180deg, var(--grad-1) 0%, var(--grad-2) 52%, var(--grad-3) 100%);
+      linear-gradient(
+        180deg,
+        var(--grad-1) 0%,
+        var(--grad-2) 52%,
+        var(--grad-3) 100%
+      );
     background-attachment: fixed;
   }
 
@@ -115,7 +126,7 @@
 
 @layer components {
   .surface-card {
-    @apply rounded-3xl border border-border-app bg-surface/95 shadow-panel backdrop-blur;
+    @apply rounded-2xl bg-surface/95;
   }
 
   .field-label {
@@ -230,7 +241,8 @@
   }
   100% {
     opacity: 0;
-    transform: translate3d(var(--confetti-x, 0), 320px, 0) rotate(var(--confetti-r, 360deg));
+    transform: translate3d(var(--confetti-x, 0), 320px, 0)
+      rotate(var(--confetti-r, 360deg));
   }
 }
 
@@ -313,11 +325,68 @@
 
 /* Shared accessible surfaces */
 @layer base {
-  body { background-image: none; }
-  :root { --text-subtle: 100 116 139; }
-  :root[data-theme="dark"] { --text-subtle: 156 163 183; --bg: 14 15 21; --surface: 23 24 33; --surface-2: 29 30 41; --surface-3: 37 38 51; --border: 49 50 65; }
-  :focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 3px; }
-  button, a, input, select, textarea { touch-action: manipulation; }
-  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+  :root {
+    --text-subtle: 100 116 139;
+  }
+  :root[data-theme="dark"] {
+    --text-subtle: 156 163 183;
+    --bg: 10 12 20;
+    --surface: 18 22 34;
+    --surface-2: 24 30 46;
+    --surface-3: 33 41 62;
+    --border: 42 52 78;
+    --grad-a: rgba(139, 92, 246, 0.18);
+    --grad-b: rgba(236, 72, 153, 0.14);
+    --grad-1: #0a0d18;
+    --grad-2: #0d1222;
+    --grad-3: #11172a;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 3px;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
-@layer components { .field-input { @apply w-full rounded-xl border border-border-app bg-surface px-3 py-2 text-sm text-content; } }
+@layer components {
+  .field-input {
+    @apply w-full rounded-xl border border-border-app bg-surface px-3 py-2 text-sm text-content;
+  }
+}
+
+/* Safari time controls must shrink with the dialog scroll area. */
+.reminder-time-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.reminder-time-input::-webkit-date-and-time-value {
+  min-width: 0;
+  margin: 0;
+  text-align: left;
+  line-height: 46px;
+}
+.reminder-time-input::-webkit-datetime-edit {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+  padding: 0;
+}

@@ -14,11 +14,15 @@ export type AuthResponse = {
 };
 
 const signToken = (userId: string): string =>
-  jwt.sign({ sub: userId }, env.JWT_SECRET, { expiresIn: "30d" });
+  jwt.sign({ sub: userId }, env.JWT_SECRET, {
+    expiresIn: "1d",
+    algorithm: "HS256"
+  });
 
 export const register = async (
   email: string,
-  password: string
+  password: string,
+  timezone?: string
 ): Promise<AuthResponse> => {
   const existing = await UserModel.findOne({ email: email.toLowerCase() });
   if (existing) {
@@ -26,7 +30,11 @@ export const register = async (
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const user = await UserModel.create({ email: email.toLowerCase(), passwordHash });
+  const user = await UserModel.create({
+    email: email.toLowerCase(),
+    passwordHash,
+    timezone
+  });
 
   return {
     token: signToken(user._id.toString()),
@@ -36,7 +44,8 @@ export const register = async (
 
 export const login = async (
   email: string,
-  password: string
+  password: string,
+  timezone?: string
 ): Promise<AuthResponse> => {
   const user = await UserModel.findOne({ email: email.toLowerCase() });
   if (!user) {
@@ -46,6 +55,11 @@ export const login = async (
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
     throw new AppError("Invalid email or password", 401);
+  }
+
+  if (!user.timezone && timezone) {
+    user.timezone = timezone;
+    await user.save();
   }
 
   return {

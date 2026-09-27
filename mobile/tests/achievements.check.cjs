@@ -1,0 +1,36 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+const ts = require("typescript");
+const compiled = ts.transpileModule(fs.readFileSync(path.join(__dirname, "../src/stores/achievementStore.ts"), "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+}).outputText;
+const moduleObject = { exports: {} };
+vm.runInNewContext(compiled, { module: moduleObject, exports: moduleObject.exports, require });
+const store = moduleObject.exports.useAchievementStore;
+const first = { id: "first", name: "First", unlocked: true, xpBonus: 50 };
+const second = { ...first, id: "second" };
+store.getState().showAchievement(first);
+store.getState().showAchievement(first);
+store.getState().showAchievement(second);
+assert.equal(store.getState().currentAchievement.id, "first");
+assert.equal(store.getState().pending.length, 1, "Duplicate events must not queue duplicate celebrations");
+store.getState().dismissBanner();
+assert.equal(store.getState().currentAchievement.id, "second", "Distinct badges must all be shown");
+store.getState().dismissBanner();
+store.getState().showAchievement(first);
+assert.equal(store.getState().isBannerVisible, false, "Dismissed celebrations must not replay");
+store.getState().viewAchievement(first);
+assert.equal(store.getState().mode, "details");
+assert.equal(store.getState().celebrated.length, 2, "Viewing details must not award or enqueue anything");
+store.getState().dismissBanner();
+store.getState().viewAchievement(first);
+assert.equal(store.getState().mode, "details", "Repeated previews stay in details mode");
+store.getState().reset();
+assert.equal(store.getState().currentAchievement, null);
+assert.equal(store.getState().pending.length, 0);
+assert.equal(store.getState().celebrated.length, 0, "Account changes must reset session state");
+store.getState().showAchievement({ ...first, unlocked: false });
+assert.equal(store.getState().isBannerVisible, false, "Locked badges cannot be celebrated");
+console.log("Achievement queue, deduplication, details, and account reset checks passed.");

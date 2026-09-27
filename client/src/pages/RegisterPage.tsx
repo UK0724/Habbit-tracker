@@ -30,7 +30,13 @@ export const RegisterPage = () => {
       setAuth(result.token, result.user);
       navigate("/");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Registration failed");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Registration failed"
+      );
     } finally {
       setLoading(false);
     }
@@ -42,7 +48,7 @@ export const RegisterPage = () => {
         <div className="mb-8 text-center">
           <BrandMark className="mx-auto mb-4 h-14 w-14 rounded-2xl" />
           <h1 className="text-2xl font-bold tracking-tight text-content">
-            Create your Arc account
+            Create your Pulse account
           </h1>
           <p className="mt-1 text-sm text-content-muted">
             Start tracking habits, streaks &amp; spending

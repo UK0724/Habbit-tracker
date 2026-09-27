@@ -1,8 +1,11 @@
 import { userToday } from "./workspaceSync.js";
 import { summarize, type Rules } from "./rules.js";
-import { HabitLogDocument, HabitLogModel } from "../habitLogs/habitLog.model.js";
+import {
+  HabitLogDocument,
+  HabitLogModel
+} from "../habitLogs/habitLog.model.js";
 import { AppError } from "../../utils/appError.js";
-import { addDaysToDateString, getTodayDateString } from "../../utils/date.js";
+import { addDaysToDateString } from "../../utils/date.js";
 import {
   GoalDirection,
   HabitDocument,
@@ -29,7 +32,6 @@ type HabitPayload = {
   targetMax?: number | null;
   reminderTime?: string;
   ruleHistory?: (Rules & { effectiveDate: string })[];
-
 };
 
 type HabitUpdatePayload = Partial<HabitPayload>;
@@ -136,7 +138,7 @@ const roundDifference = (value: number) => Number(value.toFixed(2));
 
 export const serializeHabit = (habit: HabitDocument): HabitResponse => ({
   schedule: habit.schedule ?? "daily",
-  weekdays: habit.weekdays ?? [1,2,3,4,5],
+  weekdays: habit.weekdays ?? [1, 2, 3, 4, 5],
   timesPerWeek: habit.timesPerWeek ?? 3,
   targetMax: habit.targetMax,
   reminderTime: habit.reminderTime,
@@ -182,7 +184,7 @@ const ensureHabitConfiguration = (type: HabitType, unit?: string) => {
 export const buildHabitStats = (
   habit: HabitDocument,
   logs: HabitLogDocument[],
-  today = getTodayDateString()
+  today: string
 ): HabitStats => {
   if (habit.type === "action") {
     const sortedLogs = [...logs].sort((left, right) =>
@@ -305,8 +307,16 @@ const getHabitByIdOrThrow = async (id: string, userId: string) => {
   return habit;
 };
 
-export const listHabits = async (userId: string, selectedDate = getTodayDateString()) => {
-  const habits = await HabitModel.find({ userId, archived: { $ne: true } }).sort({
+export const listHabits = async (
+  userId: string,
+  selectedDate?: string,
+  includeArchived = false
+) => {
+  selectedDate ??= await userToday(userId);
+  const habits = await HabitModel.find({
+    userId,
+    ...(includeArchived ? {} : { archived: { $ne: true } })
+  }).sort({
     createdAt: 1
   });
   if (habits.length === 0) {
@@ -350,11 +360,17 @@ export const listHabits = async (userId: string, selectedDate = getTodayDateStri
 };
 
 export const createHabit = async (payload: HabitPayload) => {
-  if (payload.goalDirection === "range" && (payload.target == null || payload.targetMax == null || payload.targetMax < payload.target)) throw new AppError("Enter an ordered target range", 400);
+  if (
+    payload.goalDirection === "range" &&
+    (payload.target == null ||
+      payload.targetMax == null ||
+      payload.targetMax < payload.target)
+  )
+    throw new AppError("Enter an ordered target range", 400);
   const normalizedDescription = normalizeOptionalString(payload.description);
   const normalizedUnit =
     payload.type === "expense"
-      ? normalizeOptionalString(payload.unit) ?? "₹"
+      ? (normalizeOptionalString(payload.unit) ?? "₹")
       : normalizeOptionalString(payload.unit);
 
   ensureHabitConfiguration(payload.type, normalizedUnit);
@@ -363,7 +379,7 @@ export const createHabit = async (payload: HabitPayload) => {
     payload.type === "expense"
       ? "down"
       : payload.type === "measurable"
-        ? payload.goalDirection ?? "up"
+        ? (payload.goalDirection ?? "up")
         : "up";
 
   const habit = await HabitModel.create({
@@ -371,7 +387,9 @@ export const createHabit = async (payload: HabitPayload) => {
     description: normalizedDescription,
     unit: normalizedUnit,
     requireCompletionComment:
-      payload.type === "action" ? Boolean(payload.requireCompletionComment) : false,
+      payload.type === "action"
+        ? Boolean(payload.requireCompletionComment)
+        : false,
     goalDirection,
     target: payload.type === "action" ? undefined : payload.target
   });
@@ -401,7 +419,11 @@ export const setHabitArchived = async (
   return serializeHabit(habit);
 };
 
-export const updateHabit = async (id: string, userId: string, payload: HabitUpdatePayload) => {
+export const updateHabit = async (
+  id: string,
+  userId: string,
+  payload: HabitUpdatePayload
+) => {
   const habit = await getHabitByIdOrThrow(id, userId);
 
   const nextType = payload.type ?? habit.type;
@@ -416,21 +438,44 @@ export const updateHabit = async (id: string, userId: string, payload: HabitUpda
     );
   }
 
-  if(payload.unit && payload.unit !== habit.unit && existingLogsCount > 0) throw new AppError("Create a separate habit for a new unit so past measurements keep their meaning",409);
+  if (payload.unit && payload.unit !== habit.unit && existingLogsCount > 0)
+    throw new AppError(
+      "Create a separate habit for a new unit so past measurements keep their meaning",
+      409
+    );
   const nextUnit =
     nextType === "action"
       ? undefined
-      : normalizeOptionalString(payload.unit) ??
+      : (normalizeOptionalString(payload.unit) ??
         habit.unit ??
-        (nextType === "expense" ? "₹" : undefined);
+        (nextType === "expense" ? "₹" : undefined));
 
   ensureHabitConfiguration(nextType, nextUnit);
 
   const merged = { ...habit.toObject(), ...payload };
-  if (merged.goalDirection === "range" && (merged.target == null || merged.targetMax == null || merged.targetMax < merged.target)) throw new AppError("Enter an ordered target range", 400);
+  if (
+    merged.goalDirection === "range" &&
+    (merged.target == null ||
+      merged.targetMax == null ||
+      merged.targetMax < merged.target)
+  )
+    throw new AppError("Enter an ordered target range", 400);
   const effectiveDate = await userToday(userId);
-  const snapshot = (value: Rules) => ({ schedule: value.schedule ?? "daily", weekdays: value.weekdays, timesPerWeek: value.timesPerWeek, goalDirection: value.goalDirection, target: value.target, targetMax: value.targetMax });
-  habit.ruleHistory = [...(habit.ruleHistory?.length ? habit.ruleHistory : [{ ...snapshot(habit), effectiveDate: "0001-01-01" }]).filter(r => r.effectiveDate !== effectiveDate), { ...snapshot(merged), effectiveDate }];
+  const snapshot = (value: Rules) => ({
+    schedule: value.schedule ?? "daily",
+    weekdays: value.weekdays,
+    timesPerWeek: value.timesPerWeek,
+    goalDirection: value.goalDirection,
+    target: value.target,
+    targetMax: value.targetMax
+  });
+  habit.ruleHistory = [
+    ...(habit.ruleHistory?.length
+      ? habit.ruleHistory
+      : [{ ...snapshot(habit), effectiveDate: "0001-01-01" }]
+    ).filter((r) => r.effectiveDate !== effectiveDate),
+    { ...snapshot(merged), effectiveDate }
+  ];
   habit.schedule = payload.schedule ?? habit.schedule;
   habit.weekdays = payload.weekdays ?? habit.weekdays;
   habit.timesPerWeek = payload.timesPerWeek ?? habit.timesPerWeek;
@@ -464,9 +509,13 @@ export const updateHabit = async (id: string, userId: string, payload: HabitUpda
       ? "down"
       : nextType === "action"
         ? "up"
-        : payload.goalDirection ?? habit.goalDirection ?? "up";
+        : (payload.goalDirection ?? habit.goalDirection ?? "up");
   habit.target =
-    nextType === "action" ? undefined : "target" in payload ? payload.target : habit.target;
+    nextType === "action"
+      ? undefined
+      : "target" in payload
+        ? payload.target
+        : habit.target;
 
   await habit.save();
 

@@ -84,6 +84,7 @@ export const archiveHabitBodySchema = z.object({
 });
 
 export const listHabitsQuerySchema = z.object({
+  includeArchived: z.enum(["true", "false"]).optional(),
   date: z
     .string()
     .trim()
