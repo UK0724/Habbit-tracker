@@ -18,8 +18,6 @@ export interface Habit {
   requireCompletionComment: boolean;
   color: string;
   archived: boolean;
-  linkToJobTracker?: boolean;
-  linkToDSAPrep?: boolean;
   linkToExpenseTracker?: boolean;
   /** For measurable/expense: is a higher or lower value "better". */
   goalDirection: GoalDirection;
@@ -31,6 +29,8 @@ export interface Habit {
   targetMax?: number | null;
   reminderTime?: string;
   ruleHistory?: (Rules & { effectiveDate: string })[];
+  /** Creation day in the user's timezone (YYYY-MM-DD); older habits lack it. */
+  startDate?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -76,14 +76,6 @@ const habitSchema = new Schema<Habit>(
       type: Boolean,
       default: false
     },
-    linkToJobTracker: {
-      type: Boolean,
-      default: false
-    },
-    linkToDSAPrep: {
-      type: Boolean,
-      default: false
-    },
     linkToExpenseTracker: {
       type: Boolean,
       default: false
@@ -99,6 +91,7 @@ const habitSchema = new Schema<Habit>(
     targetMax: Number,
     reminderTime: String,
     ruleHistory: { type: [Schema.Types.Mixed], default: [] },
+    startDate: String,
     target: {
       type: Number
     }

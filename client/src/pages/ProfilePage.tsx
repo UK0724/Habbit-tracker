@@ -22,12 +22,23 @@ import { LevelBadge } from "../components/ui/LevelBadge";
 import { XPBar } from "../components/ui/XPBar";
 import { StreakBadge } from "../components/ui/StreakBadge";
 import { GemCounter } from "../components/ui/GemCounter";
+import { FreezeCounter } from "../components/ui/FreezeCounter";
+import { AvatarUploader } from "../features/account/components/AvatarUploader";
+import { UserAvatar } from "../features/account/components/UserAvatar";
 import { useAuthStore } from "../stores/authStore";
+import { useCreateHabitModalStore } from "../features/habits/stores/createHabitModalStore";
 import { playSound } from "../shared/lib/sounds";
 import { getTodayDateString } from "../shared/lib/date";
 
 export const ProfilePage = () => {
-  const { data: profile, isLoading, isError } = useGameProfile();
+  const {
+    data: profile,
+    isLoading,
+    isError,
+    refetch,
+    isFetching
+  } = useGameProfile();
+  const openCreateHabit = useCreateHabitModalStore((s) => s.open);
   const { data: habits = [] } = useHabits(getTodayDateString());
   const user = useAuthStore((s) => s.user);
   const freezeMutation = useStreakFreeze();
@@ -57,10 +68,18 @@ export const ProfilePage = () => {
 
   if (isError || !profile) {
     return (
-      <div className="surface-card p-8 text-center text-rose-500">
-        <p className="font-semibold">
-          Could not load profile. Please try again.
+      <div role="alert" className="surface-card p-8 text-center">
+        <p className="font-semibold text-rose-600">
+          Could not load your profile.
         </p>
+        <Button
+          variant="secondary"
+          className="mt-4"
+          disabled={isFetching}
+          onClick={() => void refetch()}
+        >
+          {isFetching ? "Retrying…" : "Try again"}
+        </Button>
       </div>
     );
   }
@@ -90,6 +109,11 @@ export const ProfilePage = () => {
 
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex min-w-0 items-center gap-4">
+            <UserAvatar
+              alt="Your profile photo"
+              className="h-16 w-16 sm:h-20 sm:w-20"
+              textClassName="text-2xl sm:text-3xl"
+            />
             <LevelBadge
               level={profile.level}
               title={profile.levelTitle}
@@ -109,6 +133,7 @@ export const ProfilePage = () => {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <StreakBadge streak={profile.loginStreak} showLabel size="sm" />
                 <GemCounter gems={gems} size="sm" />
+                <FreezeCounter freezes={freezes} />
               </div>
             </div>
           </div>
@@ -126,7 +151,10 @@ export const ProfilePage = () => {
                     Badges Collected
                   </p>
                   <p className="text-lg font-black text-content">
-                    {profile.achievementCount} / 30
+                    {profile.achievementCount}
+                    {profile.achievementTotal
+                      ? ` / ${profile.achievementTotal}`
+                      : ""}
                   </p>
                 </div>
               </div>
@@ -235,8 +263,8 @@ export const ProfilePage = () => {
           </div>
         </div>
         <p className="mt-4 text-sm leading-relaxed text-content-muted">
-          Miss a daily check-in? One freeze is used automatically to keep your
-          streak.
+          🛡️ Each freeze covers one missed check-in day automatically, or
+          repairs a habit's broken streak.
         </p>
         <dl className="my-5 grid grid-cols-2 divide-x divide-border-app">
           <div className="pr-3">
@@ -288,6 +316,19 @@ export const ProfilePage = () => {
         )}
       </section>
 
+      <section
+        aria-labelledby="photo-title"
+        className="surface-card p-4 sm:p-6"
+      >
+        <h2
+          id="photo-title"
+          className="mb-4 font-display text-lg font-bold text-content"
+        >
+          Profile photo
+        </h2>
+        <AvatarUploader />
+      </section>
+
       {/* Habit Masteries & Recent Activity */}
       <div className="surface-card p-6 sm:p-8">
         <h3 className="font-display text-lg font-bold text-content mb-4">
@@ -295,13 +336,14 @@ export const ProfilePage = () => {
         </h3>
         {habits.length === 0 ? (
           <p className="text-sm text-content-muted">
-            No habits created yet. Start with your first habit on the{" "}
-            <Link
-              to="/habits/new"
+            No habits created yet.{" "}
+            <button
+              type="button"
+              onClick={() => openCreateHabit()}
               className="text-accent underline font-semibold"
             >
-              habit creator
-            </Link>
+              Create your first habit
+            </button>
             .
           </p>
         ) : (

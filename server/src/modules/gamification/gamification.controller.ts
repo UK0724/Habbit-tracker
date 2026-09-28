@@ -28,27 +28,17 @@ export const checkinController = catchAsync(
   }
 );
 
-export const issueAdTokenController = catchAsync(
-  async (request: Request, response: Response) => {
-    const { userId } = request as AuthRequest;
-    const result = await gamificationService.issueAdToken(userId);
-    response.json({ data: result });
-  }
-);
-
 export const restoreStreakController = catchAsync(
   async (request: Request, response: Response) => {
     const { userId } = request as AuthRequest;
-    const { adToken } = request.body as { adToken: string };
-    if (!adToken) {
-      response.status(400).json({ message: "adToken is required" });
-      return;
-    }
-    const result = await gamificationService.restoreStreakWithAd(
-      userId,
-      adToken
-    );
-    response.json({ data: result });
+    response.json({ data: await gamificationService.restoreStreak(userId) });
+  }
+);
+
+export const shareProgressController = catchAsync(
+  async (request: Request, response: Response) => {
+    const { userId } = request as AuthRequest;
+    response.json({ data: await gamificationService.shareProgress(userId) });
   }
 );
 
@@ -90,7 +80,11 @@ export const subscribePushController = catchAsync(
 export const unsubscribePushController = catchAsync(
   async (request: Request, response: Response) => {
     const { userId } = request as AuthRequest;
-    const result = await gamificationService.unsubscribePush(userId);
+    const endpoint = (request.body as { endpoint?: unknown } | undefined)?.endpoint;
+    const result = await gamificationService.unsubscribePush(
+      userId,
+      typeof endpoint === "string" ? endpoint : undefined
+    );
     response.json({ data: result });
   }
 );

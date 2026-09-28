@@ -38,8 +38,9 @@ export default defineConfig({
       server.middlewares.use((request, response, next) => {
         const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
         const apk = /^\/downloads\/([a-zA-Z0-9._-]+\.apk)$/.exec(pathname);
-        if (apk && (request.method === "GET" || request.method === "HEAD")) {
-          const file = resolve(output, "downloads", apk[1]);
+        const apkFilename = apk?.[1];
+        if (apkFilename && (request.method === "GET" || request.method === "HEAD")) {
+          const file = resolve(output, "downloads", apkFilename);
           if (!existsSync(file) || !statSync(file).isFile()) {
             response.statusCode = 404;
             response.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -47,7 +48,7 @@ export default defineConfig({
             return;
           }
           response.setHeader("Content-Type", "application/vnd.android.package-archive");
-          response.setHeader("Content-Disposition", `attachment; filename="${apk[1]}"`);
+          response.setHeader("Content-Disposition", `attachment; filename="${apkFilename}"`);
           response.setHeader("X-Content-Type-Options", "nosniff");
           response.setHeader("Cache-Control", "no-store");
           response.setHeader("Content-Length", statSync(file).size);

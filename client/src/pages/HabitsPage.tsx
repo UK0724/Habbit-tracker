@@ -10,9 +10,10 @@ import {
 } from "lucide-react";
 import { useHabits } from "../features/habits/hooks/useHabits";
 import { ArchivedHabits } from "../features/habits/components/ArchivedHabits";
+import { StreakRepairBanner } from "../features/habits/components/StreakRepairBanner";
 import { TodayPage } from "./TodayPage";
 import { Button } from "../components/ui/Button";
-import { EmptyState } from "../components/ui/EmptyState";
+import { FirstHabitEmptyState } from "../features/onboarding/FirstHabitEmptyState";
 import { StreakFlame } from "../components/viz/StreakFlame";
 import { getTodayDateString } from "../shared/lib/date";
 import { rulesAt } from "../shared/lib/rules";
@@ -89,9 +90,14 @@ export const HabitsPage = () => {
       </header>
 
       {/* Segmented Filter Tabs - Touch Friendly on Mobile */}
-      <div className="flex items-center gap-1.5 rounded-2xl border border-border-app bg-surface-2 p-1.5 w-full sm:w-fit overflow-x-auto no-scrollbar shadow-sm">
+      <div
+        role="group"
+        aria-label="Habit views"
+        className="flex items-center gap-1.5 rounded-2xl border border-border-app bg-surface-2 p-1.5 w-full sm:w-fit overflow-x-auto no-scrollbar shadow-sm"
+      >
         <button
           type="button"
+          aria-pressed={view === "today"}
           onClick={() => setView("today")}
           className={cn(
             "flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95",
@@ -106,6 +112,7 @@ export const HabitsPage = () => {
 
         <button
           type="button"
+          aria-pressed={view === "all"}
           onClick={() => setView("all")}
           className={cn(
             "flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95",
@@ -132,6 +139,7 @@ export const HabitsPage = () => {
 
         <button
           type="button"
+          aria-pressed={view === "archived"}
           onClick={() => setView("archived")}
           className={cn(
             "flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition-all duration-200 active:scale-95",
@@ -235,11 +243,11 @@ export const HabitsPage = () => {
                   habit.stats.type === "action" ? habit.stats.currentStreak : 0;
 
                 return (
+                  <div key={habit.id} className="flex min-w-0 flex-col gap-2">
                   <Link
-                    key={habit.id}
                     to={`/habits/${habit.id}`}
                     className={cn(
-                      "surface-card group relative flex flex-col justify-between overflow-hidden rounded-2xl border-l-4 p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg",
+                      "surface-card group relative flex flex-1 flex-col justify-between overflow-hidden rounded-2xl border-l-4 p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg",
                       borderClass
                     )}
                   >
@@ -296,6 +304,14 @@ export const HabitsPage = () => {
                       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </div>
                   </Link>
+                  {habit.streakRepair && (
+                    <StreakRepairBanner
+                      habitId={habit.id}
+                      habitTitle={habit.title}
+                      offer={habit.streakRepair}
+                    />
+                  )}
+                  </div>
                 );
               })}
             </div>
@@ -303,19 +319,7 @@ export const HabitsPage = () => {
 
           {/* Empty State */}
           {!query.isLoading && habits.length === 0 && !query.isError && (
-            <EmptyState
-              title="No active habits yet"
-              description="Create your first habit to start building positive daily routines and earning XP."
-              action={
-                <Button
-                  onClick={() => openCreateHabit()}
-                  className="font-bold shadow-md shadow-accent/20 cursor-pointer"
-                >
-                  <Plus className="mr-1.5 h-4 w-4 stroke-[2.5]" />
-                  Create a Habit
-                </Button>
-              }
-            />
+            <FirstHabitEmptyState />
           )}
         </div>
       )}

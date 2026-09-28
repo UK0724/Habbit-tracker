@@ -6,7 +6,7 @@ export type Rules = {
   target?: number | null;
   targetMax?: number | null;
 };
-export type TrackedHabit = Rules & { type: string; createdAt: string | Date; ruleHistory?: (Rules & { effectiveDate: string })[] };
+export type TrackedHabit = Rules & { type: string; createdAt: string | Date; startDate?: string; ruleHistory?: (Rules & { effectiveDate: string })[] };
 export type Entry = { date: string; status: string | null; value: number | null };
 export const shift = (date: string, days: number) => {
   const value = new Date(`${date}T12:00:00Z`);
@@ -15,8 +15,11 @@ export const shift = (date: string, days: number) => {
 };
 export const rulesAt = (habit: TrackedHabit, date: string): Rules =>
   [...(habit.ruleHistory ?? [])].reverse().find(r => r.effectiveDate <= date) ?? habit;
+/** First trackable day: the creation day in the user's timezone (startDate), else the UTC creation date for older habits. */
+export const startDateOf = (habit: TrackedHabit) =>
+  habit.startDate ?? new Date(habit.createdAt).toISOString().slice(0, 10);
 export const scheduled = (habit: TrackedHabit, date: string) => {
-  if (date < new Date(habit.createdAt).toISOString().slice(0, 10)) return false;
+  if (date < startDateOf(habit)) return false;
   const rules = rulesAt(habit, date);
   return rules.schedule !== "weekdays" || (rules.weekdays ?? []).includes(new Date(`${date}T12:00:00Z`).getUTCDay());
 };
@@ -67,7 +70,7 @@ export const summarize = (habit: TrackedHabit, entries: Entry[], today: string, 
     }
   }
   let current = 0, best = 0, run = 0;
-  const start = new Date(habit.createdAt).toISOString().slice(0, 10);
+  const start = startDateOf(habit);
   const seenWeeks = new Set<string>();
   for (let date = start; date <= today; date = shift(date, 1)) {
     if (!scheduled(habit, date)) continue;

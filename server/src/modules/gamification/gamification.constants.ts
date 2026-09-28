@@ -69,16 +69,16 @@ export const LEVEL_TITLES: string[] = [
   "Giant", // 48
   "Behemoth", // 49
   "Grand Champion", // 50
-  "Conqueror", // 51
-  "Vanquisher", // 52
-  "Dominator", // 53
-  "Annihilator", // 54
-  "Destroyer", // 55
-  "Devastator", // 56
-  "Obliterator", // 57
-  "Exterminator", // 58
-  "Eliminator", // 59
-  "Terminator", // 60
+  "Trailblazer", // 51
+  "Pathfinder", // 52
+  "Luminary", // 53
+  "Virtuoso", // 54
+  "Maestro", // 55
+  "Sage", // 56
+  "Visionary", // 57
+  "Pioneer", // 58
+  "Stalwart", // 59
+  "Grandmaster", // 60
   "Warlord", // 61
   "Commander", // 62
   "General", // 63
@@ -104,7 +104,7 @@ export const LEVEL_TITLES: string[] = [
   "Omnipotent", // 83
   "Omniscient", // 84
   "Omnipresent", // 85
-  "Transcendant", // 86
+  "Radiant", // 86
   "Supernal", // 87
   "Celestial", // 88
   "Divine", // 89
@@ -162,9 +162,37 @@ export const XP_REWARDS = {
   ACHIEVEMENT_PLATINUM: 500
 } as const;
 
+// ─── Gem Rewards ─────────────────────────────────────────────────────────────
+// Gems buy streak freezes (2 gems each). Earned from achievements by tier and
+// from login-streak milestones.
+
+export const GEM_REWARDS = {
+  bronze: 1,
+  silver: 2,
+  gold: 3,
+  platinum: 5,
+  STREAK_MILESTONE: 1
+} as const;
+
+/** Gems to restore a broken login streak, allowed for 24h after the break. */
+export const STREAK_RESTORE_COST = 5;
+export const STREAK_RESTORE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** Repairing one habit's missed day: 1 streak freeze, or this many gems. */
+export const STREAK_REPAIR_GEM_COST = 3;
+/** How many days back a missed habit day can be repaired. */
+export const STREAK_REPAIR_WINDOW_DAYS = 2;
+
 // ─── Achievements ─────────────────────────────────────────────────────────────
 
 export type AchievementTier = "bronze" | "silver" | "gold" | "platinum";
+export type AchievementCategory =
+  | "beginner"
+  | "streak"
+  | "performance"
+  | "consistency"
+  | "levels"
+  | "special";
 
 export interface AchievementDefinition {
   emoji: string;
@@ -173,9 +201,12 @@ export interface AchievementDefinition {
   description: string;
   xpBonus: number;
   tier: AchievementTier;
+  category: AchievementCategory;
 }
 
-export const ACHIEVEMENTS: AchievementDefinition[] = [
+export type Achievement = AchievementDefinition & { gemBonus: number };
+
+const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
   // ── Beginner ──
   {
     id: "first_step",
@@ -183,7 +214,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "First Step",
     description: "Log your very first habit entry.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_BRONZE,
-    tier: "bronze"
+    tier: "bronze",
+    category: "beginner"
   },
   {
     id: "early_bird",
@@ -191,7 +223,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Early Bird",
     description: "Log a habit before 8 AM.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_BRONZE,
-    tier: "bronze"
+    tier: "bronze",
+    category: "beginner"
   },
   {
     id: "night_owl",
@@ -199,7 +232,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Night Owl",
     description: "Log a habit after 10 PM.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_BRONZE,
-    tier: "bronze"
+    tier: "bronze",
+    category: "beginner"
   },
   {
     id: "getting_started",
@@ -207,7 +241,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Getting Started",
     description: "Log habits on 3 different days.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_BRONZE,
-    tier: "bronze"
+    tier: "bronze",
+    category: "beginner"
   },
   {
     id: "creator",
@@ -215,7 +250,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Creator",
     description: "Create your first habit.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_BRONZE,
-    tier: "bronze"
+    tier: "bronze",
+    category: "beginner"
   },
   // ── Streak ──
   {
@@ -224,7 +260,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "On Fire",
     description: "Maintain a 7-day login streak.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_SILVER,
-    tier: "silver"
+    tier: "silver",
+    category: "streak"
   },
   {
     id: "unstoppable",
@@ -232,7 +269,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Unstoppable",
     description: "Maintain a 14-day login streak.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_SILVER,
-    tier: "silver"
+    tier: "silver",
+    category: "streak"
   },
   {
     id: "diamond_streak",
@@ -240,7 +278,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Diamond Streak",
     description: "Maintain a 30-day login streak.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_GOLD,
-    tier: "gold"
+    tier: "gold",
+    category: "streak"
   },
   {
     id: "century",
@@ -248,7 +287,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Century",
     description: "Maintain a 100-day login streak.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_GOLD,
-    tier: "gold"
+    tier: "gold",
+    category: "streak"
   },
   {
     id: "legend",
@@ -256,7 +296,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Legend",
     description: "Maintain a 365-day login streak.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_PLATINUM,
-    tier: "platinum"
+    tier: "platinum",
+    category: "streak"
   },
   // ── Performance ──
   {
@@ -265,7 +306,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Perfect Day",
     description: "Complete all habits in a single day.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_SILVER,
-    tier: "silver"
+    tier: "silver",
+    category: "performance"
   },
   {
     id: "legendary_week",
@@ -273,7 +315,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Legendary Week",
     description: "Complete all habits every day for 7 consecutive days.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_GOLD,
-    tier: "gold"
+    tier: "gold",
+    category: "performance"
   },
   {
     id: "speedrunner",
@@ -281,7 +324,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Speedrunner",
     description: "Log 5 habits in a single day.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_SILVER,
-    tier: "silver"
+    tier: "silver",
+    category: "performance"
   },
   {
     id: "goal_crusher",
@@ -289,7 +333,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Goal Crusher",
     description: "Hit the target on a measurable habit 10 times.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_SILVER,
-    tier: "silver"
+    tier: "silver",
+    category: "performance"
   },
   {
     id: "overachiever",
@@ -297,7 +342,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Overachiever",
     description: "Earn 1000 XP in a single day.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_GOLD,
-    tier: "gold"
+    tier: "gold",
+    category: "performance"
   },
   // ── Consistency ──
   {
@@ -306,7 +352,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Dedicated",
     description: "Log 50 total habit entries.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_SILVER,
-    tier: "silver"
+    tier: "silver",
+    category: "consistency"
   },
   {
     id: "centurion",
@@ -314,7 +361,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Centurion",
     description: "Log 100 total habit entries.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_GOLD,
-    tier: "gold"
+    tier: "gold",
+    category: "consistency"
   },
   {
     id: "veteran",
@@ -322,23 +370,26 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Veteran",
     description: "Log 500 total habit entries.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_PLATINUM,
-    tier: "platinum"
+    tier: "platinum",
+    category: "consistency"
   },
   {
     id: "no_excuses",
     emoji: "🚫",
     name: "No Excuses",
-    description: "Check in for 14 consecutive days without skipping.",
+    description: "Complete at least one habit 14 days in a row.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_SILVER,
-    tier: "silver"
+    tier: "silver",
+    category: "consistency"
   },
   {
     id: "iron_will",
-    emoji: "🛡️",
+    emoji: "🏋️",
     name: "Iron Will",
-    description: "Check in for 30 consecutive days without skipping.",
+    description: "Complete at least one habit 30 days in a row.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_GOLD,
-    tier: "gold"
+    tier: "gold",
+    category: "consistency"
   },
   // ── Levels ──
   {
@@ -347,7 +398,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Rising Star",
     description: "Reach level 10.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_SILVER,
-    tier: "silver"
+    tier: "silver",
+    category: "levels"
   },
   {
     id: "warrior",
@@ -355,7 +407,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Warrior",
     description: "Reach level 25.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_GOLD,
-    tier: "gold"
+    tier: "gold",
+    category: "levels"
   },
   {
     id: "champion",
@@ -363,7 +416,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Champion",
     description: "Reach level 50.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_GOLD,
-    tier: "gold"
+    tier: "gold",
+    category: "levels"
   },
   {
     id: "apex",
@@ -371,16 +425,18 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Apex",
     description: "Reach level 100 — the maximum.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_PLATINUM,
-    tier: "platinum"
+    tier: "platinum",
+    category: "levels"
   },
   // ── Special ──
   {
     id: "comeback_kid",
     emoji: "🦅",
     name: "Comeback Kid",
-    description: "Restore a broken streak by watching an ad.",
+    description: "Check in again after losing a streak.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_BRONZE,
-    tier: "bronze"
+    tier: "bronze",
+    category: "special"
   },
   {
     id: "wise_spender",
@@ -388,7 +444,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Wise Spender",
     description: "Use a streak freeze to protect your streak.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_BRONZE,
-    tier: "bronze"
+    tier: "bronze",
+    category: "special"
   },
   {
     id: "collector",
@@ -396,7 +453,8 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Collector",
     description: "Unlock 10 achievements.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_SILVER,
-    tier: "silver"
+    tier: "silver",
+    category: "special"
   },
   {
     id: "master",
@@ -404,15 +462,26 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Master",
     description: "Unlock 25 achievements.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_GOLD,
-    tier: "gold"
+    tier: "gold",
+    category: "special"
   },
   {
     id: "completionist",
     emoji: "🌠",
     name: "Completionist",
-    description: "Unlock all 30 achievements.",
+    description: "Unlock every other achievement.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_PLATINUM,
-    tier: "platinum"
+    tier: "platinum",
+    category: "special"
+  },
+  {
+    id: "second_chance",
+    emoji: "❄️",
+    name: "Second Chance",
+    description: "Repair a habit's streak with a freeze or gems.",
+    xpBonus: XP_REWARDS.ACHIEVEMENT_BRONZE,
+    tier: "bronze",
+    category: "special"
   },
   {
     id: "social_proof",
@@ -420,10 +489,16 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     name: "Social Proof",
     description: "Share your progress with the world.",
     xpBonus: XP_REWARDS.ACHIEVEMENT_BRONZE,
-    tier: "bronze"
+    tier: "bronze",
+    category: "special"
   }
 ];
 
-export const ACHIEVEMENT_MAP = new Map<string, AchievementDefinition>(
+export const ACHIEVEMENTS: Achievement[] = ACHIEVEMENT_DEFINITIONS.map((def) => ({
+  ...def,
+  gemBonus: GEM_REWARDS[def.tier]
+}));
+
+export const ACHIEVEMENT_MAP = new Map<string, Achievement>(
   ACHIEVEMENTS.map((a) => [a.id, a])
 );

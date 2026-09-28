@@ -1,208 +1,251 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Modal,
-  View,
-  Text,
-  StyleSheet,
+  AccessibilityInfo,
   Animated,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
   TouchableOpacity,
-  Dimensions
+  View,
+  useWindowDimensions
 } from "react-native";
-import { Award, Sparkles, Trophy, Check } from "lucide-react-native";
-import { COLORS, BORDER_RADIUS, SPACING, TYPOGRAPHY } from "../constants/theme";
-import { hapticSuccess, hapticLight } from "../utils/haptics";
+import { Award, Lock, Share2 } from "lucide-react-native";
+import { BORDER_RADIUS, COLORS, SPACING, TYPOGRAPHY, tierColors } from "../constants/theme";
+import { hapticSuccess } from "../utils/haptics";
 import type { AchievementItem } from "../services/api";
+import type { AchievementCelebration } from "../stores/achievementStore";
+import { useReduceMotion } from "../hooks/useReduceMotion";
+import { shortDate } from "../utils/date";
+import { Button } from "./Button";
+import { Confetti } from "./Confetti";
 
 export interface AchievementBannerProps {
-  visible: boolean;
-  mode?: "unlock" | "details";
-  achievement: AchievementItem | null;
+  celebration: AchievementCelebration | null;
   onDismiss: () => void;
+  onShare: (achievement: AchievementItem) => void;
+  /** A share is being prepared (image card capture / share sheet). */
+  sharing?: boolean;
+}
+
+const tierLabel = (tier: string) => tier.charAt(0).toUpperCase() + tier.slice(1);
+
+export function RewardsRow({ achievement }: { achievement: AchievementItem }) {
+  const gems = achievement.gemBonus ?? 0;
+  return (
+    <View style={styles.rewards}>
+      <View style={[styles.rewardChip, styles.xpChip]}>
+        <Text style={styles.xpChipText}>⚡ +{achievement.xpBonus} XP</Text>
+      </View>
+      {gems > 0 && (
+        <View style={[styles.rewardChip, styles.gemChip]}>
+          <Text style={styles.gemChipText}>💎 +{gems}</Text>
+        </View>
+      )}
+    </View>
+  );
 }
 
 export const AchievementBanner: React.FC<AchievementBannerProps> = ({
-  visible,
-  mode = "unlock",
-  achievement,
-  onDismiss
+  celebration,
+  onDismiss,
+  onShare,
+  sharing = false
 }) => {
-  const scaleAnim = useRef(new Animated.Value(0.7)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const { width } = useWindowDimensions();
+  const reduceMotion = useReduceMotion();
+  const scale = useRef(new Animated.Value(0.8)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const [showAll, setShowAll] = useState(false);
+  const [burst, setBurst] = useState(0);
+
+  const achievement = celebration?.achievements[0] ?? null;
+  const others = celebration?.achievements.slice(1) ?? [];
+  const mode = celebration?.mode ?? "unlock";
+  const locked = mode === "details" && achievement?.unlocked === false;
 
   useEffect(() => {
-    if (visible && achievement) {
-      if (mode === "unlock") hapticSuccess();
-      Animated.parallel([
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          friction: 6,
-          tension: 40,
-          useNativeDriver: true
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true
-        })
-      ]).start();
-    } else {
-      scaleAnim.setValue(0.7);
-      opacityAnim.setValue(0);
+    if (!celebration || !achievement) return;
+    setShowAll(false);
+    if (mode === "unlock") {
+      void hapticSuccess();
+      AccessibilityInfo.announceForAccessibility(
+        `Achievement unlocked: ${achievement.name}.${others.length ? ` Plus ${others.length} more.` : ""}`
+      );
+      if (!reduceMotion) setBurst((value) => value + 1);
     }
-  }, [visible, achievement, mode, scaleAnim, opacityAnim]);
-
-  if (!achievement) return null;
-
-  const getTierBadge = (tier: string) => {
-    switch (tier) {
-      case "platinum":
-        return {
-          text: "PLATINUM",
-          color: "#C084FC",
-          bg: "rgba(192, 132, 252, 0.2)"
-        };
-      case "gold":
-        return {
-          text: "GOLD",
-          color: "#FBBF24",
-          bg: "rgba(251, 191, 36, 0.2)"
-        };
-      case "silver":
-        return {
-          text: "SILVER",
-          color: "#94A3B8",
-          bg: "rgba(148, 163, 184, 0.2)"
-        };
-      case "bronze":
-      default:
-        return {
-          text: "BRONZE",
-          color: "#F59E0B",
-          bg: "rgba(245, 158, 11, 0.2)"
-        };
+    if (reduceMotion) {
+      scale.setValue(1);
+      opacity.setValue(0);
+      Animated.timing(opacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+      return;
     }
-  };
+    scale.setValue(0.8);
+    opacity.setValue(0);
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, friction: 6, tension: 60, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true })
+    ]).start();
+    // Only re-run for a new celebration.
+  }, [celebration?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const tierInfo = getTierBadge(achievement.tier);
-
-  const handleClaim = () => {
-    hapticLight();
-    onDismiss();
-  };
+  if (!celebration || !achievement) return null;
+  const tier = tierColors(achievement.tier);
+  const cardWidth = Math.min(width - 32, 400);
+  const unlockedOn = shortDate(achievement.unlockedAt);
 
   return (
     <Modal
       transparent
-      visible={visible}
+      visible
       animationType="none"
+      statusBarTranslucent
       onRequestClose={onDismiss}
     >
       <View style={styles.overlay}>
+        {mode === "unlock" && <Confetti run={burst} />}
         <Animated.View
-          style={[
-            styles.card,
-            {
-              opacity: opacityAnim,
-              transform: [{ scale: scaleAnim }]
-            }
-          ]}
+          accessibilityViewIsModal
+          style={[styles.card, { width: cardWidth, borderColor: tier.border, opacity, transform: [{ scale }] }]}
         >
-          {/* Glowing Top Aura */}
-          <View style={styles.aura} />
+          <View style={[styles.aura, { backgroundColor: tier.bg }]} />
+          <ScrollView contentContainerStyle={styles.scroll} bounces={false}>
+            <View style={[styles.iconContainer, { backgroundColor: tier.bg, borderColor: tier.border }]}>
+              <Text style={[styles.emojiText, locked && styles.emojiLocked]}>{achievement.emoji || "🏆"}</Text>
+              {locked && (
+                <View style={styles.lockBadge}>
+                  <Lock size={14} color={COLORS.text} />
+                </View>
+              )}
+            </View>
 
-          {/* Badge / Trophy Icon */}
-          <View
-            style={[styles.iconContainer, { backgroundColor: tierInfo.bg }]}
-          >
-            {achievement.emoji ? (
-              <Text style={styles.emojiText}>{achievement.emoji}</Text>
-            ) : (
-              <Trophy size={48} color={tierInfo.color} />
+            <View style={[styles.tierPill, { backgroundColor: tier.bg }]}>
+              <Award size={12} color={tier.fg} />
+              <Text style={[styles.tierText, { color: tier.fg }]}>{tierLabel(achievement.tier)}</Text>
+            </View>
+
+            <Text style={styles.kicker} accessibilityRole="header">
+              {mode === "unlock" ? "Achievement unlocked!" : locked ? "How to unlock" : "Achievement"}
+            </Text>
+            <Text style={styles.name}>{achievement.name}</Text>
+            <Text style={styles.description}>{achievement.description}</Text>
+
+            <RewardsRow achievement={achievement} />
+            <Text style={styles.rewardNote}>
+              {mode === "unlock"
+                ? "Added to your total"
+                : locked
+                  ? "Reward when you unlock it"
+                  : unlockedOn
+                    ? `Unlocked ${unlockedOn}`
+                    : "Unlocked"}
+            </Text>
+
+            {others.length > 0 && (
+              <View style={styles.more}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showAll }}
+                  accessibilityLabel={showAll ? "Hide other badges" : `Show ${others.length} more badges`}
+                  onPress={() => setShowAll((value) => !value)}
+                  style={styles.moreToggle}
+                >
+                  <Text style={styles.moreText}>
+                    {showAll ? "Hide" : `+${others.length} more`}
+                  </Text>
+                </TouchableOpacity>
+                {showAll &&
+                  others.map((other) => (
+                    <View key={other.id} style={styles.moreRow}>
+                      <Text style={styles.moreEmoji}>{other.emoji || "🏆"}</Text>
+                      <View style={styles.moreCopy}>
+                        <Text style={styles.moreName}>{other.name}</Text>
+                        <Text style={styles.moreReward}>
+                          +{other.xpBonus} XP{other.gemBonus ? ` · +${other.gemBonus} 💎` : ""}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+              </View>
             )}
-          </View>
 
-          {/* Tier pill */}
-          <View style={[styles.tierPill, { backgroundColor: tierInfo.bg }]}>
-            <Award size={12} color={tierInfo.color} />
-            <Text style={[styles.tierText, { color: tierInfo.color }]}>
-              {tierInfo.text} ACHIEVEMENT
-            </Text>
-          </View>
-
-          {/* Main Title */}
-          <Text style={styles.unlockSubtitle}>{mode === "unlock" ? "ACHIEVEMENT UNLOCKED!" : "ACHIEVEMENT DETAILS"}</Text>
-          <Text style={styles.achievementName}>{achievement.name}</Text>
-          <Text style={styles.description}>{achievement.description}</Text>
-
-          {/* XP Bonus */}
-          <View style={styles.xpBonusCard}>
-            <Sparkles size={16} color={COLORS.xp} />
-            <Text style={styles.xpBonusText}>
-              {achievement.xpBonus} XP {mode === "unlock" ? "earned" : "already earned"}
-            </Text>
-          </View>
-
-          {/* Claim Button */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            onPress={handleClaim}
-            style={styles.claimButton}
-          >
-            <Check size={18} color={COLORS.white} strokeWidth={3} />
-            <Text style={styles.claimButtonText}>{mode === "unlock" ? "Continue" : "Done"}</Text>
-          </TouchableOpacity>
+            <View style={styles.actions}>
+              {!locked && (
+                <Button
+                  title="Share"
+                  variant="secondary"
+                  icon={<Share2 size={16} color={COLORS.text} />}
+                  onPress={() => onShare(achievement)}
+                  loading={sharing}
+                  style={styles.action}
+                />
+              )}
+              <Button
+                title={mode === "unlock" ? "Continue" : "Done"}
+                onPress={onDismiss}
+                style={styles.action}
+              />
+            </View>
+          </ScrollView>
         </Animated.View>
       </View>
     </Modal>
   );
 };
 
-const { width } = Dimensions.get("window");
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(5, 8, 15, 0.85)",
+    backgroundColor: COLORS.overlay,
     alignItems: "center",
     justifyContent: "center",
-    padding: SPACING.xl
+    padding: SPACING.lg
   },
   card: {
-    width: Math.min(width - 48, 380),
+    maxHeight: "90%",
     backgroundColor: COLORS.card,
     borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.xxl,
-    alignItems: "center",
     borderWidth: 1,
-    borderColor: COLORS.borderLight,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
-    overflow: "hidden"
+    overflow: "hidden",
+    elevation: 10
+  },
+  scroll: {
+    padding: SPACING.xxl,
+    alignItems: "center"
   },
   aura: {
     position: "absolute",
-    top: -50,
-    width: 200,
-    height: 100,
-    backgroundColor: "rgba(99, 102, 241, 0.2)",
-    borderRadius: 100
+    top: -80,
+    alignSelf: "center",
+    width: 280,
+    height: 180,
+    borderRadius: 140
   },
   iconContainer: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: SPACING.md,
-    borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.15)"
+    borderWidth: 2
   },
   emojiText: {
-    fontSize: 44
+    fontSize: 46
+  },
+  emojiLocked: {
+    opacity: 0.35
+  },
+  lockBadge: {
+    position: "absolute",
+    right: 2,
+    bottom: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceElevated,
+    alignItems: "center",
+    justifyContent: "center"
   },
   tierPill: {
     flexDirection: "row",
@@ -214,18 +257,16 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md
   },
   tierText: {
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1
+    ...TYPOGRAPHY.label,
+    letterSpacing: 0.5
   },
-  unlockSubtitle: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.primary,
-    fontWeight: "800",
-    letterSpacing: 1.5,
+  kicker: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.primaryText,
+    letterSpacing: 0.5,
     marginBottom: 4
   },
-  achievementName: {
+  name: {
     ...TYPOGRAPHY.title1,
     textAlign: "center",
     marginBottom: SPACING.xs
@@ -233,42 +274,84 @@ const styles = StyleSheet.create({
   description: {
     ...TYPOGRAPHY.bodySecondary,
     textAlign: "center",
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.lg,
-    paddingHorizontal: SPACING.sm
+    marginBottom: SPACING.lg
   },
-  xpBonusCard: {
+  rewards: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.xpLight,
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.4)",
-    borderRadius: BORDER_RADIUS.md,
-    paddingVertical: 10,
-    paddingHorizontal: SPACING.lg,
-    gap: 8,
-    marginBottom: SPACING.xl
-  },
-  xpBonusText: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.xp,
-    fontWeight: "700",
-    fontSize: 13
-  },
-  claimButton: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexWrap: "wrap",
     justifyContent: "center",
-    backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    paddingHorizontal: SPACING.xxl,
-    borderRadius: BORDER_RADIUS.lg,
-    width: "100%",
-    gap: 8
+    gap: SPACING.sm
   },
-  claimButtonText: {
-    color: COLORS.white,
-    fontWeight: "700",
-    fontSize: 15
+  rewardChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1
+  },
+  xpChip: {
+    backgroundColor: COLORS.xpLight,
+    borderColor: COLORS.xpBorder
+  },
+  xpChipText: {
+    color: COLORS.xpText,
+    fontWeight: "800",
+    fontSize: 14
+  },
+  gemChip: {
+    backgroundColor: COLORS.gemLight,
+    borderColor: COLORS.gemBorder
+  },
+  gemChipText: {
+    color: COLORS.gem,
+    fontWeight: "800",
+    fontSize: 14
+  },
+  rewardNote: {
+    ...TYPOGRAPHY.micro,
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.lg
+  },
+  more: {
+    alignSelf: "stretch",
+    marginBottom: SPACING.md
+  },
+  moreToggle: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  moreText: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.primaryText
+  },
+  moreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.border
+  },
+  moreEmoji: {
+    fontSize: 26
+  },
+  moreCopy: {
+    flex: 1
+  },
+  moreName: {
+    ...TYPOGRAPHY.body,
+    fontWeight: "700"
+  },
+  moreReward: {
+    ...TYPOGRAPHY.micro,
+    color: COLORS.xpText
+  },
+  actions: {
+    flexDirection: "row",
+    alignSelf: "stretch",
+    gap: SPACING.sm
+  },
+  action: {
+    flex: 1
   }
 });

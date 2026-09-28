@@ -4,6 +4,11 @@ export interface User {
   timezone?: string;
   email: string;
   passwordHash: string;
+  /** SHA-256 of the emailed reset token; the raw token is never stored. */
+  resetTokenHash?: string;
+  resetTokenExpiresAt?: Date;
+  /** Small profile photo as a data URL (resized on the device, <= ~64 KB). */
+  avatar?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,7 +27,11 @@ const userSchema = new Schema<User>(
     passwordHash: {
       type: String,
       required: true
-    }
+    },
+    resetTokenHash: { type: String, index: true, sparse: true },
+    resetTokenExpiresAt: Date,
+    // Never loaded by default: only the avatar endpoint reads it.
+    avatar: { type: String, select: false }
   },
   {
     timestamps: true,

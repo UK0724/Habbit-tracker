@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pulse",
     "slug": "pulse",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "pulseapp",
@@ -23,8 +23,18 @@
         "backgroundColor": "#0B0F19",
         "monochromeImage": "./assets/monochrome-icon.png"
       },
-      "package": "com.pulse.app",
-      "versionCode": 10
+      "package": "com.abuk.pulse",
+      "versionCode": 12,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.CAMERA"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -34,6 +44,14 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#7c3aed"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": false,
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ]
     ],

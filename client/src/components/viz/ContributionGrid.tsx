@@ -40,6 +40,9 @@ export const ContributionGrid = ({
     if (!cell.hasLog) {
       return { background: "rgb(var(--surface-3))" };
     }
+    if (cell.frozen) {
+      return { background: hexToRgba("#06b6d4", 0.55) };
+    }
     if (mode === "action") {
       if (cell.status === "done") {
         return { background: baseColor };
@@ -60,6 +63,9 @@ export const ContributionGrid = ({
     }
     if (!cell.hasLog) {
       return `${cell.date} · no log`;
+    }
+    if (cell.frozen) {
+      return `${cell.date} · frozen ❄️`;
     }
     if (mode === "action") {
       return `${cell.date} · ${cell.status === "done" ? "done" : "not done"}`;

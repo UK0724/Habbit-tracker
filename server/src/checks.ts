@@ -14,8 +14,6 @@ import {
   createExpenseBodySchema,
   updateExpenseBodySchema
 } from "./modules/expenses/expense.validation.js";
-import { markSolvedBodySchema } from "./modules/dsaPrep/dsaPrep.validation.js";
-import { updateProfileBodySchema } from "./modules/jobTracker/jobTracker.validation.js";
 
 // Expenses serialize as `id`, not `_id` -- the client keys edit/delete off it.
 const serialized = new ExpenseModel({
@@ -49,19 +47,5 @@ assert.equal(
   }).amount,
   10.5
 );
-
-// DSA solve requires a real problem id and language.
-assert.throws(() => markSolvedBodySchema.parse({ problemId: 1 }));
-assert.throws(() =>
-  markSolvedBodySchema.parse({ problemId: -1, language: "ts" })
-);
-
-// The job tracker body is $set straight onto the document, so unknown keys
-// must be rejected rather than silently written.
-assert.throws(
-  () => updateProfileBodySchema.parse({ streak: 3, isAdmin: true }),
-  /Unrecognized key/
-);
-assert.deepEqual(updateProfileBodySchema.parse({ streak: 3 }), { streak: 3 });
 
 console.log("checks passed");

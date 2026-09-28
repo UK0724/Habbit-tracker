@@ -1,4 +1,5 @@
 import { apiRequest } from "../../../services/api";
+import type { RewardSummary } from "../../gamification/rewards";
 import type {
   CreateHabitInput,
   Habit,
@@ -35,4 +36,18 @@ export const updateHabit = (id: string, input: UpdateHabitInput) =>
 export const deleteHabit = (id: string) =>
   apiRequest<void>(`/habits/${id}`, {
     method: "DELETE"
+  });
+
+export type StreakRepairResult = Partial<RewardSummary> & {
+  paidWith: "freeze" | "gems";
+  date: string;
+  streakFreezes: number;
+  gems: number;
+};
+
+/** Spend a streak freeze (or gems) to excuse the offered missed day. */
+export const repairHabitStreak = (id: string, date: string) =>
+  apiRequest<StreakRepairResult>(`/habits/${id}/streak-repair`, {
+    method: "POST",
+    body: JSON.stringify({ date })
   });

@@ -1,4 +1,3 @@
-import { ProgressHeader } from "../../../src/components/ProgressHeader";
 import React, { useState, useMemo } from "react";
 import {
   View,
@@ -6,76 +5,73 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  RefreshControl,
-  ActivityIndicator
+  RefreshControl
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  Plus,
-  Search,
-  ChevronRight,
-  Layers,
-  Archive
-} from "lucide-react-native";
-import {
-  COLORS,
-  SPACING,
-  TYPOGRAPHY,
-  BORDER_RADIUS
-} from "../../../src/constants/theme";
+import { Plus, Search, ChevronRight, Layers, Archive } from "lucide-react-native";
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from "../../../src/constants/theme";
+import { ProgressHeader } from "../../../src/components/ProgressHeader";
 import { Input } from "../../../src/components/Input";
 import { StreakBadge } from "../../../src/components/StreakBadge";
 import { Card } from "../../../src/components/Card";
-import { habitApi } from "../../../src/services/api";
+import { Button } from "../../../src/components/Button";
+import { CardSkeleton, ErrorState } from "../../../src/components/StateViews";
 import { habitColor } from "../../../src/utils/habitColor";
+import { formatGoal, formatSchedule } from "../../../src/utils/format";
+import { useHabitsList } from "../../../src/hooks/useHabitsList";
+import { useLocalDate } from "../../../src/utils/date";
 import type { HabitListItem } from "@habit-tracker/shared";
 
-type FilterType = "all" | "active" | "action" | "measurable" | "archived";
+type FilterType = "active" | "all" | "action" | "measurable" | "expense" | "archived";
+
+const EMPTY_COPY: Record<FilterType, { title: string; body: string }> = {
+  active: { title: "No active habits", body: "Create a habit to start earning XP." },
+  all: { title: "No habits yet", body: "Create your first habit to start earning XP." },
+  action: { title: "No check-off habits", body: "Action habits are simple \"did you do it?\" quests." },
+  measurable: { title: "No measurable habits", body: "Track an amount like minutes, pages or steps." },
+  expense: { title: "No expense habits", body: "Expense habits are set up on the web at habbit.abuk.in." },
+  archived: { title: "Nothing archived", body: "Habits you archive show up here and can be restored." }
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  action: "Check off",
+  measurable: "Measurable",
+  expense: "Expense"
+};
 
 export default function HabitsListScreen() {
   const router = useRouter();
+  const today = useLocalDate();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("active");
   const [refreshing, setRefreshing] = useState(false);
-
-  const {
-    data: habits = [],
-    isLoading,
-    refetch
-  } = useQuery<HabitListItem[]>({
-    queryKey: ["habits", "all"],
-    queryFn: () => habitApi.list({ includeArchived: true })
-  });
+  const habitsQuery = useHabitsList(today);
+  const habits = habitsQuery.data ?? [];
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refetch();
+    await habitsQuery.refetch();
     setRefreshing(false);
   };
 
   const filteredHabits = useMemo(() => {
-    return habits.filter((habit) => {
-      // 1. Search Query
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
+    return habits.filter((habit: HabitListItem) => {
+      if (query) {
         const matchesTitle = habit.title.toLowerCase().includes(query);
         const matchesDesc = habit.description?.toLowerCase().includes(query);
         if (!matchesTitle && !matchesDesc) return false;
       }
-
-      // 2. Filter tabs
       switch (activeFilter) {
         case "active":
           return !habit.archived;
         case "archived":
           return habit.archived;
         case "action":
-          return !habit.archived && habit.type === "action";
         case "measurable":
-          return !habit.archived && habit.type === "measurable";
-        case "all":
+        case "expense":
+          return !habit.archived && habit.type === activeFilter;
         default:
           return true;
       }
@@ -85,26 +81,34 @@ export default function HabitsListScreen() {
   const filterButtons: { key: FilterType; label: string }[] = [
     { key: "active", label: "Active" },
     { key: "all", label: "All" },
-    { key: "action", label: "Action" },
+    { key: "action", label: "Check off" },
     { key: "measurable", label: "Measurable" },
+    { key: "expense", label: "Expense" },
     { key: "archived", label: "Archived" }
   ];
+  const activeCount = habits.filter((h) => !h.archived).length;
+  const empty = searchQuery.trim()
+    ? { title: "No matches", body: `Nothing matches "${searchQuery.trim()}". Try another word.` }
+    : EMPTY_COPY[activeFilter];
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <ProgressHeader />
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Habit Armory</Text>
+          <View style={styles.headerCopy}>
+            <Text style={styles.headerTitle} accessibilityRole="header">
+              Habits
+            </Text>
             <Text style={styles.headerSubtitle}>
-              {habits.filter((h) => !h.archived).length} active disciplines
+              {habitsQuery.isSuccess ? `${activeCount} active` : " "}
             </Text>
           </View>
           <TouchableOpacity
             style={styles.createButton}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="New habit"
             onPress={() => router.push("/habits/new")}
           >
             <Plus size={18} color={COLORS.white} />
@@ -112,41 +116,36 @@ export default function HabitsListScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Search Input */}
         <View style={styles.searchContainer}>
           <Input
-            placeholder="Search habits..."
+            placeholder="Search habits"
+            accessibilityLabel="Search habits"
             value={searchQuery}
             onChangeText={setSearchQuery}
             leftIcon={<Search size={18} color={COLORS.textMuted} />}
             containerStyle={styles.searchInput}
+            returnKeyType="search"
           />
         </View>
 
-        {/* Filter Chips */}
         <View style={styles.filterBar}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterScroll}
+            keyboardShouldPersistTaps="handled"
           >
             {filterButtons.map((btn) => {
               const isSelected = activeFilter === btn.key;
               return (
                 <TouchableOpacity
                   key={btn.key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
                   onPress={() => setActiveFilter(btn.key)}
-                  style={[
-                    styles.filterChip,
-                    isSelected && styles.filterChipActive
-                  ]}
+                  style={[styles.filterChip, isSelected && styles.filterChipActive]}
                 >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      isSelected && styles.filterChipTextActive
-                    ]}
-                  >
+                  <Text style={[styles.filterChipText, isSelected && styles.filterChipTextActive]}>
                     {btn.label}
                   </Text>
                 </TouchableOpacity>
@@ -155,95 +154,80 @@ export default function HabitsListScreen() {
           </ScrollView>
         </View>
 
-        {/* Habit List */}
         <ScrollView
           contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
           }
         >
-          {isLoading ? (
-            <View style={styles.loaderContainer}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
-            </View>
+          {habitsQuery.isLoading ? (
+            <>
+              <CardSkeleton lines={1} />
+              <CardSkeleton lines={1} />
+              <CardSkeleton lines={1} />
+            </>
+          ) : habitsQuery.isError && !habitsQuery.data ? (
+            <Card>
+              <ErrorState
+                title="Couldn't load your habits"
+                error={habitsQuery.error}
+                retrying={habitsQuery.isFetching}
+                onRetry={() => void habitsQuery.refetch()}
+              />
+            </Card>
           ) : filteredHabits.length === 0 ? (
             <Card style={styles.emptyCard}>
-              <Layers size={48} color={COLORS.textMuted} />
-              <Text style={styles.emptyTitle}>No Habits Found</Text>
-              <Text style={styles.emptySubtitle}>
-                {searchQuery
-                  ? "Try searching with a different term"
-                  : "Create your first habit to begin leveling up"}
-              </Text>
-              <TouchableOpacity
-                style={styles.emptyCreateButton}
-                onPress={() => router.push("/habits/new")}
-              >
-                <Plus size={16} color={COLORS.white} />
-                <Text style={styles.emptyCreateButtonText}>Create Habit</Text>
-              </TouchableOpacity>
+              <Layers size={44} color={COLORS.textMuted} />
+              <Text style={styles.emptyTitle}>{empty.title}</Text>
+              <Text style={styles.emptySubtitle}>{empty.body}</Text>
+              {!searchQuery.trim() && ["active", "all", "action", "measurable"].includes(activeFilter) && (
+                <Button
+                  title="Create a habit"
+                  icon={<Plus size={16} color={COLORS.white} />}
+                  onPress={() => router.push("/habits/new")}
+                />
+              )}
             </Card>
           ) : (
             filteredHabits.map((habit) => {
-              const streak =
-                habit.stats?.type === "action" ? habit.stats.currentStreak : 0;
-
+              const streak = habit.stats?.type === "action" ? habit.stats.currentStreak : 0;
+              const schedule = formatSchedule(habit);
+              const goal = habit.type === "measurable" ? formatGoal(habit, today) : TYPE_LABEL[habit.type];
               return (
                 <TouchableOpacity
                   key={habit.id}
                   activeOpacity={0.8}
-                  style={[
-                    styles.habitItem,
-                    habit.archived && styles.habitItemArchived
-                  ]}
-                  onPress={() => router.push(`/habits/${habit.id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${habit.title}. ${goal}. ${schedule}.${
+                    habit.type === "action" ? ` ${streak} ${habit.schedule === "weekly" ? "week" : "day"} streak.` : ""
+                  }${habit.archived ? " Archived." : ""}`}
+                  style={[styles.habitItem, habit.archived && styles.habitItemArchived]}
+                  onPress={() => router.push({ pathname: "/habits/[id]", params: { id: habit.id } })}
                 >
                   <View style={styles.habitMainRow}>
-                    <View
-                      style={[
-                        styles.colorIndicator,
-                        { backgroundColor: habitColor(habit.color) }
-                      ]}
-                    />
-
+                    <View style={[styles.colorIndicator, { backgroundColor: habitColor(habit.color) }]} />
                     <View style={styles.habitInfo}>
                       <View style={styles.titleRow}>
                         <Text
-                          style={[
-                            styles.habitTitle,
-                            habit.archived && styles.habitTitleArchived
-                          ]}
+                          style={[styles.habitTitle, habit.archived && styles.habitTitleArchived]}
                           numberOfLines={1}
                         >
                           {habit.title}
                         </Text>
                         {habit.archived && (
                           <View style={styles.archivedBadge}>
-                            <Archive size={10} color={COLORS.textMuted} />
+                            <Archive size={11} color={COLORS.textMuted} />
                             <Text style={styles.archivedText}>Archived</Text>
                           </View>
                         )}
                       </View>
-
-                      <View style={styles.habitSubRow}>
-                        <Text style={styles.habitType}>
-                          {habit.type === "action"
-                            ? "Action Habit"
-                            : `Target: ${habit.target ?? ""} ${habit.unit || ""}`}
-                        </Text>
-                        <Text style={styles.dotSeparator}>•</Text>
-                        <Text style={styles.habitSchedule}>
-                          {habit.schedule || "Daily"}
-                        </Text>
-                      </View>
+                      <Text style={styles.habitSub} numberOfLines={2}>
+                        {goal} · {schedule}
+                      </Text>
                     </View>
-
                     <View style={styles.habitActionCol}>
-                      <StreakBadge count={streak} size="sm" />
+                      {habit.type === "action" && <StreakBadge count={streak} size="sm" />}
                       <ChevronRight size={18} color={COLORS.textMuted} />
                     </View>
                   </View>
@@ -271,32 +255,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.md,
-    paddingBottom: SPACING.sm
+    paddingBottom: SPACING.sm,
+    gap: SPACING.sm
+  },
+  headerCopy: {
+    flex: 1
   },
   headerTitle: {
     ...TYPOGRAPHY.title1
   },
   headerSubtitle: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted
+    ...TYPOGRAPHY.caption
   },
   createButton: {
+    minHeight: 44,
+    minWidth: 44,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: COLORS.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     borderRadius: BORDER_RADIUS.md,
     gap: 4
   },
   createButtonText: {
     color: COLORS.white,
     fontWeight: "700",
-    fontSize: 13
+    fontSize: 14
   },
   searchContainer: {
     paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm
+    marginBottom: SPACING.xs
   },
   searchInput: {
     marginBottom: SPACING.xs
@@ -312,7 +301,6 @@ const styles = StyleSheet.create({
   filterChip: {
     minHeight: 44,
     justifyContent: "center",
-    paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: BORDER_RADIUS.full,
     backgroundColor: COLORS.surface,
@@ -329,17 +317,13 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   filterChipTextActive: {
-    color: COLORS.primary,
+    color: COLORS.primaryText,
     fontWeight: "700"
   },
   listContent: {
     padding: SPACING.lg,
     paddingBottom: SPACING.xxxl,
     gap: SPACING.sm
-  },
-  loaderContainer: {
-    paddingVertical: SPACING.xxxl,
-    alignItems: "center"
   },
   emptyCard: {
     alignItems: "center",
@@ -355,29 +339,17 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
     marginBottom: SPACING.lg
   },
-  emptyCreateButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.primary,
-    paddingVertical: 10,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    gap: 6
-  },
-  emptyCreateButtonText: {
-    color: COLORS.white,
-    fontWeight: "700",
-    fontSize: 14
-  },
   habitItem: {
     backgroundColor: COLORS.card,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
+    minHeight: 64,
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: COLORS.border
   },
   habitItemArchived: {
-    opacity: 0.6
+    opacity: 0.7
   },
   habitMainRow: {
     flexDirection: "row",
@@ -399,11 +371,10 @@ const styles = StyleSheet.create({
   },
   habitTitle: {
     ...TYPOGRAPHY.title3,
-    color: COLORS.text
+    flexShrink: 1
   },
   habitTitleArchived: {
-    textDecorationLine: "line-through",
-    color: COLORS.textMuted
+    color: COLORS.textSecondary
   },
   archivedBadge: {
     flexDirection: "row",
@@ -415,25 +386,12 @@ const styles = StyleSheet.create({
     gap: 3
   },
   archivedText: {
-    fontSize: 10,
-    color: COLORS.textMuted
+    ...TYPOGRAPHY.micro
   },
-  habitSubRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  habitSub: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
     marginTop: 3
-  },
-  habitType: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary
-  },
-  dotSeparator: {
-    marginHorizontal: 6,
-    color: COLORS.textMuted
-  },
-  habitSchedule: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted
   },
   habitActionCol: {
     flexDirection: "row",

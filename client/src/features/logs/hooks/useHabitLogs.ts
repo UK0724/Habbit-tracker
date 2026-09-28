@@ -5,44 +5,40 @@ import {
   useQueryClient
 } from "@tanstack/react-query";
 
-import { getTodayDateString } from "../../../shared/lib/date";
 import type { SaveHabitLogInput } from "../../../shared/types/habit";
+import { applyReward } from "../../gamification/rewards";
 import {
   createHabitLog,
+  deleteHabitLog,
   getHabitLogs,
-  getTodayLogs,
   updateHabitLog
 } from "../services/logsApi";
+
+/** Copy for the XP toast that follows a successful log change. */
+type Feedback = { title?: string; undoTitle?: string };
 
 type SaveLogVariables = {
   habitId: string;
   logId?: string;
   input: SaveHabitLogInput;
+  feedback?: Feedback;
+};
+
+type DeleteLogVariables = {
+  habitId: string;
+  logId: string;
+  feedback?: Feedback;
 };
 
 const invalidateLogQueries = async (
   queryClient: QueryClient,
-  variables: SaveLogVariables
+  habitId: string
 ) => {
   await Promise.all([
-    queryClient.invalidateQueries({queryKey:["insights"]}),
-    queryClient.invalidateQueries({
-      queryKey: ["habits"]
-    }),
-    queryClient.invalidateQueries({
-      queryKey: ["habit-logs", variables.habitId]
-    }),
-    queryClient.invalidateQueries({
-      queryKey: ["habit-stats", variables.habitId]
-    }),
-    queryClient.invalidateQueries({
-      queryKey: ["habit", variables.habitId]
-    }),
-    variables.input.date === getTodayDateString()
-      ? queryClient.invalidateQueries({
-          queryKey: ["today-logs"]
-        })
-      : Promise.resolve()
+    queryClient.invalidateQueries({ queryKey: ["insights"] }),
+    queryClient.invalidateQueries({ queryKey: ["habits"] }),
+    queryClient.invalidateQueries({ queryKey: ["habit-logs", habitId] }),
+    queryClient.invalidateQueries({ queryKey: ["habit", habitId] })
   ]);
 };
 
@@ -53,12 +49,6 @@ export const useHabitLogs = (habitId?: string, limit = 12) =>
     enabled: Boolean(habitId)
   });
 
-export const useTodayLogs = () =>
-  useQuery({
-    queryKey: ["today-logs"],
-    queryFn: () => getTodayLogs()
-  });
-
 export const useSaveHabitLog = () => {
   const queryClient = useQueryClient();
 
@@ -67,8 +57,23 @@ export const useSaveHabitLog = () => {
       logId
         ? updateHabitLog(habitId, logId, input)
         : createHabitLog(habitId, input),
-    onSuccess: async (_data, variables) => {
-      await invalidateLogQueries(queryClient, variables);
+    onSuccess: async (data, variables) => {
+      // Handled here (not in the caller) so feedback survives unmounts.
+      applyReward(queryClient, data?.reward, variables.feedback);
+      await invalidateLogQueries(queryClient, variables.habitId);
+    }
+  });
+};
+
+export const useDeleteHabitLog = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ habitId, logId }: DeleteLogVariables) =>
+      deleteHabitLog(habitId, logId),
+    onSuccess: async (data, variables) => {
+      applyReward(queryClient, data.reward, variables.feedback);
+      await invalidateLogQueries(queryClient, variables.habitId);
     }
   });
 };

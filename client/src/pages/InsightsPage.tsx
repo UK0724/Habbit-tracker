@@ -13,7 +13,7 @@ import {
 import { apiRequest } from "../services/api";
 import { getTodayDateString } from "../shared/lib/date";
 import type { Habit } from "../shared/types/habit";
-import type { summarize } from "../shared/lib/rules";
+import { rulesAt, type summarize } from "../shared/lib/rules";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { cn } from "../shared/lib/utils";
@@ -112,9 +112,14 @@ export const InsightsPage = () => {
         </div>
 
         {/* Timeframe Switcher */}
-        <div className="inline-flex self-start rounded-2xl border border-border-app bg-surface-2 p-1.5 shadow-sm sm:self-auto">
+        <div
+          role="group"
+          aria-label="Time range"
+          className="inline-flex self-start rounded-2xl border border-border-app bg-surface-2 p-1.5 shadow-sm sm:self-auto"
+        >
           <button
             type="button"
+            aria-pressed={days === 7}
             onClick={() => setDays(7)}
             className={cn(
               "rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 active:scale-95",
@@ -127,6 +132,7 @@ export const InsightsPage = () => {
           </button>
           <button
             type="button"
+            aria-pressed={days === 30}
             onClick={() => setDays(30)}
             className={cn(
               "rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 active:scale-95",
@@ -332,8 +338,11 @@ export const InsightsPage = () => {
                 const isHigh = consistencyRate >= 80;
                 const isMid = consistencyRate >= 50 && consistencyRate < 80;
 
-                // Recent 14 cells for compact dot matrix
+                // Up to 14 recent cells for the compact dot matrix (7 when
+                // the 7-day range is selected).
                 const recentCells = row.cells.slice(-14);
+                const isWeekly =
+                  rulesAt(row.habit, today).schedule === "weekly";
 
                 return (
                   <div
@@ -403,13 +412,16 @@ export const InsightsPage = () => {
                       {/* Stats Strip */}
                       <div className="mt-3.5 flex items-center justify-between text-xs text-content-2">
                         <span>
-                          {row.done} of {row.due} days completed
+                          {row.done} of {row.due}{" "}
+                          {isWeekly ? "sessions" : "days"} completed
                         </span>
                         <div className="flex items-center gap-1 font-bold text-amber-500">
                           <Flame className="h-3.5 w-3.5" />
-                          <span>{row.current} streak</span>
+                          <span>
+                            {row.current}-{isWeekly ? "week" : "day"} streak
+                          </span>
                           <span className="text-content-muted text-[10px]">
-                            (Best: {row.best})
+                            (Best: {row.best} {isWeekly ? "wk" : "d"})
                           </span>
                         </div>
                       </div>
@@ -417,9 +429,9 @@ export const InsightsPage = () => {
                       {/* Modern Dot Matrix Activity Strip (No ugly scrollbars) */}
                       <div className="mt-4 pt-3 border-t border-border-app">
                         <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-content-muted">
-                          Last 14 Days Activity
+                          Last {recentCells.length} days activity
                         </p>
-                        <div className="grid grid-cols-7 sm:grid-cols-14 gap-1.5">
+                        <div className="grid grid-cols-7 gap-1.5">
                           {recentCells.map((cell) => {
                             const isDone = cell.state === "completed";
                             const isSkipped = cell.state === "skipped";
@@ -429,6 +441,8 @@ export const InsightsPage = () => {
                               <div
                                 key={cell.date}
                                 title={`${cell.date}: ${cell.state}${cell.value ? ` (${cell.value})` : ""}`}
+                                aria-label={`${cell.date}: ${cell.state}`}
+                                role="img"
                                 className={cn(
                                   "flex h-7 flex-col items-center justify-center rounded-lg text-[10px] font-black transition cursor-default",
                                   isDone &&

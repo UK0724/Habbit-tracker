@@ -8,6 +8,13 @@ export type ApiResponse<T> = {
   data: T;
 };
 
+/** Offered when a recent missed day broke a running streak and can be excused. */
+export type StreakRepairOffer = {
+  date: string;
+  freezeCost: number;
+  gemCost: number;
+};
+
 export type Habit = {
   id: string;
   title: string;
@@ -17,8 +24,6 @@ export type Habit = {
   requireCompletionComment: boolean;
   color: string;
   archived: boolean;
-  linkToJobTracker?: boolean;
-  linkToDSAPrep?: boolean;
   linkToExpenseTracker?: boolean;
   goalDirection: GoalDirection;
   target?: number | null;
@@ -29,6 +34,10 @@ export type Habit = {
   reminderTime?: string;
   ruleHistory?: (Rules & { effectiveDate: string })[];
 
+  /** Creation day in the user's timezone (YYYY-MM-DD). */
+  startDate?: string;
+  /** List items and habit detail only (absent on older servers). */
+  streakRepair?: StreakRepairOffer | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -40,6 +49,8 @@ export type HabitLog = {
   status: ActionStatus | null;
   value: number | null;
   comment?: string;
+  /** A missed day excused by a streak repair (status is "skipped"). */
+  frozen?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -66,6 +77,8 @@ export type RecentDay = {
   status: ActionStatus | null;
   value: number | null;
   hasLog: boolean;
+  /** Excused by a streak repair. */
+  frozen?: boolean;
 };
 
 export type HabitListItem = Habit & {
@@ -74,9 +87,6 @@ export type HabitListItem = Habit & {
   recentDays: RecentDay[];
 };
 
-export type TodayLogEntry = HabitLog & {
-  habit: Habit | null;
-};
 
 export type CreateHabitInput = {
   title: string;
@@ -84,8 +94,6 @@ export type CreateHabitInput = {
   type: HabitType;
   unit?: string;
   requireCompletionComment?: boolean;
-  linkToJobTracker?: boolean;
-  linkToDSAPrep?: boolean;
   linkToExpenseTracker?: boolean;
   color: string;
   goalDirection?: GoalDirection;

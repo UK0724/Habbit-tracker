@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,33 +6,26 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  type TextInput
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Flame, Mail, Lock, AlertCircle, Settings } from "lucide-react-native";
 import { Input } from "../../src/components/Input";
 import { Button } from "../../src/components/Button";
-import {
-  COLORS,
-  SPACING,
-  TYPOGRAPHY,
-  BORDER_RADIUS
-} from "../../src/constants/theme";
-import { authApi } from "../../src/services/api";
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from "../../src/constants/theme";
+import { authApi, errorMessage as describeError } from "../../src/services/api";
 import { useAuthStore } from "../../src/stores/authStore";
 import { hapticError, hapticSuccess } from "../../src/utils/haptics";
 import { getApiBaseUrl, setApiBaseUrl } from "../../src/constants/config";
 
 const loginSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, "Email is required")
-    .email("Please enter a valid email"),
-  password: z.string().min(1, "Password is required")
+  email: z.string().trim().min(1, "Enter your email").email("Enter a valid email address"),
+  password: z.string().min(1, "Enter your password")
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -44,20 +37,20 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [showServerConfig, setShowServerConfig] = useState(false);
   const [serverUrlInput, setServerUrlInput] = useState("");
+  const passwordRef = useRef<TextInput>(null);
 
   const {
     control,
     handleSubmit,
+    getValues,
     formState: { errors }
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: ""
-    }
+    defaultValues: { email: "", password: "" }
   });
 
   const onSubmit = async (data: LoginFormData) => {
+    if (isLoading) return;
     setErrorMessage(null);
     setIsLoading(true);
     try {
@@ -69,11 +62,9 @@ export default function LoginScreen() {
       await hapticSuccess();
       await setAuth(res.token, res.user);
       router.replace("/(app)");
-    } catch (error: any) {
+    } catch (error) {
       await hapticError();
-      setErrorMessage(
-        error?.message || "Login failed. Please verify credentials."
-      );
+      setErrorMessage(describeError(error, "Couldn't sign in. Check your email and password."));
     } finally {
       setIsLoading(false);
     }
@@ -90,40 +81,40 @@ export default function LoginScreen() {
       try {
         await setApiBaseUrl(serverUrlInput.trim());
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Invalid URL");
+        setErrorMessage(describeError(error, "Enter a valid URL"));
         return;
       }
       setShowServerConfig(false);
     }
   };
 
+  const submit = handleSubmit(onSubmit);
+
   return (
+    // Edge-to-edge (Android 15 / targetSdk 35): keep content clear of the
+    // status and navigation bars.
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom", "left", "right"]}>
     <KeyboardAvoidingView
       style={styles.keyboardContainer}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Header Branding */}
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <View style={styles.iconCircle}>
             <Flame size={44} color={COLORS.streak} fill={COLORS.streak} />
           </View>
-          <Text style={styles.appTitle}>Habit Tracker</Text>
-          <Text style={styles.appSubtitle}>
-            Level up your daily habits & build unstoppable momentum
+          <Text style={styles.appTitle} accessibilityRole="header">
+            Pulse
           </Text>
+          <Text style={styles.appSubtitle}>Build habits, earn XP and keep your streak alive.</Text>
         </View>
 
-        {/* Form Card */}
         <View style={styles.formCard}>
-          <Text style={styles.cardHeading}>Sign In to Quest</Text>
+          <Text style={styles.cardHeading}>Sign in</Text>
 
           {errorMessage && (
-            <View style={styles.errorBanner}>
-              <AlertCircle size={18} color={COLORS.danger} />
+            <View style={styles.errorBanner} accessibilityRole="alert" accessibilityLiveRegion="polite">
+              <AlertCircle size={18} color={COLORS.dangerText} />
               <Text style={styles.errorBannerText}>{errorMessage}</Text>
             </View>
           )}
@@ -133,11 +124,16 @@ export default function LoginScreen() {
             name="email"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="EMAIL"
-                placeholder="warrior@example.com"
+                label="Email"
+                placeholder="you@example.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => passwordRef.current?.focus()}
                 value={value}
                 onBlur={onBlur}
                 onChangeText={onChange}
@@ -152,9 +148,15 @@ export default function LoginScreen() {
             name="password"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="PASSWORD"
-                placeholder="••••••••"
+                ref={passwordRef}
+                label="Password"
+                placeholder="Your password"
                 secureTextEntry
+                autoCapitalize="none"
+                autoComplete="password"
+                textContentType="password"
+                returnKeyType="done"
+                onSubmitEditing={() => void submit()}
                 value={value}
                 onBlur={onBlur}
                 onChangeText={onChange}
@@ -164,68 +166,82 @@ export default function LoginScreen() {
             )}
           />
 
+          <TouchableOpacity
+            style={styles.forgotLink}
+            accessibilityRole="link"
+            onPress={() =>
+              router.push({
+                pathname: "/(auth)/forgot-password",
+                params: getValues("email").trim() ? { email: getValues("email").trim() } : {}
+              })
+            }
+          >
+            <Text style={styles.linkText}>Forgot password?</Text>
+          </TouchableOpacity>
+
           <Button
-            title={isLoading ? "Entering Realm..." : "Sign In"}
-            onPress={handleSubmit(onSubmit)}
+            title={isLoading ? "Signing in…" : "Sign in"}
+            onPress={() => void submit()}
             loading={isLoading}
             fullWidth
             size="lg"
             style={styles.submitButton}
           />
 
-          {/* Register Link */}
           <View style={styles.footerRow}>
-            <Text style={styles.footerText}>New adventurer?</Text>
-            <Link href="/(auth)/register" asChild>
-              <TouchableOpacity>
-                <Text style={styles.linkText}>Create Account</Text>
-              </TouchableOpacity>
-            </Link>
+            <Text style={styles.footerText}>New to Pulse?</Text>
+            <TouchableOpacity
+              style={styles.inlineLink}
+              accessibilityRole="link"
+              onPress={() => router.replace("/(auth)/register")}
+            >
+              <Text style={styles.linkText}>Create account</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Server Config Accordion for LAN testing */}
-        <View style={styles.serverConfigContainer}>
-          {!showServerConfig ? (
-            <TouchableOpacity
-              onPress={openServerConfig}
-              style={styles.serverConfigToggle}
-            >
-              <Settings size={14} color={COLORS.textMuted} />
-              <Text style={styles.serverConfigToggleText}>Server Settings</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.serverBox}>
-              <Text style={styles.serverBoxLabel}>Backend API Base URL:</Text>
-              <Input
-                value={serverUrlInput}
-                onChangeText={setServerUrlInput}
-                placeholder="http://192.168.31.217:4000/api"
-                autoCapitalize="none"
-              />
-              <View style={styles.serverBoxButtons}>
-                <Button
-                  title="Save Server"
-                  size="sm"
-                  variant="secondary"
-                  onPress={handleSaveServerUrl}
+        {/* Server settings for emulator / LAN testing; hidden in store builds */}
+        {(__DEV__ || process.env.EXPO_PUBLIC_ALLOW_LAN_HTTP === "true") && (
+          <View style={styles.serverConfigContainer}>
+            {!showServerConfig ? (
+              <TouchableOpacity
+                onPress={openServerConfig}
+                style={styles.serverConfigToggle}
+                accessibilityRole="button"
+              >
+                <Settings size={14} color={COLORS.textMuted} />
+                <Text style={styles.serverConfigToggleText}>Server settings (testing)</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.serverBox}>
+                <Input
+                  label="API base URL"
+                  value={serverUrlInput}
+                  onChangeText={setServerUrlInput}
+                  placeholder="http://10.0.2.2:4000/api"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
                 />
-                <Button
-                  title="Cancel"
-                  size="sm"
-                  variant="ghost"
-                  onPress={() => setShowServerConfig(false)}
-                />
+                <View style={styles.serverBoxButtons}>
+                  <Button title="Save server" size="sm" variant="secondary" onPress={handleSaveServerUrl} />
+                  <Button title="Cancel" size="sm" variant="ghost" onPress={() => setShowServerConfig(false)} />
+                </View>
               </View>
-            </View>
-          )}
-        </View>
+            )}
+          </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background
+  },
   keyboardContainer: {
     flex: 1,
     backgroundColor: COLORS.background
@@ -243,23 +259,21 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "rgba(249, 115, 22, 0.15)",
+    backgroundColor: COLORS.streakLight,
     borderWidth: 2,
-    borderColor: "rgba(249, 115, 22, 0.3)",
+    borderColor: COLORS.streakBorder,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: SPACING.md
   },
   appTitle: {
     ...TYPOGRAPHY.hero,
-    color: COLORS.text,
     textAlign: "center",
     marginBottom: SPACING.xs
   },
   appSubtitle: {
     ...TYPOGRAPHY.bodySecondary,
     textAlign: "center",
-    color: COLORS.textMuted,
     paddingHorizontal: SPACING.lg
   },
   formCard: {
@@ -271,15 +285,14 @@ const styles = StyleSheet.create({
   },
   cardHeading: {
     ...TYPOGRAPHY.title2,
-    marginBottom: SPACING.lg,
-    color: COLORS.text
+    marginBottom: SPACING.lg
   },
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.dangerLight,
     borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.3)",
+    borderColor: COLORS.dangerBorder,
     borderRadius: BORDER_RADIUS.md,
     padding: SPACING.md,
     marginBottom: SPACING.lg,
@@ -287,26 +300,38 @@ const styles = StyleSheet.create({
   },
   errorBannerText: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.danger,
+    color: COLORS.dangerText,
     flex: 1
   },
+  forgotLink: {
+    alignSelf: "flex-end",
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: SPACING.xs,
+    marginTop: -SPACING.sm
+  },
   submitButton: {
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.lg
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.md
   },
   footerRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "center",
     alignItems: "center",
-    gap: 6
+    gap: 4
   },
   footerText: {
-    ...TYPOGRAPHY.bodySecondary,
-    color: COLORS.textMuted
+    ...TYPOGRAPHY.bodySecondary
+  },
+  inlineLink: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: SPACING.xs
   },
   linkText: {
     ...TYPOGRAPHY.body,
-    color: COLORS.primary,
+    color: COLORS.primaryText,
     fontWeight: "700"
   },
   serverConfigContainer: {
@@ -317,11 +342,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    padding: SPACING.sm
+    minHeight: 44,
+    paddingHorizontal: SPACING.sm
   },
   serverConfigToggleText: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted
+    ...TYPOGRAPHY.caption
   },
   serverBox: {
     width: "100%",
@@ -330,11 +355,6 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.border
-  },
-  serverBoxLabel: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.xs
   },
   serverBoxButtons: {
     flexDirection: "row",

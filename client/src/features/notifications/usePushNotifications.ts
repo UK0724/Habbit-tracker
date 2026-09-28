@@ -138,13 +138,18 @@ export const usePushNotifications = (): PushNotificationState => {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
 
+      const endpoint = subscription?.endpoint;
+
+      // Remove only this browser's subscription on the server, then locally.
+      if (endpoint) {
+        await apiRequest("/gamification/push/unsubscribe", {
+          method: "DELETE",
+          body: JSON.stringify({ endpoint })
+        });
+      }
       if (subscription) {
         await subscription.unsubscribe();
       }
-
-      await apiRequest("/gamification/push/unsubscribe", {
-        method: "DELETE"
-      });
 
       setIsSubscribed(false);
       return true;

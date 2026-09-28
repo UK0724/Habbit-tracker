@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { Button } from "../components/ui/Button";
@@ -12,13 +12,15 @@ import { Sparkline } from "../components/viz/Sparkline";
 import { StreakFlame } from "../components/viz/StreakFlame";
 import { useHabit, useSetHabitArchived } from "../features/habits/hooks/useHabits";
 import { RecentEntriesList } from "../features/logs/components/RecentEntriesList";
+import { StreakRepairBanner } from "../features/habits/components/StreakRepairBanner";
 import { useHabitLogs } from "../features/logs/hooks/useHabitLogs";
 import {
   buildActionAnalytics,
   buildContributionGrid,
   buildMeasurableAnalytics
 } from "../features/stats/lib/analytics";
-import { formatShortDateLabel } from "../shared/lib/date";
+import { formatShortDateLabel, getTodayDateString } from "../shared/lib/date";
+import { rulesAt } from "../shared/lib/rules";
 import { getHabitHex } from "../shared/lib/habitTheme";
 import { formatValueWithUnit } from "../shared/lib/utils";
 
@@ -48,13 +50,33 @@ export const HabitDetailPage = () => {
   const logsQuery = useHabitLogs(id, 180);
   const archiveMutation = useSetHabitArchived();
 
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const handleArchive = async () => {
-    await archiveMutation.mutateAsync({ id: id as string, archived: true });
-    navigate("/");
+    setActionError(null);
+    try {
+      await archiveMutation.mutateAsync({ id: id as string, archived: true });
+      navigate("/habits");
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? `Could not archive this habit: ${error.message}`
+          : "Could not archive this habit. Please try again."
+      );
+    }
   };
 
   const handleRestore = async () => {
-    await archiveMutation.mutateAsync({ id: id as string, archived: false });
+    setActionError(null);
+    try {
+      await archiveMutation.mutateAsync({ id: id as string, archived: false });
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? `Could not restore this habit: ${error.message}`
+          : "Could not restore this habit. Please try again."
+      );
+    }
   };
 
   const logs = useMemo(() => logsQuery.data ?? [], [logsQuery.data]);
@@ -86,6 +108,11 @@ export const HabitDetailPage = () => {
   }
 
   const hex = getHabitHex(habit.color);
+  const isWeekly = rulesAt(habit, getTodayDateString()).schedule === "weekly";
+  const streakUnit = (count: number) =>
+    isWeekly
+      ? `week${count === 1 ? "" : "s"}`
+      : `day${count === 1 ? "" : "s"}`;
   const isExpense = habit.type === "expense";
   const lowerIsBetter = isExpense || habit.goalDirection === "down";
 
@@ -121,7 +148,7 @@ export const HabitDetailPage = () => {
         actions={
           <>
             <Button asChild variant="secondary">
-              <Link to="/">Back to today</Link>
+              <Link to="/habits">Back to today</Link>
             </Button>
             <Button asChild>
               <Link to={`/habits/${habit.id}/edit`}>Edit habit</Link>
@@ -130,7 +157,7 @@ export const HabitDetailPage = () => {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={handleRestore}
+                onClick={() => void handleRestore()}
                 disabled={archiveMutation.isPending}
               >
                 {archiveMutation.isPending ? "Restoring..." : "Restore"}
@@ -139,7 +166,7 @@ export const HabitDetailPage = () => {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={handleArchive}
+                onClick={() => void handleArchive()}
                 disabled={archiveMutation.isPending}
               >
                 {archiveMutation.isPending ? "Archiving..." : "Archive"}
@@ -148,6 +175,24 @@ export const HabitDetailPage = () => {
           </>
         }
       />
+
+      {actionError ? (
+        <p
+          role="alert"
+          className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-600"
+        >
+          {actionError}
+        </p>
+      ) : null}
+
+      {habit.streakRepair && !habit.archived ? (
+        <StreakRepairBanner
+          className="text-sm"
+          habitId={habit.id}
+          habitTitle={habit.title}
+          offer={habit.streakRepair}
+        />
+      ) : null}
 
       {/* ---- Action analytics ---- */}
       {habit.type === "action" && actionAnalytics ? (
@@ -187,7 +232,7 @@ export const HabitDetailPage = () => {
                   <p className="text-3xl font-bold text-content">
                     <CountUp value={actionAnalytics.currentStreak} />
                     <span className="ml-1 text-base font-semibold text-content-subtle">
-                      day{actionAnalytics.currentStreak === 1 ? "" : "s"}
+                      {streakUnit(actionAnalytics.currentStreak)}
                     </span>
                   </p>
                 </div>
@@ -197,7 +242,7 @@ export const HabitDetailPage = () => {
                 <p className="text-3xl font-bold text-content">
                   <CountUp value={actionAnalytics.longestStreak} />
                   <span className="ml-1 text-base font-semibold text-content-subtle">
-                    day{actionAnalytics.longestStreak === 1 ? "" : "s"}
+                    {streakUnit(actionAnalytics.longestStreak)}
                   </span>
                 </p>
               </MetricCard>
@@ -391,7 +436,7 @@ export const HabitDetailPage = () => {
           <EmptyState
             title="No logs yet"
             description="Start logging this habit from the Today page to see history and analytics here."
-            actionHref="/"
+            actionHref="/habits"
             actionLabel="Back to Today"
           />
         )}

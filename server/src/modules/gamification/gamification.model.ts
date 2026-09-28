@@ -18,6 +18,9 @@ export interface UserGameProfile {
   streakFreezes: number;
   achievements: AchievementUnlock[];
   perfectDates: string[];
+  /** Streak length lost at the last break; restorable with gems until brokenAt + 24h. */
+  brokenStreak: number | null;
+  brokenAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +43,8 @@ const userGameProfileSchema = new Schema<UserGameProfile>(
     lastLoginDate: { type: String, default: null },
     streakFreezes: { type: Number, default: 0 },
     perfectDates: { type: [String], default: [] },
+    brokenStreak: { type: Number, default: null },
+    brokenAt: { type: Date, default: null },
     achievements: {
       type: [
         {
@@ -122,31 +127,6 @@ xpEventSchema.set("toJSON", {
 });
 
 export const XPEventModel = model<XPEvent>("XPEvent", xpEventSchema);
-
-// ─── UsedAdToken ─────────────────────────────────────────────────────────────
-
-export interface UsedAdToken {
-  token: string;
-  usedAt: Date;
-}
-
-export type UsedAdTokenDocument = HydratedDocument<UsedAdToken>;
-
-const usedAdTokenSchema = new Schema<UsedAdToken>(
-  {
-    token: { type: String, required: true, unique: true },
-    usedAt: { type: Date, required: true, default: Date.now }
-  },
-  { versionKey: false }
-);
-
-// Auto-expire after 1 hour — tokens are 5-min, generous cleanup
-usedAdTokenSchema.index({ usedAt: 1 }, { expireAfterSeconds: 3600 });
-
-export const UsedAdTokenModel = model<UsedAdToken>(
-  "UsedAdToken",
-  usedAdTokenSchema
-);
 
 // ─── PushSubscription ─────────────────────────────────────────────────────────
 

@@ -17,8 +17,6 @@ export type Habit = {
   requireCompletionComment: boolean;
   color: string;
   archived: boolean;
-  linkToJobTracker?: boolean;
-  linkToDSAPrep?: boolean;
   linkToExpenseTracker?: boolean;
   goalDirection: GoalDirection;
   target?: number | null;
@@ -28,6 +26,8 @@ export type Habit = {
   targetMax?: number | null;
   reminderTime?: string;
   ruleHistory?: (Rules & { effectiveDate: string })[];
+  /** Creation day in the user's timezone. */
+  startDate?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -83,8 +83,6 @@ export type CreateHabitInput = {
   type: HabitType;
   unit?: string;
   requireCompletionComment?: boolean;
-  linkToJobTracker?: boolean;
-  linkToDSAPrep?: boolean;
   linkToExpenseTracker?: boolean;
   color: string;
   goalDirection?: GoalDirection;

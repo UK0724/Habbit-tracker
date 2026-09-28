@@ -5,6 +5,7 @@ import { BrandMark } from "../components/brand/BrandMark";
 import { ApiError } from "../services/api";
 import { registerApi } from "../services/authApi";
 import { useAuthStore } from "../stores/authStore";
+import { validateNewPassword } from "../shared/lib/password";
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
@@ -19,8 +20,9 @@ export const RegisterPage = () => {
     e.preventDefault();
     setError(null);
 
-    if (password !== confirm) {
-      setError("Passwords do not match");
+    const passwordError = validateNewPassword(password, confirm);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -28,14 +30,14 @@ export const RegisterPage = () => {
     try {
       const result = await registerApi(email, password);
       setAuth(result.token, result.user);
-      navigate("/");
+      navigate("/habits", { replace: true });
     } catch (err) {
       setError(
         err instanceof ApiError
           ? err.message
           : err instanceof Error
             ? err.message
-            : "Registration failed"
+            : "Could not create your account. Please try again."
       );
     } finally {
       setLoading(false);
@@ -119,7 +121,10 @@ export const RegisterPage = () => {
             </div>
 
             {error ? (
-              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-600">
+              <div
+                role="alert"
+                className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-600"
+              >
                 {error}
               </div>
             ) : null}
@@ -141,6 +146,13 @@ export const RegisterPage = () => {
             >
               Sign in
             </Link>
+          </p>
+          <p className="mt-3 text-center text-xs text-content-muted">
+            By creating an account you agree to how we handle your data in our{" "}
+            <Link to="/privacy" className="font-semibold text-accent hover:underline">
+              privacy policy
+            </Link>
+            .
           </p>
         </div>
       </div>

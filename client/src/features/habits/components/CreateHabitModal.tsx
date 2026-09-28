@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { X, Sparkles } from "lucide-react";
 import { useDialog } from "../../../shared/hooks/useDialog";
 import { HabitForm } from "../forms/HabitForm";
@@ -22,12 +22,30 @@ export const CreateHabitModal = ({
 }: CreateHabitModalProps) => {
   const createHabitMutation = useCreateHabit();
   const { reset } = createHabitMutation;
+  const dirtyRef = useRef(false);
+  const handleDirtyChange = useCallback((dirty: boolean) => {
+    dirtyRef.current = dirty;
+  }, []);
   const close = () => {
     if (!createHabitMutation.isPending) onClose();
   };
-  useDialog(isOpen, close, "[data-create-habit-dialog]");
+  /** Backdrop clicks and Escape are easy to trigger by accident. */
+  const closeWithConfirm = () => {
+    if (createHabitMutation.isPending) return;
+    if (
+      dirtyRef.current &&
+      !window.confirm("Discard this habit? Your changes will be lost.")
+    ) {
+      return;
+    }
+    onClose();
+  };
+  useDialog(isOpen, closeWithConfirm, "[data-create-habit-dialog]");
   useEffect(() => {
-    if (isOpen) reset();
+    if (isOpen) {
+      reset();
+      dirtyRef.current = false;
+    }
   }, [isOpen, reset]);
 
   if (!isOpen) return null;
@@ -43,7 +61,7 @@ export const CreateHabitModal = ({
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-3 sm:p-4 bg-black/70 animate-fade-in"
-      onClick={close}
+      onClick={closeWithConfirm}
     >
       <div
         data-create-habit-dialog
@@ -90,6 +108,7 @@ export const CreateHabitModal = ({
           errorMessage={createHabitMutation.error?.message}
           onSubmit={handleSubmit}
           onCancel={close}
+          onDirtyChange={handleDirtyChange}
         />
       </div>
     </div>,

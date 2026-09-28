@@ -33,7 +33,18 @@ export interface ButtonProps {
   fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
+
+const LABEL_COLOR: Record<ButtonVariant, string> = {
+  primary: COLORS.white,
+  secondary: COLORS.text,
+  success: COLORS.onSuccess,
+  danger: COLORS.white,
+  outline: COLORS.primaryText,
+  ghost: COLORS.primaryText
+};
 
 export const Button: React.FC<ButtonProps> = ({
   title,
@@ -46,7 +57,9 @@ export const Button: React.FC<ButtonProps> = ({
   iconPosition = "left",
   fullWidth = false,
   style,
-  textStyle
+  textStyle,
+  accessibilityLabel,
+  accessibilityHint
 }) => {
   const handlePress = () => {
     if (disabled || loading) return;
@@ -55,11 +68,11 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const getContainerStyle = (): ViewStyle => {
-    let base: ViewStyle = { ...styles.base };
+    const base: ViewStyle = { ...styles.base };
 
     switch (size) {
       case "sm":
-        base.paddingVertical = 6;
+        base.paddingVertical = 8;
         base.paddingHorizontal = SPACING.md;
         base.borderRadius = BORDER_RADIUS.sm;
         break;
@@ -95,6 +108,8 @@ export const Button: React.FC<ButtonProps> = ({
         break;
       case "ghost":
         base.backgroundColor = "transparent";
+        base.elevation = 0;
+        base.shadowOpacity = 0;
         break;
       case "primary":
       default:
@@ -102,71 +117,35 @@ export const Button: React.FC<ButtonProps> = ({
         break;
     }
 
-    if (fullWidth) {
-      base.alignSelf = "stretch";
-    }
-
-    if (disabled) {
-      base.opacity = 0.5;
-    }
-
+    if (fullWidth) base.alignSelf = "stretch";
+    if (disabled) base.opacity = 0.5;
     return base;
   };
 
-  const getTextStyle = (): TextStyle => {
-    let fontStyle: TextStyle = { ...styles.textBase };
-
-    switch (size) {
-      case "sm":
-        fontStyle.fontSize = 12;
-        break;
-      case "lg":
-        fontStyle.fontSize = 16;
-        break;
-      case "md":
-      default:
-        fontStyle.fontSize = 14;
-        break;
-    }
-
-    switch (variant) {
-      case "outline":
-      case "ghost":
-        fontStyle.color = COLORS.primary;
-        break;
-      case "secondary":
-        fontStyle.color = COLORS.text;
-        break;
-      default:
-        fontStyle.color = COLORS.white;
-        break;
-    }
-
-    return fontStyle;
-  };
+  const fontSize = size === "sm" ? 13 : size === "lg" ? 16 : 14;
+  const color = LABEL_COLOR[variant];
 
   return (
     <TouchableOpacity
       activeOpacity={0.75}
       onPress={handlePress}
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? title}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       style={[getContainerStyle(), style]}
     >
       {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={
-            variant === "outline" || variant === "ghost"
-              ? COLORS.primary
-              : COLORS.white
-          }
-        />
+        <ActivityIndicator size="small" color={color} />
       ) : (
         <>
           {icon && iconPosition === "left" && <>{icon}</>}
           <Text
+            maxFontSizeMultiplier={1.6}
             style={[
-              getTextStyle(),
+              styles.textBase,
+              { fontSize, color },
               textStyle,
               icon ? { marginHorizontal: 6 } : undefined
             ]}
@@ -182,6 +161,7 @@ export const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
   base: {
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -193,6 +173,7 @@ const styles = StyleSheet.create({
   },
   textBase: {
     fontWeight: "600",
-    textAlign: "center"
+    textAlign: "center",
+    flexShrink: 1
   }
 });

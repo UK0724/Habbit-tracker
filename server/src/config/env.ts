@@ -15,7 +15,15 @@ const envSchema = z
     JWT_SECRET: z.string().min(1, "JWT_SECRET is required"),
     VAPID_PUBLIC_KEY: z.string().optional(),
     VAPID_PRIVATE_KEY: z.string().optional(),
-    VAPID_CONTACT_EMAIL: z.string().optional().default("admin@habittracker.app")
+    VAPID_CONTACT_EMAIL: z.string().optional().default("admin@habittracker.app"),
+    // Password-reset email via SMTP (e.g. Gmail with an app password).
+    SMTP_HOST: z.string().optional().default("smtp.gmail.com"),
+    SMTP_PORT: z.coerce.number().int().positive().optional().default(465),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    MAIL_FROM: z.string().optional(),
+    /** Public web origin used in emailed links; defaults to the first CLIENT_ORIGIN. */
+    APP_URL: z.string().url().optional()
   })
   .superRefine((value, ctx) => {
     if (

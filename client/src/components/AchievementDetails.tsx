@@ -25,7 +25,7 @@ export const AchievementDetails = ({ achievement, onClose }: {
         <p className="mt-5 flex items-center justify-center gap-2 text-sm text-emerald-500"><CheckCircle2 size={16} />
           {achievement.unlockedAt ? `Unlocked ${new Date(achievement.unlockedAt).toLocaleDateString(undefined, { dateStyle: "medium", timeZone: "UTC" })}` : "Unlocked"}
         </p>
-        <p className="mt-2 text-sm text-content-muted">{achievement.xpBonus} XP already earned · <span className="capitalize">{achievement.tier}</span></p>
+        <p className="mt-2 text-sm text-content-muted">{achievement.xpBonus} XP{achievement.gemBonus ? ` + ${achievement.gemBonus} 💎` : ""} already earned · <span className="capitalize">{achievement.tier}</span></p>
         <Button type="button" className="mt-6 w-full" onClick={onClose}>Done</Button>
       </section>
     </div>, document.body

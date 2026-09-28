@@ -8,11 +8,13 @@ import mongoose from "mongoose";
 import { clientOrigins, env } from "./config/env.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { notFoundHandler } from "./middleware/notFound.js";
+import { accountRouter } from "./modules/auth/account.routes.js";
+import { avatarRouter } from "./modules/auth/avatar.routes.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
+import { passwordResetRouter } from "./modules/auth/passwordReset.routes.js";
 import { habitRouter } from "./modules/habits/habit.routes.js";
+import { streakRepairRouter } from "./modules/habits/streakRepair.routes.js";
 import { habitLogRouter } from "./modules/habitLogs/habitLog.routes.js";
-import { jobTrackerRouter } from "./modules/jobTracker/jobTracker.routes.js";
-import { dsaPrepRouter } from "./modules/dsaPrep/dsaPrep.routes.js";
 import { expenseRouter } from "./modules/expenses/expense.routes.js";
 import { gamificationRouter } from "./modules/gamification/gamification.routes.js";
 
@@ -48,10 +50,12 @@ app.get("/api/health", (_request, response) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/auth", passwordResetRouter);
+app.use("/api/account/avatar", avatarRouter);
+app.use("/api/account", accountRouter);
 app.use("/api", trackingRouter);
+app.use("/api", streakRepairRouter);
 app.use("/api/habits", habitRouter);
-app.use("/api/job-tracker", jobTrackerRouter);
-app.use("/api/dsa-prep", dsaPrepRouter);
 app.use("/api/expenses", expenseRouter);
 app.use("/api/gamification", gamificationRouter);
 app.use("/api", habitLogRouter);

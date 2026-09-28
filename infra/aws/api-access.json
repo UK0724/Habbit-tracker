@@ -1,0 +1,38 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Pulse HTTP origin for CloudFront. Public invocation is gated by application JWT authorization, not AWS IAM. Review public-access permissions before execution.",
+  "Parameters": {
+    "Environment": {"Type": "String", "AllowedValues": ["dev", "prod"], "Default": "dev"}
+  },
+  "Resources": {
+    "ApiUrl": {
+      "Type": "AWS::Lambda::Url",
+      "Properties": {
+        "TargetFunctionArn": {"Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:pulse-${Environment}-api"},
+        "AuthType": "NONE",
+        "InvokeMode": "BUFFERED"
+      }
+    },
+    "UrlInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {"Fn::Sub": "pulse-${Environment}-api"},
+        "Action": "lambda:InvokeFunctionUrl",
+        "Principal": "*",
+        "FunctionUrlAuthType": "NONE"
+      }
+    },
+    "UrlOnlyFunctionPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {"Fn::Sub": "pulse-${Environment}-api"},
+        "Action": "lambda:InvokeFunction",
+        "Principal": "*",
+        "InvokedViaFunctionUrl": true
+      }
+    }
+  },
+  "Outputs": {
+    "ApiOriginUrl": {"Value": {"Fn::GetAtt": ["ApiUrl", "FunctionUrl"]}}
+  }
+}

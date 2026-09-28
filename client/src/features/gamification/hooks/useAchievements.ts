@@ -1,13 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "../../../services/api";
-import { getAchievementEmoji,type AchievementTier } from "../../../shared/lib/gamification";
+import {
+  getAchievementEmoji,
+  type AchievementCategory,
+  type AchievementTier
+} from "../../../shared/lib/gamification";
 
 export interface Achievement {
   id: string;
   name: string;
   description: string;
   xpBonus: number;
+  /** Gems granted on unlock (absent on older servers). */
+  gemBonus?: number;
   tier: AchievementTier;
+  category?: AchievementCategory;
   emoji?: string;
   unlocked: boolean;
   unlockedAt: string | null;

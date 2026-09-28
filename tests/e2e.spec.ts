@@ -6,6 +6,29 @@ test.describe("Habit Tracker & Expenses E2E", () => {
     password: "Password123!"
   };
 
+  test.beforeEach(async ({ page }, testInfo) => {
+    // The first-run walkthrough only opens for accounts without habits; test 1
+    // walks through it explicitly. Anywhere else, skip it if it ever appears.
+    if (!testInfo.title.startsWith("1."))
+      await page.addLocatorHandler(
+        page.locator("[data-onboarding-dialog]"),
+        async (dialog) => {
+          await dialog.getByRole("button", { name: "Skip" }).click();
+        },
+        { noWaitAfter: true }
+      );
+    // Reward celebrations (badges, level-ups, Legendary Day) are modal by design.
+    // Dismiss them whenever they appear so each test exercises its own flow.
+    await page.addLocatorHandler(
+      page.locator("[data-achievement-dialog], [data-level-up-dialog], [data-legendary-dialog]"),
+      async (dialog) => {
+        await dialog.getByRole("button", { name: "Continue" }).click();
+      },
+      // Several can queue (badges, then level-up, then Legendary Day).
+      { noWaitAfter: true }
+    );
+  });
+
   test.beforeEach(async ({ request }, testInfo) => {
     testUser.email = `playwright_${Date.now()}_${Math.random().toString(36).slice(2)}@example.com`;
     if (testInfo.title.startsWith("1.")) return;
@@ -33,10 +56,20 @@ test.describe("Habit Tracker & Expenses E2E", () => {
     await page.click('button[type="submit"]');
 
     // Should redirect to Today dashboard "/"
-    await page.waitForURL("**/", { timeout: 15000 });
+    await page.waitForURL("**/habits", { timeout: 15000 });
     await expect(page.locator("text=Today").first()).toBeVisible({
       timeout: 10000
     });
+
+    // A brand-new account gets the walkthrough; a starter habit starts Day 1.
+    const walkthrough = page.getByRole("dialog", { name: "Welcome to Pulse" });
+    await expect(walkthrough).toBeVisible();
+    for (let step = 0; step < 3; step++)
+      await walkthrough.getByRole("button", { name: "Next" }).click();
+    await walkthrough.getByRole("button", { name: /Drink water/ }).click();
+    await expect(walkthrough).toHaveCount(0);
+    await expect(page.getByText("your streak has started")).toBeVisible();
+    await expect(page.getByText("Drink water").first()).toBeVisible();
   });
 
   test("2. Simple habit creation without multi-checkbox clutter", async ({
@@ -47,7 +80,7 @@ test.describe("Habit Tracker & Expenses E2E", () => {
     await page.fill("input#email", testUser.email);
     await page.fill("input#password", testUser.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/", { timeout: 15000 });
+    await page.waitForURL("**/habits", { timeout: 15000 });
 
     // Navigate to Create Habit
     await page.goto("/habits/new");
@@ -62,17 +95,16 @@ test.describe("Habit Tracker & Expenses E2E", () => {
     await expect(page.locator("text=Link to DSA Prep Tracker")).toHaveCount(0);
 
     // Fill simple habit details
-    await page.fill("input#title", "Morning Meditation");
+    await page.fill("input#title", "Evening Stretch");
     await page.fill("textarea#description", "10 minutes of mindfulness");
     await page.click('button[type="submit"]:has-text("Create habit")');
 
-    // Should redirect to habit detail page
-    await page.waitForURL(
-      (url) => /^\/habits\/[a-f0-9]{24}$/.test(url.pathname),
-      { timeout: 15000 }
-    );
+    // /habits/new opens the create dialog over the list; saving closes it.
+    await expect(
+      page.getByRole("dialog", { name: "Create New Habit" })
+    ).toHaveCount(0, { timeout: 15000 });
     await page.reload();
-    await expect(page.locator("text=Morning Meditation").first()).toBeVisible({
+    await expect(page.getByText("Evening Stretch").first()).toBeVisible({
       timeout: 10000
     });
   });
@@ -84,7 +116,7 @@ test.describe("Habit Tracker & Expenses E2E", () => {
     await page.fill("input#email", testUser.email);
     await page.fill("input#password", testUser.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/", { timeout: 15000 });
+    await page.waitForURL("**/habits", { timeout: 15000 });
 
     // Today page should list the created habit
     await expect(page.locator("text=Morning Meditation").first()).toBeVisible({
@@ -93,18 +125,18 @@ test.describe("Habit Tracker & Expenses E2E", () => {
 
     // Mark habit as done
     await page
-      .getByRole("button", { name: "Mark habit done", exact: true })
+      .getByRole("button", { name: /^Mark habit done/ })
       .first()
       .click();
     await expect(
       page
-        .getByRole("button", { name: "Mark habit incomplete", exact: true })
+        .getByRole("button", { name: /^Mark habit incomplete/ })
         .first()
     ).toBeVisible();
     await page.reload();
     await expect(
       page
-        .getByRole("button", { name: "Mark habit incomplete", exact: true })
+        .getByRole("button", { name: /^Mark habit incomplete/ })
         .first()
     ).toBeVisible();
   });
@@ -159,7 +191,7 @@ test.describe("Habit Tracker & Expenses E2E", () => {
 
     // Click profile dropdown trigger in header
     const profileTrigger = page
-      .locator('header button[aria-label*="Profile"]:visible')
+      .locator('header button[aria-label*="Account menu"]:visible')
       .first();
     await expect(profileTrigger).toBeVisible({ timeout: 10000 });
     await profileTrigger.click();
@@ -246,7 +278,7 @@ test.describe("Habit Tracker & Expenses E2E", () => {
     await page.locator("#email").fill(testUser.email);
     await page.locator("#password").fill(testUser.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await page.waitForURL("**/");
+    await page.waitForURL("**/habits");
     await page.getByRole("button", { name: "New habit", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Create New Habit" });
     const save = dialog.getByRole("button", {
@@ -304,7 +336,7 @@ test.describe("Habit Tracker & Expenses E2E", () => {
       await page.locator("#email").fill(testUser.email);
       await page.locator("#password").fill(testUser.password);
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
-      await page.waitForURL("**/");
+      await page.waitForURL("**/habits");
       await page
         .getByRole("button", { name: "New habit", exact: true })
         .click();
@@ -363,7 +395,7 @@ test.describe("Habit Tracker & Expenses E2E", () => {
     await page.locator("#email").fill(testUser.email);
     await page.locator("#password").fill(testUser.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await page.waitForURL("**/");
+    await page.waitForURL("**/habits");
 
     const login = await request.post("/api/auth/login", { data: testUser });
     const token = (await login.json()).data.token as string;
@@ -394,7 +426,7 @@ test.describe("Habit Tracker & Expenses E2E", () => {
     await page
       .getByRole("article")
       .filter({ hasText: "Reading" })
-      .getByRole("button", { name: "Mark habit done" })
+      .getByRole("button", { name: /^Mark habit done/ })
       .click();
     await expect(page.getByText("All Done!")).toBeVisible();
   });

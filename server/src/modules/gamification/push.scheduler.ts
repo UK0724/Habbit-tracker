@@ -11,7 +11,7 @@ import { scheduled } from "../habits/rules.js";
  * Checks whether a user still has unlogged habits for today and sends
  * a streak reminder push notification.
  */
-const sendStreakReminders = async (): Promise<void> => {
+export const sendStreakReminders = async (): Promise<void> => {
   try {
     const now = new Date();
     const habitsWithReminder = await HabitModel.find({

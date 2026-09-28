@@ -117,15 +117,22 @@ export const listHabitLogs = async (
   return logs.map(serializeHabitLog);
 };
 
+/** Excusing a past day keeps a streak alive, so it goes through a paid streak repair. */
+const PAST_SKIP_MESSAGE =
+  "Only today can be skipped. Use a streak repair to excuse a missed day.";
+
 export const createHabitLog = async (
   habitId: string,
   userId: string,
   payload: HabitLogPayload
 ) => {
   const habit = await getHabitByIdOrThrow(habitId, userId);
-  if (payload.date && payload.date > (await userToday(userId)))
+  const today = await userToday(userId);
+  if (payload.date && payload.date > today)
     throw new AppError("Future check-ins are not available", 400);
   const normalizedPayload = normalizePayloadForHabit(habit, payload);
+  if (normalizedPayload.status === "skipped" && normalizedPayload.date < today)
+    throw new AppError(PAST_SKIP_MESSAGE, 400);
 
   const existingLog = await HabitLogModel.findOne({
     habitId: habit._id,
@@ -141,9 +148,9 @@ export const createHabitLog = async (
     ...normalizedPayload
   });
 
-  await handleHabitLogXP(userId, habit, undefined, log);
+  const reward = await handleHabitLogXP(userId, habit, undefined, log);
 
-  return serializeHabitLog(log);
+  return { ...serializeHabitLog(log), reward };
 };
 
 export const updateHabitLog = async (
@@ -163,8 +170,16 @@ export const updateHabitLog = async (
   }
 
   const normalizedPayload = normalizePayloadForHabit(habit, payload, log);
-  if (normalizedPayload.date > (await userToday(userId)))
+  const today = await userToday(userId);
+  if (normalizedPayload.date > today)
     throw new AppError("Future check-ins are not available", 400);
+  // Editing an already-excused day (e.g. its note) stays allowed.
+  if (
+    normalizedPayload.status === "skipped" &&
+    normalizedPayload.date < today &&
+    !(log.status === "skipped" && log.date === normalizedPayload.date)
+  )
+    throw new AppError(PAST_SKIP_MESSAGE, 400);
   const updated = await HabitLogModel.findOneAndUpdate(
     {
       _id: log._id,
@@ -184,8 +199,8 @@ export const updateHabitLog = async (
   );
   if (!updated)
     throw new AppError("This log changed. Refresh and try again.", 409);
-  await handleHabitLogXP(userId, habit, log, updated);
-  return serializeHabitLog(updated);
+  const reward = await handleHabitLogXP(userId, habit, log, updated);
+  return { ...serializeHabitLog(updated), reward };
 };
 
 export const getTodayLogs = async (userId: string) => {

@@ -34,6 +34,7 @@ const storage = {
 };
 const moduleObject = { exports: {} };
 const loggedErrors = [];
+let remindersCleared = 0;
 vm.runInNewContext(compiled, {
   module: moduleObject,
   exports: moduleObject.exports,
@@ -41,6 +42,8 @@ vm.runInNewContext(compiled, {
     if (name === "zustand") return require("zustand");
     if (name === "../services/storage") return storage;
     if (name === "../constants/config") return { SECURE_STORE_KEYS: keys };
+    if (name === "../services/notifications")
+      return { clearHabitReminders: async () => { remindersCleared += 1; } };
     throw new Error(`Unexpected import: ${name}`);
   },
   console: { error: (...args) => loggedErrors.push(args) }
@@ -71,6 +74,8 @@ const user = { id: "user-1", email: "user@example.com" };
   assert.equal(store.getState().isAuthenticated, false);
   assert.equal(saved.has(keys.AUTH_TOKEN), false);
   assert.equal(loggedErrors.length, 1);
+  // Only the two successful sign-outs clear reminders; the failed one keeps the session.
+  assert.equal(remindersCleared, 2);
   console.log("Mobile secure sign-out checks passed");
 })().catch((error) => {
   console.error(error);

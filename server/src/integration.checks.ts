@@ -94,7 +94,8 @@ try {
   });
   assert.equal(created.status, 201);
   const id = created.data.id;
-  const date = new Date().toISOString().slice(0, 10);
+  // The user's own "today" (Asia/Kolkata): habits start on their local creation day.
+  const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
   assert.equal((await request(`/habits/${id}`, other)).status, 404);
   assert.equal(
     (await request(`/habits/${id}`, other, "PATCH", { title: "stolen" }))
@@ -245,7 +246,8 @@ try {
     `/insights?days=7&date=${expectedToday}`,
     token
   );
-  assert.equal(defaultInsights.data.length, 2);
+  // The first habit was archived above; insights only cover active habits.
+  assert.equal(defaultInsights.data.length, 1);
   assert.equal(accountDayList.data[0].recentDays.at(-1).date, expectedToday);
   assert.deepEqual(defaultInsights.data, explicitInsights.data);
   assert.equal(defaultInsights.data[0].cells.at(-1).date, expectedToday);
@@ -266,6 +268,14 @@ try {
   const { XP_REWARDS } =
     await import("./modules/gamification/gamification.constants.js");
   await UserGameProfileModel.init();
+  // Logging a habit today already checked the user in automatically.
+  assert.equal(
+    await XPEventModel.countDocuments({ userId, reason: "checkin" }),
+    1
+  );
+  // Reset so concurrent explicit check-ins are exercised from a fresh day.
+  await UserGameProfileModel.updateOne({ userId }, { $set: { lastLoginDate: null } });
+  await XPEventModel.deleteMany({ userId, reason: "checkin" });
   const checkins = await Promise.all(
     Array.from({ length: 8 }, () =>
       request("/gamification/checkin", token, "POST")
@@ -288,7 +298,8 @@ try {
   );
   assert.equal(freezes.filter((r) => r.status === 200).length, 1);
   const afterFreeze = await UserGameProfileModel.findOne({ userId });
-  assert.equal(afterFreeze!.gems, 0);
+  // 2 gems spent, then the bronze Wise Spender badge pays 1 gem back.
+  assert.equal(afterFreeze!.gems, 1);
   assert.equal(afterFreeze!.streakFreezes, 1);
   assert.equal(
     afterFreeze!.achievements.filter((a) => a.id === "wise_spender").length,
@@ -388,7 +399,7 @@ try {
         "DELETE"
       )
     ).status,
-    204
+    200
   );
   assert.deepEqual(
     (await request(`/habits/${recordOnly.data.id}/logs`, token)).data,
@@ -435,19 +446,20 @@ try {
         ].map((id: string) => new mongoose.Types.ObjectId(id))
       }
     },
-    { $set: { createdAt: new Date(`${challengeMonday}T00:00:00.000Z`) } }
+    {
+      $set: {
+        createdAt: new Date(`${challengeMonday}T00:00:00.000Z`),
+        startDate: challengeMonday
+      }
+    }
   );
-  assert.equal(
-    (
-      await request(
-        `/habits/${skippedChallenge.data.id}/logs`,
-        challengeToken,
-        "POST",
-        { date: challengeDate, status: "skipped" }
-      )
-    ).status,
-    201
-  );
+  // Historical setup: skipping a past day through the API now needs a streak repair.
+  await HabitLogModel.create({
+    habitId: skippedChallenge.data.id,
+    date: challengeDate,
+    status: "skipped",
+    value: null
+  });
   assert.equal(
     (
       await request(

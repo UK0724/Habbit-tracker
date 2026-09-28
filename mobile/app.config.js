@@ -11,6 +11,9 @@ module.exports = ({ config }) => ({
       "expo-build-properties",
       {
         android: {
+          // Google Play requires targeting Android 15 (API 35) or newer.
+          compileSdkVersion: 35,
+          targetSdkVersion: 35,
           usesCleartextTraffic: process.env.EAS_BUILD_PROFILE === "preview"
         }
       }

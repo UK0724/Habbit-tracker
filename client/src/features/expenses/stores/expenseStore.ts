@@ -26,7 +26,11 @@ interface ExpenseState {
 
   fetchExpenses: () => Promise<void>;
   fetchBudgets: () => Promise<void>;
-  addExpense: (expense: Omit<Expense, "id" | "createdAt">) => Promise<void>;
+  /** Resolves with the saved expense; `reward` is set when it completed a linked habit. */
+  addExpense: (
+    expense: Omit<Expense, "id" | "createdAt">
+  ) => Promise<Expense & { reward?: unknown }>;
+  clearError: () => void;
   updateExpense: (id: string, expense: Partial<Omit<Expense, "id" | "createdAt">>) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   setBudgetLimit: (category: string, monthlyLimit: number) => Promise<void>;
@@ -37,6 +41,8 @@ export const useExpenseStore = create<ExpenseState>((set, get) => ({
   budgets: [],
   isLoading: false,
   error: null,
+
+  clearError: () => set({ error: null }),
 
   fetchExpenses: async () => {
     set({ isLoading: true, error: null });
@@ -61,14 +67,18 @@ export const useExpenseStore = create<ExpenseState>((set, get) => ({
   addExpense: async (expense) => {
     set({ isLoading: true, error: null });
     try {
-      const newExpense = await apiRequest<Expense>("/expenses", {
-        method: "POST",
-        body: JSON.stringify(expense)
-      });
+      const newExpense = await apiRequest<Expense & { reward?: unknown }>(
+        "/expenses",
+        {
+          method: "POST",
+          body: JSON.stringify(expense)
+        }
+      );
       set({
         expenses: [newExpense, ...get().expenses],
         isLoading: false
       });
+      return newExpense;
     } catch (err: unknown) {
       set({ error: err instanceof Error ? err.message : "Failed to add expense", isLoading: false });
       throw err;

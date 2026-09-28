@@ -27,8 +27,12 @@ export const EditHabitPage = () => {
       return;
     }
 
-    await deleteHabitMutation.mutateAsync();
-    navigate("/");
+    try {
+      await deleteHabitMutation.mutateAsync();
+      navigate("/habits");
+    } catch {
+      // The error is shown by the form via deleteHabitMutation.error.
+    }
   };
 
   if (habitQuery.isLoading) {
@@ -72,7 +76,10 @@ export const EditHabitPage = () => {
           submitLabel="Save changes"
           isSubmitting={updateHabitMutation.isPending}
           errorMessage={
-            updateHabitMutation.error?.message ?? deleteHabitMutation.error?.message
+            updateHabitMutation.error?.message ??
+            (deleteHabitMutation.error
+              ? `Could not delete this habit: ${deleteHabitMutation.error.message}`
+              : undefined)
           }
           typeDisabled
           onSubmit={handleSubmit}

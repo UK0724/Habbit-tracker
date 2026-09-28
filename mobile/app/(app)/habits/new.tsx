@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Switch, type TextInput } from "react-native";
 import {
   View,
   Text,
@@ -11,7 +12,7 @@ import {
   ActivityIndicator
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useForm, Controller } from "react-hook-form";
@@ -32,25 +33,31 @@ import {
   TYPOGRAPHY,
   BORDER_RADIUS
 } from "../../../src/constants/theme";
-import { habitApi } from "../../../src/services/api";
+import { errorMessage as describeError, habitApi, habitLogApi } from "../../../src/services/api";
 import {
   hapticSuccess,
   hapticLight,
   hapticError
 } from "../../../src/utils/haptics";
+import { parseNumberInput } from "../../../src/utils/format";
 import type { HabitType } from "@habit-tracker/shared";
 import { requestNotificationPermissions } from "../../../src/services/notifications";
 
-const COLOR_PALETTE = [
-  "#6366F1", // Indigo
-  "#10B981", // Emerald
-  "#F59E0B", // Amber
-  "#EC4899", // Pink
-  "#06B6D4", // Cyan
-  "#8B5CF6", // Violet
-  "#EF4444", // Red
-  "#14B8A6" // Teal
+const COLOR_OPTIONS = [
+  { value: "#6366F1", name: "Indigo" },
+  { value: "#10B981", name: "Emerald" },
+  { value: "#F59E0B", name: "Amber" },
+  { value: "#EC4899", name: "Pink" },
+  { value: "#06B6D4", name: "Cyan" },
+  { value: "#8B5CF6", name: "Violet" },
+  { value: "#EF4444", name: "Red" },
+  { value: "#14B8A6", name: "Teal" }
 ];
+const COLOR_PALETTE = COLOR_OPTIONS.map((option) => option.value);
+/** Form fields in screen order, for jumping to the first error. */
+const FIELD_ORDER = ["title", "description", "target", "targetMax", "unit", "weekdays"] as const;
+const WEB_APP_HOST = "habbit.abuk.in";
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const WEEKDAYS = [
   { label: "Sun", value: 0 },
@@ -74,7 +81,8 @@ const habitFormSchema = z
     schedule: z.enum(["daily", "weekdays", "weekly"]).default("daily"),
     weekdays: z.array(z.number().int().min(0).max(6)).default([1, 2, 3, 4, 5]),
     timesPerWeek: z.number().int().min(1).max(7).default(1),
-    color: z.string().default("#6366F1")
+    color: z.string().default("#6366F1"),
+    requireCompletionComment: z.boolean().default(false)
   })
   .superRefine((value, context) => {
     if (value.schedule === "weekdays" && value.weekdays.length === 0)
@@ -97,11 +105,12 @@ const habitFormSchema = z
         message: "Use 20 characters or fewer"
       });
     const hasTarget = Boolean(value.target?.trim());
-    const target = hasTarget ? Number(value.target) : null;
+    // Same parsing as the payload: "2,5" and "10,000" are understood.
+    const target = hasTarget ? parseNumberInput(value.target ?? "") : null;
     if (
       value.goalDirection !== "record" &&
       hasTarget &&
-      !Number.isFinite(target)
+      target === null
     )
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -109,11 +118,10 @@ const habitFormSchema = z
         message: "Enter a valid number"
       });
     if (value.goalDirection === "range") {
-      const max = value.targetMax?.trim() ? Number(value.targetMax) : null;
+      const max = value.targetMax?.trim() ? parseNumberInput(value.targetMax) : null;
       if (
         target === null ||
         max === null ||
-        !Number.isFinite(max) ||
         max < target
       )
         context.addIssue({
@@ -135,6 +143,15 @@ export default function CreateHabitScreen() {
   const [reminderTime, setReminderTime] = useState<string | null>(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const createInFlight = useRef(false);
+  const navigation = useNavigation();
+  const scrollRef = useRef<ScrollView>(null);
+  const fieldY = useRef<Record<string, number>>({});
+  const titleRef = useRef<TextInput>(null);
+  const unitRef = useRef<TextInput>(null);
+  const targetRef = useRef<TextInput>(null);
+  const targetMaxRef = useRef<TextInput>(null);
+  const allowLeave = useRef(false);
+  const [initialReminder, setInitialReminder] = useState<string | null>(null);
   const {
     data: editingHabit,
     isLoading: isLoadingHabit,
@@ -145,6 +162,23 @@ export default function CreateHabitScreen() {
     queryFn: () => habitApi.get(editId as string),
     enabled: Boolean(editId)
   });
+  // The unit is locked once entries exist, so old values keep their meaning.
+  // Until the check succeeds (loading or failed) the unit stays locked too.
+  const existingLogsQuery = useQuery({
+    queryKey: ["habitLogs", editId, "any"],
+    queryFn: () => habitLogApi.list(editId as string, 1),
+    enabled: Boolean(editId) && editingHabit?.type === "measurable"
+  });
+  const unitLocked =
+    Boolean(editId) &&
+    !(existingLogsQuery.isSuccess && existingLogsQuery.data.length === 0);
+  const unitLockHint = !unitLocked
+    ? undefined
+    : existingLogsQuery.isSuccess
+      ? "The unit can't change once you've logged entries."
+      : existingLogsQuery.isError
+        ? "Couldn't check your entries, so the unit can't be changed right now."
+        : "Checking your entries…";
 
   const {
     control,
@@ -152,7 +186,7 @@ export default function CreateHabitScreen() {
     setValue,
     reset,
     handleSubmit,
-    formState: { errors }
+    formState: { errors, isDirty }
   } = useForm<HabitFormValues>({
     resolver: zodResolver(habitFormSchema),
     defaultValues: {
@@ -166,7 +200,8 @@ export default function CreateHabitScreen() {
       schedule: "daily",
       weekdays: [1, 2, 3, 4, 5],
       timesPerWeek: 1,
-      color: COLOR_PALETTE[0]
+      color: COLOR_PALETTE[0],
+      requireCompletionComment: false
     }
   });
 
@@ -176,6 +211,8 @@ export default function CreateHabitScreen() {
   const selectedColor = watch("color");
   const selectedWeekdays = watch("weekdays");
   const selectedTimesPerWeek = watch("timesPerWeek");
+  const requireNote = watch("requireCompletionComment");
+  const hasChanges = isDirty || reminderTime !== initialReminder;
 
   useEffect(() => {
     if (!editingHabit || editingHabit.type === "expense") return;
@@ -191,9 +228,11 @@ export default function CreateHabitScreen() {
       schedule: editingHabit.schedule ?? "daily",
       weekdays: editingHabit.weekdays ?? [1, 2, 3, 4, 5],
       timesPerWeek: editingHabit.timesPerWeek ?? 1,
-      color: editingHabit.color
+      color: editingHabit.color,
+      requireCompletionComment: Boolean(editingHabit.requireCompletionComment)
     });
     setReminderTime(editingHabit.reminderTime || null);
+    setInitialReminder(editingHabit.reminderTime || null);
   }, [editingHabit, reset]);
 
   const createMutation = useMutation({
@@ -202,13 +241,13 @@ export default function CreateHabitScreen() {
         values.type === "measurable" &&
         values.goalDirection !== "record" &&
         values.target?.trim()
-          ? Number(values.target)
+          ? parseNumberInput(values.target)
           : null;
       const targetMax =
         values.type === "measurable" &&
         values.goalDirection === "range" &&
         values.targetMax?.trim()
-          ? Number(values.targetMax)
+          ? parseNumberInput(values.targetMax)
           : null;
       const payload = {
         title: values.title.trim(),
@@ -235,7 +274,11 @@ export default function CreateHabitScreen() {
         reminderTime: editId
           ? (reminderTime ?? "")
           : (reminderTime ?? undefined),
-        requireCompletionComment: false
+        // Round-trip the setting; only action habits offer the toggle.
+        requireCompletionComment:
+          values.type === "action"
+            ? values.requireCompletionComment
+            : Boolean(editingHabit?.requireCompletionComment)
       };
       return editId
         ? habitApi.update(editId, payload)
@@ -244,17 +287,27 @@ export default function CreateHabitScreen() {
     onSuccess: async () => {
       await hapticSuccess();
       await queryClient.invalidateQueries({ queryKey: ["habits"] });
+      // The first habit starts the check-in streak server-side (Day 1).
+      void queryClient.invalidateQueries({ queryKey: ["gamificationProfile"] });
       if (editId) {
         await queryClient.invalidateQueries({ queryKey: ["habit", editId] });
         await queryClient.invalidateQueries({
           queryKey: ["habitStats", editId]
         });
       }
+      allowLeave.current = true;
       router.back();
     },
     onError: (err: Error) => {
       hapticError();
-      setErrorMessage(err?.message || "Failed to create habit");
+      setErrorMessage(
+        describeError(
+          err,
+          editId
+            ? "Couldn't save your changes. Please try again."
+            : "Couldn't create the habit. Please try again."
+        )
+      );
     },
     onSettled: () => {
       createInFlight.current = false;
@@ -266,6 +319,50 @@ export default function CreateHabitScreen() {
     createInFlight.current = true;
     setErrorMessage(null);
     createMutation.mutate(data);
+  };
+
+  // Confirm before leaving with unsaved edits (back button, gesture or header).
+  const leaveGuard = useRef({ hasChanges, pending: false });
+  leaveGuard.current = { hasChanges, pending: createMutation.isPending };
+  useEffect(
+    () =>
+      navigation.addListener("beforeRemove", (event) => {
+        const { hasChanges: dirty, pending } = leaveGuard.current;
+        if (allowLeave.current || !dirty || pending) return;
+        event.preventDefault();
+        Alert.alert("Discard changes?", "Your changes to this habit haven't been saved.", [
+          { text: "Keep editing", style: "cancel" },
+          {
+            text: "Discard",
+            style: "destructive",
+            onPress: () => {
+              allowLeave.current = true;
+              navigation.dispatch(event.data.action);
+            }
+          }
+        ]);
+      }),
+    [navigation]
+  );
+
+  const onInvalid = (formErrors: Partial<Record<keyof HabitFormValues, unknown>>) => {
+    void hapticError();
+    const first = FIELD_ORDER.find((field) => formErrors[field]);
+    if (!first) return;
+    const y = fieldY.current[first];
+    if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - 16), animated: true });
+    const refs: Partial<Record<string, React.RefObject<TextInput>>> = {
+      title: titleRef,
+      unit: unitRef,
+      target: targetRef,
+      targetMax: targetMaxRef
+    };
+    setTimeout(() => refs[first]?.current?.focus(), 250);
+  };
+
+  /** Records a field's y offset within the scroll content. */
+  const trackY = (field: string, offset = 0) => (event: { nativeEvent: { layout: { y: number } } }) => {
+    fieldY.current[field] = event.nativeEvent.layout.y + offset;
   };
 
   const openReminderPicker = async () => {
@@ -304,8 +401,8 @@ export default function CreateHabitScreen() {
           <View style={styles.loadError}>
             <Text style={styles.errorText}>
               {editingHabit?.type === "expense"
-                ? "Edit expense habits on the web app."
-                : (editingError?.message ?? "Habit not found")}
+                ? `Expense habits are edited on the web at ${WEB_APP_HOST}.`
+                : describeError(editingError, "This habit couldn't be found. It may have been deleted.")}
             </Text>
             {editingHabit?.type !== "expense" && (
               <Button
@@ -337,28 +434,32 @@ export default function CreateHabitScreen() {
             accessibilityLabel="Close habit form"
             disabled={createMutation.isPending}
             onPress={() => router.back()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <ArrowLeft size={22} color={COLORS.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
             {editId ? "Edit habit" : "New habit"}
           </Text>
-          <View style={{ width: 32 }} />
+          <View style={{ width: 44 }} />
         </View>
 
         <ScrollView
+          ref={scrollRef}
           style={styles.formScroll}
           contentContainerStyle={styles.formContent}
           keyboardShouldPersistTaps="handled"
         >
           {/* Title Input */}
+          <View onLayout={trackY("title")}>
           <Controller
             control={control}
             name="title"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
+                ref={titleRef}
                 label="Title"
+                returnKeyType="next"
+                maxLength={100}
                 placeholder="e.g. Read 20 Pages, Morning Workout..."
                 value={value}
                 onBlur={onBlur}
@@ -367,6 +468,7 @@ export default function CreateHabitScreen() {
               />
             )}
           />
+          </View>
 
           {/* Description Input */}
           <Controller
@@ -375,6 +477,7 @@ export default function CreateHabitScreen() {
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
                 label="Description (optional)"
+                maxLength={280}
                 placeholder="A short note to keep you going"
                 value={value}
                 onBlur={onBlur}
@@ -395,13 +498,15 @@ export default function CreateHabitScreen() {
                 accessibilityLabel="Action"
                 accessibilityState={{ selected: selectedType === "action" }}
                 disabled={Boolean(editId)}
+                accessibilityHint={editId ? "Type can't change after creation" : undefined}
                 style={[
                   styles.typeButton,
-                  selectedType === "action" && styles.typeButtonActive
+                  selectedType === "action" && styles.typeButtonActive,
+                  Boolean(editId) && selectedType !== "action" && styles.typeButtonLocked
                 ]}
                 onPress={() => {
                   hapticLight();
-                  setValue("type", "action");
+                  setValue("type", "action", { shouldDirty: true });
                 }}
               >
                 <CheckCircle2
@@ -429,13 +534,15 @@ export default function CreateHabitScreen() {
                 accessibilityLabel="Measurable"
                 accessibilityState={{ selected: selectedType === "measurable" }}
                 disabled={Boolean(editId)}
+                accessibilityHint={editId ? "Type can't change after creation" : undefined}
                 style={[
                   styles.typeButton,
-                  selectedType === "measurable" && styles.typeButtonActive
+                  selectedType === "measurable" && styles.typeButtonActive,
+                  Boolean(editId) && selectedType !== "measurable" && styles.typeButtonLocked
                 ]}
                 onPress={() => {
                   hapticLight();
-                  setValue("type", "measurable");
+                  setValue("type", "measurable", { shouldDirty: true });
                 }}
               >
                 <Sliders
@@ -468,9 +575,30 @@ export default function CreateHabitScreen() {
             </Text>
           </View>
 
+          {selectedType === "action" && (
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleCopy}>
+                <Text style={styles.toggleTitle}>Require a note to complete</Text>
+                <Text style={styles.toggleHint}>
+                  You'll add a short note each time you check it off.
+                </Text>
+              </View>
+              <Switch
+                accessibilityLabel="Require a note to complete"
+                value={requireNote}
+                onValueChange={(value) => {
+                  hapticLight();
+                  setValue("requireCompletionComment", value, { shouldDirty: true });
+                }}
+                trackColor={{ false: COLORS.surfaceElevated, true: COLORS.primary }}
+                thumbColor={COLORS.white}
+              />
+            </View>
+          )}
+
           {/* Measurable specific fields */}
           {selectedType === "measurable" && (
-            <View style={styles.measurableBox}>
+            <View style={styles.measurableBox} onLayout={trackY("measurableBox")}>
               <Text style={styles.boxTitle}>What counts as progress?</Text>
               <View style={styles.goalOptions}>
                 {(
@@ -508,7 +636,8 @@ export default function CreateHabitScreen() {
                       onPress={() => {
                         hapticLight();
                         setValue("goalDirection", option.value, {
-                          shouldValidate: true
+                          shouldValidate: true,
+                          shouldDirty: true
                         });
                       }}
                       style={[
@@ -529,7 +658,14 @@ export default function CreateHabitScreen() {
                   );
                 })}
               </View>
-              <View style={styles.measurableInputsRow}>
+              <View
+                style={styles.measurableInputsRow}
+                onLayout={(event) => {
+                  const base = fieldY.current.measurableBox ?? 0;
+                  fieldY.current.target = base + event.nativeEvent.layout.y;
+                  fieldY.current.targetMax = base + event.nativeEvent.layout.y;
+                }}
+              >
                 {selectedGoal !== "record" && (
                   <View style={{ flex: 1 }}>
                     <Controller
@@ -537,12 +673,13 @@ export default function CreateHabitScreen() {
                       name="target"
                       render={({ field: { onChange, onBlur, value } }) => (
                         <Input
+                          ref={targetRef}
                           label={
                             selectedGoal === "range"
-                              ? "MINIMUM"
+                              ? "Minimum"
                               : selectedGoal === "down"
-                                ? "LIMIT (OPTIONAL)"
-                                : "TARGET (OPTIONAL)"
+                                ? "Limit (optional)"
+                                : "Target (optional)"
                           }
                           placeholder="30"
                           keyboardType="decimal-pad"
@@ -562,7 +699,8 @@ export default function CreateHabitScreen() {
                       name="targetMax"
                       render={({ field: { onChange, onBlur, value } }) => (
                         <Input
-                          label="MAXIMUM"
+                          ref={targetMaxRef}
+                          label="Maximum"
                           placeholder="60"
                           keyboardType="decimal-pad"
                           value={value}
@@ -575,15 +713,24 @@ export default function CreateHabitScreen() {
                   </View>
                 )}
               </View>
-              <View style={styles.unitInput}>
+              <View
+                style={styles.unitInput}
+                onLayout={(event) => {
+                  fieldY.current.unit = (fieldY.current.measurableBox ?? 0) + event.nativeEvent.layout.y;
+                }}
+              >
                 <View style={{ flex: 1 }}>
                   <Controller
                     control={control}
                     name="unit"
                     render={({ field: { onChange, onBlur, value } }) => (
                       <Input
+                        ref={unitRef}
                         label="Unit"
                         placeholder="mins / pages"
+                        editable={!unitLocked}
+                        helperText={unitLockHint}
+                        maxLength={20}
                         value={value}
                         onBlur={onBlur}
                         onChangeText={onChange}
@@ -602,7 +749,7 @@ export default function CreateHabitScreen() {
           )}
 
           {/* Schedule Selector */}
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={trackY("weekdays")}>
             <Text style={styles.sectionLabel}>Repeat</Text>
             <View style={styles.scheduleRow}>
               {(["daily", "weekdays", "weekly"] as const).map((cadence) => {
@@ -611,11 +758,11 @@ export default function CreateHabitScreen() {
                   <TouchableOpacity
                     key={cadence}
                     accessibilityRole="button"
-                    accessibilityLabel={`${cadence} repeat`}
+                    accessibilityLabel={`Repeat ${cadence === "weekdays" ? "on chosen days" : cadence}`}
                     accessibilityState={{ selected: isSelected }}
                     onPress={() => {
                       hapticLight();
-                      setValue("schedule", cadence);
+                      setValue("schedule", cadence, { shouldDirty: true });
                     }}
                     style={[
                       styles.scheduleButton,
@@ -632,7 +779,7 @@ export default function CreateHabitScreen() {
                         isSelected && styles.scheduleTextActive
                       ]}
                     >
-                      {cadence.charAt(0).toUpperCase() + cadence.slice(1)}
+                      {cadence === "daily" ? "Daily" : cadence === "weekdays" ? "Some days" : "Weekly"}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -648,7 +795,7 @@ export default function CreateHabitScreen() {
                       <TouchableOpacity
                         key={value}
                         accessibilityRole="button"
-                        accessibilityLabel={label}
+                        accessibilityLabel={DAY_NAMES[value]}
                         accessibilityState={{ selected }}
                         onPress={() => {
                           hapticLight();
@@ -657,7 +804,7 @@ export default function CreateHabitScreen() {
                             selected
                               ? selectedWeekdays.filter((day) => day !== value)
                               : [...selectedWeekdays, value].sort(),
-                            { shouldValidate: true }
+                            { shouldValidate: true, shouldDirty: true }
                           );
                         }}
                         style={[
@@ -699,7 +846,8 @@ export default function CreateHabitScreen() {
                         onPress={() => {
                           hapticLight();
                           setValue("timesPerWeek", count, {
-                            shouldValidate: true
+                            shouldValidate: true,
+                            shouldDirty: true
                           });
                         }}
                         style={[
@@ -805,17 +953,17 @@ export default function CreateHabitScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Color</Text>
             <View style={styles.colorsRow}>
-              {COLOR_PALETTE.map((color) => {
+              {COLOR_OPTIONS.map(({ value: color, name }) => {
                 const isSelected = selectedColor === color;
                 return (
                   <TouchableOpacity
                     key={color}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${color} habit color`}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`${name} color`}
                     accessibilityState={{ selected: isSelected }}
                     onPress={() => {
                       hapticLight();
-                      setValue("color", color);
+                      setValue("color", color, { shouldDirty: true });
                     }}
                     style={[
                       styles.colorCircle,
@@ -842,7 +990,7 @@ export default function CreateHabitScreen() {
                   ? "Save changes"
                   : "Create habit"
             }
-            onPress={handleSubmit(onSubmit)}
+            onPress={handleSubmit(onSubmit, onInvalid)}
             loading={createMutation.isPending}
             fullWidth
             size="lg"
@@ -902,11 +1050,11 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.3)"
+    borderColor: COLORS.dangerBorder
   },
   errorText: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.danger
+    color: COLORS.dangerText
   },
   section: {
     marginBottom: SPACING.lg
@@ -936,6 +1084,30 @@ const styles = StyleSheet.create({
   typeButtonActive: {
     backgroundColor: COLORS.surfaceElevated
   },
+  typeButtonLocked: {
+    opacity: 0.4
+  },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+    minHeight: 56,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.surface,
+    marginBottom: SPACING.lg
+  },
+  toggleCopy: {
+    flex: 1
+  },
+  toggleTitle: {
+    ...TYPOGRAPHY.body,
+    fontWeight: "600"
+  },
+  toggleHint: {
+    ...TYPOGRAPHY.caption,
+    marginTop: 2
+  },
   typeButtonTextGroup: {
     flex: 1
   },
@@ -945,7 +1117,7 @@ const styles = StyleSheet.create({
     color: COLORS.text
   },
   typeButtonTitleActive: {
-    color: COLORS.primary
+    color: COLORS.primaryText
   },
   typeButtonDesc: {
     ...TYPOGRAPHY.caption,
@@ -979,7 +1151,7 @@ const styles = StyleSheet.create({
     color: COLORS.text
   },
   goalOptionLabelSelected: {
-    color: COLORS.primary
+    color: COLORS.primaryText
   },
   goalOptionHint: {
     ...TYPOGRAPHY.caption,
@@ -1010,6 +1182,7 @@ const styles = StyleSheet.create({
   },
   scheduleButton: {
     flex: 1,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -1027,7 +1200,7 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   scheduleTextActive: {
-    color: COLORS.primary,
+    color: COLORS.primaryText,
     fontWeight: "700"
   },
   scheduleHint: {
@@ -1042,14 +1215,14 @@ const styles = StyleSheet.create({
   },
   weekdayButton: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: BORDER_RADIUS.sm,
     backgroundColor: COLORS.card
   },
   weekdayText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "600",
     color: COLORS.textSecondary
   },

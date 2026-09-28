@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { RouteErrorPage } from "../components/RouteErrorPage";
+import { NewHabitRoute } from "../features/habits/components/NewHabitRoute";
 
 const HabitsPage = lazy(() =>
   import("../pages/HabitsPage").then((module) => ({
@@ -28,11 +29,6 @@ const AppLayout = lazy(() =>
 );
 import { RedirectIfAuthed } from "../components/RedirectIfAuthed";
 import { RequireAuth } from "../components/RequireAuth";
-const CreateHabitPage = lazy(() =>
-  import("../pages/CreateHabitPage").then((module) => ({
-    default: module.CreateHabitPage
-  }))
-);
 const EditHabitPage = lazy(() =>
   import("../pages/EditHabitPage").then((module) => ({
     default: module.EditHabitPage
@@ -71,7 +67,40 @@ const ExpenseDashboardPage = lazy(() =>
   }))
 );
 
+const PrivacyPage = lazy(() =>
+  import("../pages/LegalPages").then((module) => ({ default: module.PrivacyPage }))
+);
+const DeleteAccountInfoPage = lazy(() =>
+  import("../pages/LegalPages").then((module) => ({
+    default: module.DeleteAccountInfoPage
+  }))
+);
+const ForgotPasswordPage = lazy(() =>
+  import("../pages/ForgotPasswordPage").then((module) => ({
+    default: module.ForgotPasswordPage
+  }))
+);
+const ResetPasswordPage = lazy(() =>
+  import("../pages/ResetPasswordPage").then((module) => ({
+    default: module.ResetPasswordPage
+  }))
+);
+
 export const router = createBrowserRouter([
+  {
+    errorElement: <RouteErrorPage />,
+    element: (
+      <Suspense fallback={<div role="status" className="p-6">Loading…</div>}>
+        <Outlet />
+      </Suspense>
+    ),
+    children: [
+      { path: "/privacy", element: <PrivacyPage /> },
+      { path: "/delete-account", element: <DeleteAccountInfoPage /> },
+      { path: "/forgot-password", element: <ForgotPasswordPage /> },
+      { path: "/reset-password", element: <ResetPasswordPage /> }
+    ]
+  },
   {
     errorElement: <RouteErrorPage />,
     element: (
@@ -108,13 +137,13 @@ export const router = createBrowserRouter([
           </Suspense>
         ),
         children: [
-          { index: true, element: <HabitsPage /> },
+          { index: true, element: <Navigate to="/habits" replace /> },
           { path: "habits", element: <HabitsPage /> },
           { path: "insights", element: <InsightsPage /> },
           { path: "achievements", element: <AchievementsPage /> },
           { path: "profile", element: <ProfilePage /> },
           { path: "settings", element: <SettingsPage /> },
-          { path: "habits/new", element: <CreateHabitPage /> },
+          { path: "habits/new", element: <NewHabitRoute /> },
           { path: "habits/:id", element: <HabitDetailPage /> },
           { path: "habits/:id/edit", element: <EditHabitPage /> },
           // Nested Expense Tracker Routes

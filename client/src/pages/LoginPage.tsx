@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { BrandMark } from "../components/brand/BrandMark";
 import { ApiError } from "../services/api";
 import { loginApi } from "../services/authApi";
 import { useAuthStore } from "../stores/authStore";
+import { getRedirectTarget } from "../shared/lib/redirect";
 
 export const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,14 +23,14 @@ export const LoginPage = () => {
     try {
       const result = await loginApi(email, password);
       setAuth(result.token, result.user);
-      navigate("/");
+      navigate(getRedirectTarget(location.state), { replace: true });
     } catch (err) {
       setError(
         err instanceof ApiError
           ? err.message
           : err instanceof Error
             ? err.message
-            : "Login failed"
+            : "Could not sign in. Please try again."
       );
     } finally {
       setLoading(false);
@@ -70,12 +72,20 @@ export const LoginPage = () => {
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="mb-1.5 block text-sm font-semibold text-content-2"
-              >
-                Password
-              </label>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-semibold text-content-2"
+                >
+                  Password
+                </label>
+                <Link
+                  to="/forgot-password"
+                  className="text-sm font-semibold text-accent hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 id="password"
                 type="password"
@@ -89,7 +99,10 @@ export const LoginPage = () => {
             </div>
 
             {error ? (
-              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-600">
+              <div
+                role="alert"
+                className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-600"
+              >
                 {error}
               </div>
             ) : null}
@@ -110,6 +123,11 @@ export const LoginPage = () => {
               className="font-semibold text-accent hover:text-accent"
             >
               Create one
+            </Link>
+          </p>
+          <p className="mt-3 text-center text-xs text-content-muted">
+            <Link to="/privacy" className="font-semibold hover:underline">
+              Privacy policy
             </Link>
           </p>
         </div>

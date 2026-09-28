@@ -29,6 +29,7 @@ const baseHabitSchema = z.object({
     .optional()
     .transform((value) => value || undefined),
   requireCompletionComment: z.boolean().optional(),
+  // Removed features: still accepted (and ignored) so older clients keep working.
   linkToJobTracker: z.boolean().optional(),
   linkToDSAPrep: z.boolean().optional(),
   linkToExpenseTracker: z.boolean().optional(),

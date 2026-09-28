@@ -69,6 +69,16 @@ export const AchievementsPage = () => {
   const unlockedCount = unlockedList.length;
   const percent = totalCount ? Math.round((unlockedCount / totalCount) * 100) : 0;
   const totalXPEarned = unlockedList.reduce((sum, a) => sum + a.xpBonus, 0);
+  const totalGemsEarned = unlockedList.reduce(
+    (sum, a) => sum + (a.gemBonus ?? 0),
+    0
+  );
+  const emptyMessage =
+    selectedTier === "unlocked"
+      ? "No badges unlocked yet. Complete your first quest to earn one."
+      : selectedTier === "all"
+        ? "No achievements to show right now."
+        : `No ${selectedTier} badges to show yet.`;
 
   const filteredAchievements = achievements.filter((a) => {
     if (selectedTier === "unlocked") return a.unlocked;
@@ -108,7 +118,8 @@ export const AchievementsPage = () => {
               </span>
             </div>
             <p className="text-xs text-content-muted">
-              +{totalXPEarned.toLocaleString()} bonus XP earned
+              +{totalXPEarned.toLocaleString()} bonus XP
+              {totalGemsEarned > 0 ? ` · +${totalGemsEarned} 💎` : ""} earned
             </p>
           </div>
 
@@ -201,7 +212,7 @@ export const AchievementsPage = () => {
       )}
 
       {isError && (
-        <div className="surface-card p-8 text-center text-rose-500">
+        <div role="alert" className="surface-card p-8 text-center text-rose-600">
           <p className="font-semibold">Could not load achievements.</p>
           <button type="button" className="mt-3 min-h-11 text-accent" onClick={() => void refetch()}>Try again</button>
         </div>
@@ -210,7 +221,7 @@ export const AchievementsPage = () => {
       {/* Badge Grid */}
       {!isLoading && !isError && (
         <div className="space-y-6">
-          {filteredAchievements.length === 0 && <p className="py-8 text-center text-content-muted">No achievements unlocked yet. Keep building your habits to earn your first badge.</p>}
+          {filteredAchievements.length === 0 && <p role="status" className="py-8 text-center text-content-muted">{emptyMessage}</p>}
           {groups.filter((group) => group.items.length > 0).map((group) => (
           <section key={group.title} aria-label={group.title}>
           <h2 className="mb-3 text-sm font-semibold text-content-2">{group.title} <span className="text-content-muted">({group.items.length})</span></h2>
@@ -256,8 +267,16 @@ export const AchievementsPage = () => {
                       {achievement.tier}
                     </span>
                     <span className="flex items-center gap-1 rounded-lg bg-surface-3 px-2 py-0.5 text-xs font-bold text-amber-400">
-                      <Sparkles className="h-3 w-3" />+{achievement.xpBonus} XP
+                      <Sparkles className="h-3 w-3" aria-hidden />+{achievement.xpBonus} XP
                     </span>
+                    {achievement.gemBonus ? (
+                      <span className="flex items-center gap-1 rounded-lg bg-surface-3 px-2 py-0.5 text-xs font-bold text-cyan-400">
+                        <span aria-hidden>💎</span>+{achievement.gemBonus}
+                        <span className="sr-only">
+                          {achievement.gemBonus === 1 ? " gem" : " gems"}
+                        </span>
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 

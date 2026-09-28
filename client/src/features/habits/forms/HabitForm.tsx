@@ -3,7 +3,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
+  ArrowDown,
+  ArrowLeftRight,
+  ArrowUp,
   CircleCheck,
+  CircleDot,
   ChartNoAxesColumnIncreasing,
   Bell,
   ChevronDown
@@ -30,6 +34,8 @@ type HabitFormProps = {
   onDelete?: () => Promise<void> | void;
   isDeleting?: boolean;
   onCancel?: () => void;
+  /** Called whenever the form's dirty state changes (used to guard discards). */
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
 const TYPE_OPTIONS = [
@@ -59,7 +65,8 @@ export const HabitForm = ({
   onSubmit,
   onDelete,
   isDeleting,
-  onCancel
+  onCancel,
+  onDirtyChange
 }: HabitFormProps) => {
   const {
     register,
@@ -67,7 +74,7 @@ export const HabitForm = ({
     setValue,
     getValues,
     handleSubmit,
-    formState: { errors, isSubmitting: formSubmitting }
+    formState: { errors, isSubmitting: formSubmitting, isDirty }
   } = useForm<HabitFormValues>({
     resolver: zodResolver(habitFormSchema),
     defaultValues: {
@@ -76,7 +83,6 @@ export const HabitForm = ({
       timesPerWeek: defaultValues?.timesPerWeek ?? 3,
       targetMax: defaultValues?.targetMax,
       reminderTime: defaultValues?.reminderTime ?? "",
-      linkToDSAPrep: defaultValues?.linkToDSAPrep ?? false,
       linkToExpenseTracker: defaultValues?.linkToExpenseTracker ?? false,
       title: defaultValues?.title ?? "",
       description: defaultValues?.description ?? "",
@@ -84,7 +90,6 @@ export const HabitForm = ({
       unit: defaultValues?.unit ?? "",
       requireCompletionComment:
         defaultValues?.requireCompletionComment ?? false,
-      linkToJobTracker: defaultValues?.linkToJobTracker ?? false,
       color: defaultValues?.color ?? "violet",
       goalDirection: defaultValues?.goalDirection ?? "up",
       target: defaultValues?.target
@@ -98,6 +103,16 @@ export const HabitForm = ({
   const selectedSchedule = watch("schedule");
   const [submissionError, setSubmissionError] = useState<string>();
   const saving = Boolean(isSubmitting || formSubmitting);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+
+  useEffect(() => {
+    // Only a range goal uses an upper limit; "record only" has no target.
+    if (selectedGoal !== "range") setValue("targetMax", null);
+    if (selectedGoal === "record") setValue("target", null);
+  }, [selectedGoal, setValue]);
 
   useEffect(() => {
     if (selectedSchedule !== "weekdays")
@@ -244,7 +259,11 @@ export const HabitForm = ({
           </select>
 
           {watch("schedule") === "weekdays" && (
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div
+              role="group"
+              aria-label="Days of the week"
+              className="flex flex-wrap gap-2 pt-1"
+            >
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
                 (day, index) => {
                   const isSelected = watch("weekdays")?.includes(index);
@@ -306,23 +325,6 @@ export const HabitForm = ({
           )}
         </div>
 
-        {selectedType === "measurable" && selectedGoal === "range" && (
-          <div>
-            <label className="field-label" htmlFor="targetMax">
-              Upper Target Limit
-            </label>
-            <Input
-              id="targetMax"
-              type="number"
-              step="any"
-              placeholder="e.g. 100"
-              {...register("targetMax", {
-                setValueAs: (v) => (v === "" ? null : Number(v))
-              })}
-            />
-          </div>
-        )}
-
         {/* Optional Daily Reminder */}
         <details className="group border-y border-border-app/60 py-3">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-medium text-content [&::-webkit-details-marker]:hidden">
@@ -369,33 +371,44 @@ export const HabitForm = ({
             </div>
 
             <div>
-              <p className="field-label">Goal</p>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <p id="habit-goal-label" className="field-label">
+                Goal
+              </p>
+              <div
+                role="group"
+                aria-labelledby="habit-goal-label"
+                className="grid gap-2 sm:grid-cols-2"
+              >
                 {(
                   [
                     {
                       value: "up",
                       label: "Higher is better",
-                      hint: "steps, water, pages"
+                      hint: "steps, water, pages",
+                      icon: ArrowUp
                     },
                     {
                       value: "down",
                       label: "Lower is better",
-                      hint: "screen time"
+                      hint: "screen time",
+                      icon: ArrowDown
                     },
                     {
                       value: "range",
                       label: "Within a range",
-                      hint: "minimum to maximum"
+                      hint: "minimum to maximum",
+                      icon: ArrowLeftRight
                     },
                     {
                       value: "record",
                       label: "Record only",
-                      hint: "every entry counts"
+                      hint: "every entry counts",
+                      icon: CircleDot
                     }
                   ] as const
                 ).map((option) => {
                   const isActive = selectedGoal === option.value;
+                  const GoalIcon = option.icon;
                   return (
                     <button
                       key={option.value}
@@ -416,11 +429,11 @@ export const HabitForm = ({
                     >
                       <span
                         className={cn(
-                          "block text-sm font-bold",
+                          "flex items-center gap-1.5 text-sm font-bold",
                           isActive ? "text-accent" : "text-content"
                         )}
                       >
-                        {option.value === "up" ? "↑ " : "↓ "}
+                        <GoalIcon aria-hidden className="h-4 w-4 shrink-0" />
                         {option.label}
                       </span>
                       <span className="text-xs text-content-muted">
@@ -432,27 +445,92 @@ export const HabitForm = ({
               </div>
             </div>
 
-            <div>
-              <label className="field-label" htmlFor="target">
-                Target {selectedUnit ? `(${selectedUnit})` : ""} — optional
-              </label>
-              <Input
-                id="target"
-                type="number"
-                inputMode="decimal"
-                step="any"
-                placeholder="e.g. 75"
-                {...targetField}
-              />
-              <p className="field-hint">
-                Daily target: the saved value must meet this rule. Leave blank
-                to count any recorded value.
-              </p>
-              {errors.target ? (
-                <p className="field-hint text-rose-600">
-                  {errors.target.message}
+            {selectedGoal !== "record" ? (
+              <div>
+                <label className="field-label" htmlFor="target">
+                  {selectedGoal === "range"
+                    ? `Lower limit${selectedUnit ? ` (${selectedUnit})` : ""} — required`
+                    : `${selectedGoal === "down" ? "Daily maximum" : "Daily target"}${selectedUnit ? ` (${selectedUnit})` : ""} — optional`}
+                </label>
+                <Input
+                  id="target"
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  placeholder="e.g. 75"
+                  aria-invalid={Boolean(errors.target)}
+                  aria-describedby="target-hint"
+                  {...targetField}
+                />
+                <p id="target-hint" className="field-hint">
+                  {selectedGoal === "range"
+                    ? "The lowest value that still counts as done."
+                    : "The saved value must meet this rule. Leave blank to count any recorded value."}
                 </p>
-              ) : null}
+                {errors.target ? (
+                  <p role="alert" className="field-hint text-rose-600">
+                    {errors.target.message}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {selectedGoal === "range" ? (
+              <div>
+                <label className="field-label" htmlFor="targetMax">
+                  Upper limit{selectedUnit ? ` (${selectedUnit})` : ""} —
+                  required
+                </label>
+                <Input
+                  id="targetMax"
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  placeholder="e.g. 100"
+                  aria-invalid={Boolean(errors.targetMax)}
+                  aria-describedby="targetMax-hint"
+                  {...register("targetMax", {
+                    setValueAs: (v) =>
+                      v === "" || v === null || v === undefined
+                        ? null
+                        : Number(v)
+                  })}
+                />
+                <p id="targetMax-hint" className="field-hint">
+                  The highest value that still counts as done.
+                </p>
+                {errors.targetMax ? (
+                  <p role="alert" className="field-hint text-rose-600">
+                    {errors.targetMax.message}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {selectedType === "action" ? (
+          <div className="flex items-start gap-3">
+            <input
+              id="requireCompletionComment"
+              type="checkbox"
+              className="mt-0.5 h-5 w-5 shrink-0 rounded border-border-app accent-accent focus-visible:ring-2 focus-visible:ring-accent"
+              aria-describedby="requireCompletionComment-hint"
+              {...register("requireCompletionComment")}
+            />
+            <div>
+              <label
+                htmlFor="requireCompletionComment"
+                className="text-sm font-semibold text-content"
+              >
+                Require a note to complete
+              </label>
+              <p
+                id="requireCompletionComment-hint"
+                className="field-hint mt-0.5"
+              >
+                You&apos;ll add a short note each time you tick this habit off.
+              </p>
             </div>
           </div>
         ) : null}

@@ -1,5 +1,4 @@
-import { ProgressHeader } from "../../src/components/ProgressHeader";
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,49 +6,130 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator
+  useWindowDimensions
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Trophy, Lock, Sparkles, CheckCircle2 } from "lucide-react-native";
+import Svg, { Circle } from "react-native-svg";
+import { ChevronRight, Lock } from "lucide-react-native";
 import {
+  BORDER_RADIUS,
   COLORS,
   SPACING,
+  TIER_COLORS,
   TYPOGRAPHY,
-  BORDER_RADIUS
+  tierColors,
+  type Tier
 } from "../../src/constants/theme";
+import { ProgressHeader } from "../../src/components/ProgressHeader";
+import { Card } from "../../src/components/Card";
+import { ErrorState, Skeleton } from "../../src/components/StateViews";
 import { gamificationApi, type AchievementItem } from "../../src/services/api";
-import { useAchievementStore } from "../../src/stores/achievementStore";
+import { useCelebrationStore } from "../../src/stores/achievementStore";
+import { shortDate } from "../../src/utils/date";
 
-type TierFilter =
-  | "all"
-  | "unlocked"
-  | "bronze"
-  | "silver"
-  | "gold"
-  | "platinum";
+type Filter = "all" | "unlocked" | "locked";
+
+const TIERS: Tier[] = ["bronze", "silver", "gold", "platinum"];
+const CATEGORY_ORDER = ["beginner", "streak", "consistency", "performance", "levels", "special", "other"] as const;
+const CATEGORY_LABEL: Record<(typeof CATEGORY_ORDER)[number], string> = {
+  beginner: "Getting started",
+  streak: "Streaks",
+  consistency: "Consistency",
+  performance: "Performance",
+  levels: "Levels",
+  special: "Special",
+  other: "More badges"
+};
+
+const rewardText = (badge: AchievementItem) =>
+  `+${badge.xpBonus} XP${badge.gemBonus ? ` · +${badge.gemBonus} 💎` : ""}`;
+
+function ProgressRing({ unlocked, total }: { unlocked: number; total: number }) {
+  const size = 104;
+  const stroke = 10;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = total ? unlocked / total : 0;
+  return (
+    <View
+      style={{ width: size, height: size }}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={`${unlocked} of ${total} badges unlocked`}
+      accessibilityValue={{ min: 0, max: total, now: unlocked }}
+    >
+      <Svg width={size} height={size}>
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={COLORS.surfaceElevated} strokeWidth={stroke} fill="none" />
+        {progress > 0 && <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={COLORS.gold}
+          strokeWidth={stroke}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={`${circumference} ${circumference}`}
+          strokeDashoffset={circumference * (1 - progress)}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />}
+      </Svg>
+      <View style={styles.ringCenter} pointerEvents="none">
+        <Text style={styles.ringValue} maxFontSizeMultiplier={1.2}>
+          {unlocked}/{total}
+        </Text>
+        <Text style={styles.ringLabel} maxFontSizeMultiplier={1.2}>
+          badges
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 export default function AchievementsScreen() {
-  const [activeFilter, setActiveFilter] = useState<TierFilter>("all");
+  const [filter, setFilter] = useState<Filter>("all");
   const [refreshing, setRefreshing] = useState(false);
-  const viewAchievement = useAchievementStore((state) => state.viewAchievement);
+  const viewAchievement = useCelebrationStore((state) => state.viewAchievement);
+  const { width, fontScale } = useWindowDimensions();
+  const columns = fontScale > 1.35 ? 1 : 2;
+  const tileWidth = (width - SPACING.lg * 2 - SPACING.sm * (columns - 1)) / columns;
 
-  const {
-    data: achievements = [],
-    isLoading,
-    isError,
-    refetch
-  } = useQuery<AchievementItem[]>({
+  const { data: achievements = [], isLoading, isError, error, refetch, isFetching } = useQuery<AchievementItem[]>({
     queryKey: ["achievements"],
     queryFn: gamificationApi.getAchievements
   });
 
-  // The API owns badge IDs, rewards, and unlock status.
-  const allBadges = achievements;
+  const unlockedCount = achievements.filter((b) => b.unlocked).length;
+  const tierCounts = TIERS.map((tier) => ({
+    tier,
+    unlocked: achievements.filter((b) => b.tier === tier && b.unlocked).length,
+    total: achievements.filter((b) => b.tier === tier).length
+  })).filter((entry) => entry.total > 0);
 
-  const unlockedCount = allBadges.filter((b) => b.unlocked).length;
-  const totalCount = allBadges.length;
-  const progressPercent = totalCount ? Math.round((unlockedCount / totalCount) * 100) : 0;
+  const nextUp = useMemo(
+    () =>
+      achievements
+        .filter((b) => !b.unlocked && (b.tier === "bronze" || b.tier === "silver"))
+        .sort((a, b) => TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier) || a.xpBonus - b.xpBonus)
+        .slice(0, 2),
+    [achievements]
+  );
+
+  const sections = useMemo(() => {
+    const visible = achievements.filter((badge) =>
+      filter === "all" ? true : filter === "unlocked" ? badge.unlocked : !badge.unlocked
+    );
+    return CATEGORY_ORDER.map((category) => ({
+      category,
+      badges: visible
+        .filter((badge) => (badge.category && badge.category in CATEGORY_LABEL ? badge.category : "other") === category)
+        .sort(
+          (a, b) =>
+            Number(Boolean(b.unlocked)) - Number(Boolean(a.unlocked)) ||
+            TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier)
+        )
+    })).filter((section) => section.badges.length > 0);
+  }, [achievements, filter]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -57,249 +137,171 @@ export default function AchievementsScreen() {
     setRefreshing(false);
   };
 
-  const filteredBadges = useMemo(() => {
-    return allBadges.filter((badge) => {
-      if (activeFilter === "unlocked") return badge.unlocked;
-      if (activeFilter === "all") return true;
-      return badge.tier === activeFilter;
-    }).sort((a, b) => Number(b.unlocked) - Number(a.unlocked)
-      || (b.unlockedAt ?? "").localeCompare(a.unlockedAt ?? ""));
-  }, [allBadges, activeFilter]);
-
-  const filterChips: { key: TierFilter; label: string }[] = [
-    { key: "all", label: `All (${totalCount})` },
+  const filters: { key: Filter; label: string }[] = [
+    { key: "all", label: `All (${achievements.length})` },
     { key: "unlocked", label: `Unlocked (${unlockedCount})` },
-    { key: "bronze", label: "Bronze" },
-    { key: "silver", label: "Silver" },
-    { key: "gold", label: "Gold" },
-    { key: "platinum", label: "Platinum" }
+    { key: "locked", label: `Locked (${achievements.length - unlockedCount})` }
   ];
-
-  const getTierColor = (tier: string) => {
-    switch (tier) {
-      case "platinum":
-        return {
-          border: "#C084FC",
-          bg: "rgba(192, 132, 252, 0.15)",
-          text: "#C084FC"
-        };
-      case "gold":
-        return {
-          border: "#FBBF24",
-          bg: "rgba(251, 191, 36, 0.15)",
-          text: "#FBBF24"
-        };
-      case "silver":
-        return {
-          border: "#94A3B8",
-          bg: "rgba(148, 163, 184, 0.15)",
-          text: "#94A3B8"
-        };
-      case "bronze":
-      default:
-        return {
-          border: "#F59E0B",
-          bg: "rgba(245, 158, 11, 0.15)",
-          text: "#F59E0B"
-        };
-    }
-  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <ProgressHeader />
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Trophy Room</Text>
-            <Text style={styles.headerSubtitle}>
-              Your milestones, with unlocked badges first
-            </Text>
-          </View>
-        </View>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+      >
+        <Text style={styles.headerTitle} accessibilityRole="header">
+          Trophy Room
+        </Text>
+        <Text style={styles.headerSubtitle}>Every badge you've earned, and what's next. Tap any badge for details.</Text>
 
-        {/* Unlocked Progress Card */}
-        <View style={styles.progressCard}>
-          <View style={styles.progressHeader}>
-            <View style={styles.progressIconGroup}>
-              <Trophy size={20} color="#FBBF24" />
-              <Text style={styles.progressLabel}>Badges Collected</Text>
+        {isLoading ? (
+          <View style={styles.loading} accessible accessibilityLabel="Loading badges">
+            <Skeleton height={140} radius={BORDER_RADIUS.lg} />
+            <View style={styles.grid}>
+              {Array.from({ length: 4 }, (_, index) => (
+                <Skeleton key={index} width={tileWidth} height={150} radius={BORDER_RADIUS.lg} />
+              ))}
             </View>
-            <Text style={styles.progressValue}>
-              {unlockedCount} / {totalCount} ({progressPercent}%)
-            </Text>
           </View>
-
-          <View style={styles.track}>
-            <View style={[styles.fill, { width: `${progressPercent}%` }]} />
-          </View>
-        </View>
-
-        {/* Filter Scroll */}
-        <View style={styles.filterContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterScroll}
-          >
-            {filterChips.map((chip) => {
-              const isSelected = activeFilter === chip.key;
-              return (
-                <TouchableOpacity
-                  key={chip.key}
-                  onPress={() => setActiveFilter(chip.key)}
-                  style={[
-                    styles.filterChip,
-                    isSelected && styles.filterChipActive
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      isSelected && styles.filterChipTextActive
-                    ]}
-                  >
-                    {chip.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Badges Grid */}
-        <ScrollView
-          contentContainerStyle={styles.badgeList}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
+        ) : isError ? (
+          <Card>
+            <ErrorState
+              title="Couldn't load your badges"
+              error={error}
+              retrying={isFetching}
+              onRetry={() => void refetch()}
             />
-          }
-        >
-          {isLoading ? (
-            <View style={styles.loaderContainer}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
-            </View>
-          ) : isError ? (
-            <View style={styles.loaderContainer}>
-              <Text style={styles.headerSubtitle}>Could not load achievements.</Text>
-              <TouchableOpacity accessibilityRole="button" onPress={() => void refetch()} style={styles.filterChip}>
-                <Text style={styles.filterChipTextActive}>Try again</Text>
-              </TouchableOpacity>
-            </View>
-          ) : filteredBadges.length === 0 ? (
-            <Text style={styles.headerSubtitle}>No badges unlocked yet. Keep building your habits to earn your first.</Text>
-          ) : (
-            filteredBadges.map((badge) => {
-              const tier = getTierColor(badge.tier);
-
-              return (
-                <TouchableOpacity
-                  key={badge.id}
-                  activeOpacity={0.8}
-                  disabled={!badge.unlocked}
-                  accessibilityRole={badge.unlocked ? "button" : "text"}
-                  accessibilityLabel={`${badge.name}. ${badge.unlocked ? "View achievement details" : "Locked"}`}
-                  onPress={() => {
-                    if (badge.unlocked) {
-                      viewAchievement(badge);
-                    }
-                  }}
-                  style={[
-                    styles.badgeCard,
-                    badge.unlocked
-                      ? { borderColor: tier.border }
-                      : styles.badgeCardLocked
-                  ]}
-                >
+          </Card>
+        ) : (
+          <>
+            {/* Hero */}
+            <View style={styles.heroCard}>
+              <ProgressRing unlocked={unlockedCount} total={achievements.length} />
+              <View style={styles.tierList}>
+                {tierCounts.map(({ tier, unlocked, total }) => (
                   <View
-                    style={[
-                      styles.iconContainer,
-                      badge.unlocked
-                        ? { backgroundColor: tier.bg }
-                        : styles.iconContainerLocked
-                    ]}
+                    key={tier}
+                    style={styles.tierRow}
+                    accessible
+                    accessibilityLabel={`${tier}: ${unlocked} of ${total}`}
                   >
-                    {badge.unlocked ? (
-                      <Text style={styles.badgeEmoji}>{badge.emoji || "🏆"}</Text>
-                    ) : (
-                      <Lock size={22} color={COLORS.textMuted} />
-                    )}
+                    <View style={[styles.tierDot, { backgroundColor: TIER_COLORS[tier].border }]} />
+                    <Text style={styles.tierName}>{tier.charAt(0).toUpperCase() + tier.slice(1)}</Text>
+                    <Text style={[styles.tierCount, { color: TIER_COLORS[tier].fg }]}>
+                      {unlocked}/{total}
+                    </Text>
                   </View>
+                ))}
+              </View>
+            </View>
 
-                  <View style={styles.badgeInfo}>
-                    <View style={styles.badgeTopRow}>
-                      <Text
-                        style={[
-                          styles.badgeName,
-                          !badge.unlocked && styles.badgeNameLocked
-                        ]}
-                      >
-                        {badge.name}
-                      </Text>
-                      <View
-                        style={[
-                          styles.tierPill,
-                          {
-                            backgroundColor: badge.unlocked
-                              ? tier.bg
-                              : COLORS.surfaceElevated
-                          }
-                        ]}
-                      >
-                        <Text
+            {/* Next up */}
+            {nextUp.length > 0 && (
+              <View style={styles.nextUp}>
+                <Text style={styles.sectionTitle} accessibilityRole="header">
+                  Next up
+                </Text>
+                {nextUp.map((badge) => (
+                  <TouchableOpacity
+                    key={badge.id}
+                    style={styles.nextRow}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Next up: ${badge.name}. ${badge.description}. Reward ${rewardText(badge)}`}
+                    onPress={() => viewAchievement(badge)}
+                  >
+                    <Text style={styles.nextEmoji}>{badge.emoji || "🏆"}</Text>
+                    <View style={styles.nextCopy}>
+                      <Text style={styles.nextName}>{badge.name}</Text>
+                      <Text style={styles.nextDesc}>{badge.description}</Text>
+                    </View>
+                    <Text style={styles.reward}>{rewardText(badge)}</Text>
+                    <ChevronRight size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Filters */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+              {filters.map((chip) => {
+                const selected = filter === chip.key;
+                return (
+                  <TouchableOpacity
+                    key={chip.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => setFilter(chip.key)}
+                    style={[styles.filterChip, selected && styles.filterChipActive]}
+                  >
+                    <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>{chip.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {sections.length === 0 ? (
+              <Text style={styles.emptyText}>
+                {filter === "unlocked"
+                  ? "No badges yet. Complete today's quests to earn your first."
+                  : filter === "locked"
+                    ? "You've unlocked every badge. Legendary!"
+                    : "No badges to show yet. Pull down to refresh."}
+              </Text>
+            ) : (
+              sections.map(({ category, badges }) => (
+                <View key={category} style={styles.section}>
+                  <Text style={styles.sectionTitle} accessibilityRole="header">
+                    {CATEGORY_LABEL[category]}
+                  </Text>
+                  <View style={styles.grid}>
+                    {badges.map((badge) => {
+                      const tier = tierColors(badge.tier);
+                      const locked = !badge.unlocked;
+                      const unlockedOn = shortDate(badge.unlockedAt);
+                      return (
+                        <TouchableOpacity
+                          key={badge.id}
+                          activeOpacity={0.8}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${badge.name}, ${badge.tier}. ${
+                            locked ? `Locked. ${badge.description}` : `Unlocked${unlockedOn ? ` ${unlockedOn}` : ""}`
+                          }. Reward ${rewardText(badge)}`}
+                          accessibilityHint={locked ? "Shows how to unlock" : "Shows details"}
+                          onPress={() => viewAchievement(badge)}
                           style={[
-                            styles.tierPillText,
-                            {
-                              color: badge.unlocked
-                                ? tier.text
-                                : COLORS.textMuted
-                            }
+                            styles.tile,
+                            { width: tileWidth, borderColor: locked ? COLORS.border : tier.border }
                           ]}
                         >
-                          {badge.tier.toUpperCase()}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <Text
-                      style={[
-                        styles.badgeDescription,
-                        !badge.unlocked && styles.badgeDescLocked
-                      ]}
-                    >
-                      {badge.description}
-                    </Text>
-
-                    <View style={styles.badgeFooter}>
-                      <View style={styles.xpBonus}>
-                        <Sparkles size={12} color={COLORS.xp} />
-                        <Text style={styles.xpBonusText}>
-                          +{badge.xpBonus} XP
-                        </Text>
-                      </View>
-
-                      {badge.unlocked ? (
-                        <View style={styles.unlockedDate}>
-                          <CheckCircle2 size={12} color={COLORS.success} />
-                          <Text style={styles.unlockedDateText}>
-                            {badge.unlockedAt ? `Unlocked` : "Unlocked"}
+                          <View style={[styles.tileIcon, { backgroundColor: locked ? COLORS.surfaceElevated : tier.bg }]}>
+                            <Text style={[styles.tileEmoji, locked && styles.tileEmojiLocked]}>{badge.emoji || "🏆"}</Text>
+                            {locked && (
+                              <View style={styles.lockOverlay}>
+                                <Lock size={12} color={COLORS.text} />
+                              </View>
+                            )}
+                          </View>
+                          <Text style={[styles.tileName, locked && styles.tileNameLocked]}>{badge.name}</Text>
+                          <View style={[styles.tierPill, { backgroundColor: locked ? COLORS.surfaceElevated : tier.bg }]}>
+                            <Text style={[styles.tierPillText, { color: locked ? COLORS.textMuted : tier.fg }]}>
+                              {badge.tier.charAt(0).toUpperCase() + badge.tier.slice(1)}
+                            </Text>
+                          </View>
+                          <Text style={styles.reward}>{rewardText(badge)}</Text>
+                          <Text style={[styles.tileStatus, !locked && styles.tileStatusUnlocked]}>
+                            {locked ? "Locked · tap for how" : unlockedOn ? `Unlocked ${unlockedOn}` : "Unlocked"}
                           </Text>
-                        </View>
-                      ) : (
-                        <Text style={styles.lockedText}>Locked</Text>
-                      )}
-                    </View>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </ScrollView>
-      </View>
+                </View>
+              ))
+            )}
+          </>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -309,73 +311,104 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background
   },
-  container: {
-    flex: 1
-  },
-  header: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.sm
+  content: {
+    padding: SPACING.lg,
+    paddingBottom: SPACING.xxxl
   },
   headerTitle: {
     ...TYPOGRAPHY.title1
   },
   headerSubtitle: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted
-  },
-  progressCard: {
-    backgroundColor: COLORS.card,
-    marginHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
     marginBottom: SPACING.md
   },
-  progressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: SPACING.sm
+  loading: {
+    gap: SPACING.md
   },
-  progressIconGroup: {
+  heroCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
+    flexWrap: "wrap",
+    gap: SPACING.lg,
+    backgroundColor: COLORS.card,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.lg
   },
-  progressLabel: {
-    ...TYPOGRAPHY.caption,
-    fontWeight: "700",
+  ringCenter: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  ringValue: {
+    fontSize: 22,
+    fontWeight: "800",
     color: COLORS.text
   },
-  progressValue: {
+  ringLabel: {
+    ...TYPOGRAPHY.micro
+  },
+  tierList: {
+    flex: 1,
+    minWidth: 140,
+    gap: SPACING.sm
+  },
+  tierRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm
+  },
+  tierDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5
+  },
+  tierName: {
+    ...TYPOGRAPHY.body,
+    flex: 1
+  },
+  tierCount: {
+    ...TYPOGRAPHY.label
+  },
+  nextUp: {
+    marginBottom: SPACING.lg,
+    gap: SPACING.sm
+  },
+  nextRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+    minHeight: 56,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border
+  },
+  nextEmoji: {
+    fontSize: 26,
+    opacity: 0.6
+  },
+  nextCopy: {
+    flex: 1
+  },
+  nextName: {
+    ...TYPOGRAPHY.body,
+    fontWeight: "700"
+  },
+  nextDesc: {
     ...TYPOGRAPHY.caption,
-    fontWeight: "700",
     color: COLORS.textSecondary
   },
-  track: {
-    height: 8,
-    backgroundColor: COLORS.surfaceElevated,
-    borderRadius: 4,
-    overflow: "hidden"
-  },
-  fill: {
-    height: "100%",
-    backgroundColor: COLORS.warning,
-    borderRadius: 4
-  },
-  filterContainer: {
-    marginBottom: SPACING.sm
-  },
   filterScroll: {
-    paddingHorizontal: SPACING.lg,
-    gap: 8
+    gap: 8,
+    paddingBottom: SPACING.md
   },
   filterChip: {
     minHeight: 44,
     justifyContent: "center",
-    paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: BORDER_RADIUS.full,
     backgroundColor: COLORS.surface,
@@ -392,60 +425,64 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   filterChipTextActive: {
-    color: COLORS.primary,
+    color: COLORS.primaryText,
     fontWeight: "700"
   },
-  badgeList: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xxxl,
-    gap: SPACING.md
+  emptyText: {
+    ...TYPOGRAPHY.bodySecondary,
+    textAlign: "center",
+    paddingVertical: SPACING.xl
   },
-  loaderContainer: {
-    paddingVertical: SPACING.xxxl,
-    alignItems: "center"
+  section: {
+    marginBottom: SPACING.lg
   },
-  badgeCard: {
+  sectionTitle: {
+    ...TYPOGRAPHY.title3,
+    marginBottom: SPACING.sm
+  },
+  grid: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm
+  },
+  tile: {
     backgroundColor: COLORS.card,
     borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    padding: SPACING.md,
     alignItems: "center",
-    gap: SPACING.md
+    gap: 6
   },
-  badgeCardLocked: {
-    borderColor: COLORS.border
-  },
-  iconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  tileIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: "center",
     justifyContent: "center"
   },
-  iconContainerLocked: {
-    backgroundColor: COLORS.surfaceElevated
+  tileEmoji: {
+    fontSize: 28
   },
-  badgeEmoji: {
-    fontSize: 26
+  tileEmojiLocked: {
+    opacity: 0.3
   },
-  badgeInfo: {
-    flex: 1
-  },
-  badgeTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  lockOverlay: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: COLORS.borderLight,
     alignItems: "center",
-    marginBottom: 2
+    justifyContent: "center"
   },
-  badgeName: {
-    flexShrink: 1,
-    marginRight: SPACING.sm,
-    ...TYPOGRAPHY.title3,
-    color: COLORS.text
+  tileName: {
+    ...TYPOGRAPHY.body,
+    fontWeight: "700",
+    textAlign: "center"
   },
-  badgeNameLocked: {
+  tileNameLocked: {
     color: COLORS.textSecondary
   },
   tierPill: {
@@ -454,46 +491,20 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.xs
   },
   tierPillText: {
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 0.5
+    ...TYPOGRAPHY.micro,
+    fontWeight: "800"
   },
-  badgeDescription: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    marginBottom: 6
-  },
-  badgeDescLocked: {
-    color: COLORS.textMuted
-  },
-  badgeFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center"
-  },
-  xpBonus: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4
-  },
-  xpBonusText: {
-    fontSize: 11,
+  reward: {
+    ...TYPOGRAPHY.micro,
     fontWeight: "700",
-    color: COLORS.xp
+    color: COLORS.xpText,
+    textAlign: "center"
   },
-  unlockedDate: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4
+  tileStatus: {
+    ...TYPOGRAPHY.micro,
+    textAlign: "center"
   },
-  unlockedDateText: {
-    fontSize: 11,
-    color: COLORS.success,
-    fontWeight: "600"
-  },
-  lockedText: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    fontWeight: "600"
+  tileStatusUnlocked: {
+    color: COLORS.success
   }
 });

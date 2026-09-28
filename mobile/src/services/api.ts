@@ -9,8 +9,12 @@ import type {
   HabitLog,
   TodayLogEntry,
   SaveHabitLogInput,
-  HabitStats
+  HabitStats,
+  RecentDay
 } from "@habit-tracker/shared";
+
+export const OFFLINE_MESSAGE =
+  "Can't reach Pulse. Check your connection and try again.";
 
 const fetchWithTimeout = async (
   url: string,
@@ -29,16 +33,102 @@ const fetchWithTimeout = async (
   }
 };
 
+export type ApiErrorCode = "NETWORK" | "SESSION_CHANGED" | "INVALID_RESPONSE" | "HTTP";
+
 export class ApiError extends Error {
   public readonly status: number;
   public readonly details?: unknown;
+  public readonly code: ApiErrorCode;
 
-  constructor(message: string, status: number, details?: unknown) {
+  constructor(message: string, status: number, details?: unknown, code: ApiErrorCode = "HTTP") {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.details = details;
+    this.code = code;
   }
+}
+
+/** A user-facing message for any thrown value. */
+export const errorMessage = (error: unknown, fallback = "Something went wrong. Please try again.") =>
+  error instanceof Error && error.message ? error.message : fallback;
+
+// ── Gamification types (see Pulse 1.1.0 API contract) ──
+export type AchievementTier = "bronze" | "silver" | "gold" | "platinum";
+export type AchievementCategory =
+  | "beginner"
+  | "streak"
+  | "performance"
+  | "consistency"
+  | "levels"
+  | "special";
+
+export interface Achievement {
+  id: string;
+  emoji: string;
+  name: string;
+  description: string;
+  xpBonus: number;
+  /** Optional so older servers keep working. */
+  gemBonus?: number;
+  tier: AchievementTier;
+  category?: AchievementCategory;
+}
+
+export interface AchievementItem extends Achievement {
+  /** Present on /achievements; reward payloads omit it (they are unlocked). */
+  unlocked?: boolean;
+  unlockedAt?: string | null;
+}
+
+export interface CheckinResult {
+  alreadyCheckedIn: boolean;
+  streak: number;
+  longestStreak: number;
+  streakBroken: boolean;
+  freezeUsed: boolean;
+  xpAwarded: number;
+  previousStreak?: number;
+  canRestore?: boolean;
+  restoreCost?: number;
+  restoreExpiresAt?: string | null;
+  /** No active habit yet: nothing was recorded (the streak starts with the first habit). */
+  needsHabit?: boolean;
+}
+
+// ── Habit streak repair (Pulse 1.1.0 addendum) ──
+export interface StreakRepairOffer {
+  /** The missed day (YYYY-MM-DD) that broke a running streak. */
+  date: string;
+  freezeCost: number;
+  gemCost: number;
+}
+
+/** Offered on habit list items and habit detail; absent on older servers. */
+export type WithStreakRepair = { streakRepair?: StreakRepairOffer | null };
+/** Repaired days: skipped logs excused by a streak repair. */
+export type FrozenFlag = { frozen?: boolean };
+
+export type PulseHabit = Habit & WithStreakRepair;
+export type PulseRecentDay = RecentDay & FrozenFlag;
+export type PulseHabitListItem = HabitListItem &
+  WithStreakRepair & { recentDays: PulseRecentDay[] };
+export type PulseHabitLog = HabitLog & FrozenFlag;
+
+export type StreakRepairResult = RewardSummary & {
+  paidWith: "freeze" | "gems";
+  date: string;
+  streakFreezes: number;
+  gems: number;
+};
+
+export interface RewardSummary {
+  xpAwarded: number;
+  newAchievements: Achievement[];
+  levelUp: { level: number; title: string } | null;
+  gemsAwarded: number;
+  legendaryDay?: boolean;
+  checkin?: CheckinResult | null;
 }
 
 export interface GamificationProfile {
@@ -47,6 +137,7 @@ export interface GamificationProfile {
   level: number;
   levelTitle: string;
   xpIntoLevel: number;
+  /** null at max level. */
   xpNeeded: number | null;
   gems: number;
   loginStreak: number;
@@ -54,28 +145,15 @@ export interface GamificationProfile {
   lastLoginDate: string | null;
   streakFreezes: number;
   achievementCount: number;
+  achievementTotal?: number;
+  brokenStreak?: { previousStreak: number; restoreExpiresAt: string | null } | null;
   today: string;
 }
 
-export interface AchievementItem {
-  id: string;
-  name: string;
-  description: string;
-  xpBonus: number;
-  tier: "bronze" | "silver" | "gold" | "platinum";
-  emoji: string;
-  unlocked: boolean;
-  unlockedAt: string | null;
-}
+/** Kept for existing imports. */
+export type DailyCheckinResult = CheckinResult & Partial<RewardSummary>;
 
-export interface DailyCheckinResult {
-  alreadyCheckedIn: boolean;
-  streak: number;
-  longestStreak: number;
-  streakBroken: boolean;
-  freezeUsed: boolean;
-  xpAwarded: number;
-}
+export type RewardedLog = HabitLog & { reward?: RewardSummary | null };
 
 const buildHeaders = async (init?: RequestInit): Promise<Headers> => {
   const headers = new Headers(init?.headers);
@@ -98,7 +176,13 @@ export const apiRequest = async <T>(
   init?: RequestInit
 ): Promise<T> => {
   const sessionToken = useAuthStore.getState().token;
-  const baseUrl = await getApiBaseUrl();
+  let baseUrl: string;
+  try {
+    baseUrl = await getApiBaseUrl();
+  } catch (error) {
+    console.error("[api] API URL unavailable", error);
+    throw new ApiError(OFFLINE_MESSAGE, 0, error, "NETWORK");
+  }
   const headers = await buildHeaders(init);
 
   const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
@@ -110,40 +194,51 @@ export const apiRequest = async <T>(
       headers
     });
   } catch (error: unknown) {
-    throw new ApiError(
-      error instanceof Error
-        ? `Network Error: ${error.message}`
-        : "Unable to reach server. Please check your connection or API URL in Profile.",
-      0
-    );
+    // Keep the raw cause for debugging; users get plain words.
+    console.error(`[api] ${init?.method ?? "GET"} ${path} failed`, error);
+    throw new ApiError(OFFLINE_MESSAGE, 0, error, "NETWORK");
   }
 
   if (sessionToken !== useAuthStore.getState().token)
-    throw new ApiError("Session changed. Please retry.", 409);
+    throw new ApiError("You were signed out. Please try again.", 409, undefined, "SESSION_CHANGED");
 
   const contentType = response.headers.get("content-type");
   const hasJson = contentType?.includes("application/json");
-  const payload = hasJson ? ((await response.json()) as ApiResponse<T>) : null;
+  let payload: ApiResponse<T> | null = null;
+  if (hasJson) {
+    try {
+      payload = (await response.json()) as ApiResponse<T>;
+    } catch (error) {
+      console.error(`[api] ${path} returned malformed JSON`, error);
+    }
+  }
 
   if (!response.ok) {
     if (response.status === 401) {
-      await useAuthStore.getState().clearAuth();
+      await useAuthStore.getState().clearAuth().catch(() => undefined);
     }
 
-    const message =
+    const serverMessage =
       payload && typeof (payload as { message?: string }).message === "string"
         ? (payload as { message?: string }).message
-        : `Request failed with status ${response.status}`;
+        : null;
+    const message =
+      serverMessage ||
+      (response.status >= 500
+        ? "Pulse is having trouble right now. Please try again in a moment."
+        : "That didn't work. Please try again.");
 
-    throw new ApiError(message || "Request failed", response.status, payload);
+    throw new ApiError(message, response.status, payload);
   }
 
   if (response.status === 204) {
     return undefined as unknown as T;
   }
 
-  if (!payload || typeof payload !== "object" || !("data" in payload))
-    throw new ApiError("Invalid server response. Check your API URL.", 502);
+  if (!payload || typeof payload !== "object" || !("data" in payload)) {
+    console.error(`[api] ${path} returned an unexpected body`);
+    throw new ApiError(OFFLINE_MESSAGE, 502, undefined, "INVALID_RESPONSE");
+  }
   return payload.data;
 };
 
@@ -177,28 +272,37 @@ export const authApi = {
     );
   },
 
+  forgotPassword: async (email: string) => {
+    return apiRequest<{ sent: boolean }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email })
+    });
+  },
+
   getMe: async () => {
     return apiRequest<{ id: string; email: string }>("/auth/me");
+  },
+
+  deleteAccount: async (password: string) => {
+    return apiRequest<void>("/account", {
+      method: "DELETE",
+      body: JSON.stringify({ password })
+    });
   }
 };
 
 // ── Habit API ──
 export const habitApi = {
-  list: async (params?: {
-    date?: string;
-    includeArchived?: boolean;
-    search?: string;
-  }) => {
+  list: async (params?: { date?: string; includeArchived?: boolean }) => {
     const query = new URLSearchParams();
     if (params?.date) query.set("date", params.date);
     if (params?.includeArchived) query.set("includeArchived", "true");
-    if (params?.search) query.set("search", params.search);
     const qs = query.toString();
-    return apiRequest<HabitListItem[]>(`/habits${qs ? `?${qs}` : ""}`);
+    return apiRequest<PulseHabitListItem[]>(`/habits${qs ? `?${qs}` : ""}`);
   },
 
   get: async (id: string) => {
-    return apiRequest<Habit>(`/habits/${id}`);
+    return apiRequest<PulseHabit>(`/habits/${id}`);
   },
 
   getStats: async (id: string) => {
@@ -230,6 +334,14 @@ export const habitApi = {
     return apiRequest<void>(`/habits/${id}`, {
       method: "DELETE"
     });
+  },
+
+  /** Spends 1 streak freeze (or gems) to excuse the offered missed day. */
+  repairStreak: async (id: string, date: string) => {
+    return apiRequest<StreakRepairResult>(`/habits/${id}/streak-repair`, {
+      method: "POST",
+      body: JSON.stringify({ date })
+    });
   }
 };
 
@@ -240,11 +352,11 @@ export const habitLogApi = {
   },
 
   list: async (habitId: string, limit = 30) => {
-    return apiRequest<HabitLog[]>(`/habits/${habitId}/logs?limit=${limit}`);
+    return apiRequest<PulseHabitLog[]>(`/habits/${habitId}/logs?limit=${limit}`);
   },
 
   create: async (habitId: string, payload: SaveHabitLogInput) => {
-    return apiRequest<HabitLog>(`/habits/${habitId}/logs`, {
+    return apiRequest<RewardedLog>(`/habits/${habitId}/logs`, {
       method: "POST",
       body: JSON.stringify(payload)
     });
@@ -255,16 +367,19 @@ export const habitLogApi = {
     logId: string,
     payload: SaveHabitLogInput
   ) => {
-    return apiRequest<HabitLog>(`/habits/${habitId}/logs/${logId}`, {
+    return apiRequest<RewardedLog>(`/habits/${habitId}/logs/${logId}`, {
       method: "PATCH",
       body: JSON.stringify(payload)
     });
   },
 
+  /** Undo/unskip. Older servers answer 204 (undefined). */
   delete: async (habitId: string, logId: string) => {
-    return apiRequest<void>(`/habits/${habitId}/logs/${logId}`, {
-      method: "DELETE"
-    });
+    const result = await apiRequest<{ reward: RewardSummary | null } | undefined>(
+      `/habits/${habitId}/logs/${logId}`,
+      { method: "DELETE" }
+    );
+    return { reward: result?.reward ?? null };
   }
 };
 
@@ -279,33 +394,65 @@ export const gamificationApi = {
   },
 
   dailyCheckin: async () => {
-    return apiRequest<DailyCheckinResult>("/gamification/checkin", {
+    return apiRequest<CheckinResult & Partial<RewardSummary>>("/gamification/checkin", {
       method: "POST"
     });
   },
 
   useStreakFreeze: async () => {
-    return apiRequest<{ gems: number; streakFreezes: number }>(
+    return apiRequest<{ gems: number; streakFreezes: number } & Partial<RewardSummary>>(
       "/gamification/freeze",
-      {
-        method: "POST"
-      }
+      { method: "POST" }
     );
   },
 
-  issueAdToken: async () => {
-    return apiRequest<{ adToken: string }>("/gamification/ad-token", {
+  /** Spends gems to restore a recently broken check-in streak. */
+  restoreStreak: async () => {
+    return apiRequest<{ streak: number; gems: number } & Partial<RewardSummary>>(
+      "/gamification/restore-streak",
+      { method: "POST" }
+    );
+  },
+
+  /** Call after the OS share sheet reports a share. */
+  share: async () => {
+    return apiRequest<RewardSummary | null>("/gamification/share", {
       method: "POST"
+    });
+  }
+};
+
+// ── Account API ──
+export const accountApi = {
+  /** The profile photo as a data URL, or null. */
+  getAvatar: async () => {
+    return apiRequest<{ avatar: string | null }>("/account/avatar");
+  },
+
+  /** `image` is a data URL (jpeg/png/webp, decoded <= 64 KB). */
+  setAvatar: async (image: string) => {
+    return apiRequest<{ avatar: string | null }>("/account/avatar", {
+      method: "PUT",
+      body: JSON.stringify({ image })
     });
   },
 
-  restoreStreak: async (adToken: string) => {
-    return apiRequest<{ streak: number; restored: boolean }>(
-      "/gamification/restore",
-      {
-        method: "POST",
-        body: JSON.stringify({ adToken })
-      }
-    );
+  removeAvatar: async () => {
+    return apiRequest<{ avatar: null }>("/account/avatar", { method: "DELETE" });
+  }
+};
+
+// ── Preferences API ──
+export const preferencesApi = {
+  get: async () => {
+    return apiRequest<{ timezone: string }>("/preferences");
+  },
+
+  /** The server computes "today" and streaks in this IANA timezone. */
+  setTimezone: async (timezone: string) => {
+    return apiRequest<{ timezone: string }>("/preferences", {
+      method: "PATCH",
+      body: JSON.stringify({ timezone })
+    });
   }
 };

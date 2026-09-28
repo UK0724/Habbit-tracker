@@ -4,8 +4,6 @@ import { requireAuth, type AuthRequest } from "../../middleware/requireAuth.js";
 import { HabitModel } from "./habit.model.js";
 import { HabitLogModel } from "../habitLogs/habitLog.model.js";
 import { ExpenseModel, BudgetModel } from "../expenses/expense.model.js";
-import { JobSearchProfileModel } from "../jobTracker/jobTracker.model.js";
-import { DsaPrepProfileModel } from "../dsaPrep/dsaPrep.model.js";
 import { UserModel } from "../auth/user.model.js";
 import { serializeHabit, serializeHabitLog } from "./habit.service.js";
 import { summarize } from "./rules.js";
@@ -16,43 +14,6 @@ import { userToday } from "./workspaceSync.js";
 
 export const trackingRouter = Router();
 trackingRouter.use(requireAuth);
-trackingRouter.post(
-  "/dsa-prep/revision",
-  catchAsync(async (req, res) => {
-    const body = z
-      .object({
-        problemId: z.number().int().positive(),
-        revisionDueDate: z
-          .string()
-          .refine((v) => v === "" || isValidDateString(v)),
-        reviewedDate: z.string().refine(isValidDateString).optional()
-      })
-      .strict()
-      .parse(req.body);
-    const profile = await DsaPrepProfileModel.findOneAndUpdate(
-      {
-        userId: (req as AuthRequest).userId,
-        "solvedProblems.problemId": body.problemId
-      },
-      {
-        $set: { "solvedProblems.$.revisionDueDate": body.revisionDueDate },
-        ...(body.reviewedDate
-          ? {
-              $addToSet: { "solvedProblems.$.revisionDates": body.reviewedDate }
-            }
-          : {})
-      },
-      { new: true }
-    );
-    if (!profile) {
-      res
-        .status(404)
-        .json({ message: "Solve this problem before scheduling revision" });
-      return;
-    }
-    res.json({ data: profile });
-  })
-);
 trackingRouter.get(
   "/insights",
   catchAsync(async (req, res) => {
@@ -67,7 +28,7 @@ trackingRouter.get(
       .min(7)
       .max(366)
       .parse(req.query.days ?? 30);
-    const habits = await HabitModel.find({ userId });
+    const habits = await HabitModel.find({ userId, archived: { $ne: true } });
     const logs = await HabitLogModel.find({
       habitId: { $in: habits.map((h) => h._id) },
       date: { $lte: today }
@@ -89,12 +50,10 @@ trackingRouter.get(
   "/export",
   catchAsync(async (req, res) => {
     const userId = (req as AuthRequest).userId;
-    const [habits, expenses, budgets, jobs, dsa] = await Promise.all([
+    const [habits, expenses, budgets] = await Promise.all([
       HabitModel.find({ userId }),
       ExpenseModel.find({ userId }),
-      BudgetModel.find({ userId }),
-      JobSearchProfileModel.findOne({ userId }),
-      DsaPrepProfileModel.findOne({ userId })
+      BudgetModel.find({ userId })
     ]);
     const logs = await HabitLogModel.find({
       habitId: { $in: habits.map((h) => h._id) }
@@ -106,9 +65,7 @@ trackingRouter.get(
         habits: habits.map(serializeHabit),
         logs: logs.map(serializeHabitLog),
         expenses,
-        budgets,
-        jobs,
-        dsa
+        budgets
       }
     });
   })
@@ -169,7 +126,10 @@ trackingRouter.delete(
       _id: logId,
       habitId: habit._id
     });
-    if (log) await handleHabitLogXP((req as AuthRequest).userId, habit, log);
-    res.status(204).end();
+    // 200 with the reward so clients can show XP being taken back.
+    const reward = log
+      ? await handleHabitLogXP((req as AuthRequest).userId, habit, log)
+      : null;
+    res.json({ data: { reward } });
   })
 );

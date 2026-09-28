@@ -1,7 +1,9 @@
 param(
     [string]$SdkPath = $env:ANDROID_HOME,
     [string]$JavaPath = $env:JAVA_HOME,
-    [ValidateSet('preview', 'production')][string]$Profile = 'preview'
+    [ValidateSet('preview', 'production')][string]$Profile = 'preview',
+    # Production APK for sideloading on a test phone; Play uploads still use the .aab.
+    [switch]$Apk
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,6 +35,12 @@ if ($Profile -eq 'production') {
         throw 'Production builds require EXPO_PUBLIC_API_URL with the deployed HTTPS API URL.'
     }
 }
+
+# Metro caches transforms with EXPO_PUBLIC_* values inlined, so an unchanged
+# file would keep the previous profile's API URL. Expo ignores --reset-cache
+# when CI is set, so clear the cache directory itself.
+$metroCache = Join-Path ([IO.Path]::GetTempPath()) 'metro-cache'
+if (Test-Path -LiteralPath $metroCache) { Remove-Item -LiteralPath $metroCache -Recurse -Force }
 
 Push-Location $mobileRoot
 try {
@@ -86,13 +94,25 @@ tasks.configureEach { task ->
     $sdkForJava = $env:ANDROID_HOME.Replace('\', '/')
     Set-Content -LiteralPath 'android/local.properties' -Value "sdk.dir=$sdkForJava"
 
-    & ./android/gradlew.bat -p android :app:assembleRelease --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m' --console=plain
+    # Google Play accepts only app bundles; preview builds stay sideloadable APKs.
+    $bundle = $Profile -eq 'production' -and -not $Apk
+    $task = if ($bundle) { ':app:bundleRelease' } else { ':app:assembleRelease' }
+    & ./android/gradlew.bat -p android $task --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m' --console=plain
     if ($LASTEXITCODE -ne 0) { throw 'Android release build failed.' }
+    $bundleFile = Join-Path $mobileRoot 'android/app/build/generated/assets/createBundleReleaseJsAndAssets/index.android.bundle'
+    $bundleText = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($bundleFile))
+    if ($env:EXPO_PUBLIC_API_URL -and -not $bundleText.Contains($env:EXPO_PUBLIC_API_URL)) {
+        throw "Bundle does not contain EXPO_PUBLIC_API_URL ($env:EXPO_PUBLIC_API_URL); a stale Metro cache was used."
+    }
     & node scripts/verify-bundled-decoder.cjs
     if ($LASTEXITCODE -ne 0) { throw 'Android bundle verification failed.' }
-    $apkPath = Join-Path $mobileRoot 'android/app/build/outputs/apk/release/app-release.apk'
-    & (Join-Path $PSScriptRoot 'verify-apk.ps1') -ApkPath $apkPath
-    Write-Output $apkPath
+    $artifactPath = if ($bundle) {
+        Join-Path $mobileRoot 'android/app/build/outputs/bundle/release/app-release.aab'
+    } else {
+        Join-Path $mobileRoot 'android/app/build/outputs/apk/release/app-release.apk'
+    }
+    & (Join-Path $PSScriptRoot 'verify-apk.ps1') -ApkPath $artifactPath
+    Write-Output $artifactPath
 } finally {
     Pop-Location
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import {
   CheckSquare,
@@ -9,21 +9,32 @@ import {
   User,
   Plus,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Compass
 } from "lucide-react";
 import { cn } from "../shared/lib/utils";
-import { ReminderWatcher } from "../components/ReminderWatcher";
 import { BrandMark } from "../components/brand/BrandMark";
 import { useAuthStore } from "../stores/authStore";
 import { apiRequest } from "../services/api";
 import { useGameProfile } from "../features/gamification/hooks/useGameProfile";
+import { useDailyCheckin } from "../features/gamification/hooks/useDailyCheckin";
 import { XPBar } from "../components/ui/XPBar";
 import { StreakBadge } from "../components/ui/StreakBadge";
 import { GemCounter } from "../components/ui/GemCounter";
+import { FreezeCounter } from "../components/ui/FreezeCounter";
+import { UserAvatar } from "../features/account/components/UserAvatar";
 import { ProgressHeader } from "../components/ui/ProgressHeader";
+import {
+  CheckinBannerSlot,
+  RewardOverlays
+} from "../components/RewardOverlays";
 import { CreateHabitGlobalModal } from "../features/habits/components/CreateHabitGlobalModal";
 import { useCreateHabitModalStore } from "../features/habits/stores/createHabitModalStore";
 import { useHomeDateStore } from "../features/habits/hooks/useHomeDateStore";
+import { OnboardingWalkthrough } from "../features/onboarding/OnboardingWalkthrough";
+import { useOnboardingStore } from "../features/onboarding/onboardingStore";
+
+const TIMEZONE_KEY = "pulse-timezone";
 
 const items = [
   ["/habits", "Habits", CheckSquare],
@@ -31,48 +42,115 @@ const items = [
   ["/expenses", "Expenses", Wallet]
 ] as const;
 
+const menuItemClass =
+  "flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold text-content-2 hover:bg-surface-3 hover:text-content focus-visible:bg-surface-3 transition";
+
 export const AppLayout = () => {
-  const [ready, setReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const user = useAuthStore((s) => s.user);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const { data: profile } = useGameProfile();
   const openCreateHabit = useCreateHabitModalStore((s) => s.open);
+  const openWalkthrough = useOnboardingStore((s) => s.open);
+
+  // Daily check-in runs once per session from whichever page loads first.
+  useDailyCheckin();
+
+  const closeMenu = useCallback((restoreFocus: boolean) => {
+    setMenuOpen(false);
+    if (restoreFocus) menuButtonRef.current?.focus();
+  }, []);
 
   useEffect(() => {
+    if (!menuOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (!desktopMenuRef.current?.contains(target)) {
+      if (!desktopMenuRef.current?.contains(e.target as Node)) {
         setMenuOpen(false);
       }
     };
-    if (menuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [menuOpen]);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeMenu(true);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKey);
+    // Move focus into the menu so keyboard users land on the first item.
+    menuRef.current
+      ?.querySelector<HTMLElement>('[role="menuitem"]')
+      ?.focus();
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [menuOpen, closeMenu]);
 
+  const handleMenuKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const entries = Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []
+    );
+    const index = entries.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      entries[(index + 1) % entries.length]?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      entries[(index - 1 + entries.length) % entries.length]?.focus();
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      entries[0]?.focus();
+    } else if (e.key === "End") {
+      e.preventDefault();
+      entries[entries.length - 1]?.focus();
+    } else if (e.key === "Tab") {
+      setMenuOpen(false);
+    }
+  };
+
+  // Refresh the account timezone in the background. The app renders straight
+  // away using the cached (or browser) timezone instead of waiting on this.
   useEffect(() => {
+    let cancelled = false;
     apiRequest<{ timezone: string }>("/preferences")
       .then((p) => {
-        localStorage.setItem("pulse-timezone", p.timezone);
-        useHomeDateStore.getState().resetSelectedDate();
-        setReady(true);
+        if (cancelled || !p?.timezone) return;
+        let previous: string | null = null;
+        try {
+          previous = localStorage.getItem(TIMEZONE_KEY);
+          localStorage.setItem(TIMEZONE_KEY, p.timezone);
+        } catch {
+          return;
+        }
+        if (previous !== p.timezone) {
+          useHomeDateStore.getState().resetSelectedDate();
+        }
       })
-      .catch(() => setReady(true));
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const streak = profile?.loginStreak ?? 1;
   const gems = profile?.gems ?? 0;
 
   const renderProfileDropdown = () => (
-    <div className="absolute right-0 top-full mt-2 w-60 rounded-2xl border border-border-app bg-surface-2/95 backdrop-blur-2xl p-2 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+    <div
+      ref={menuRef}
+      id="profile-menu"
+      role="menu"
+      aria-label="Account"
+      onKeyDown={handleMenuKeyDown}
+      className="absolute right-0 top-full mt-2 w-60 rounded-2xl border border-border-app bg-surface-2/95 backdrop-blur-2xl p-2 shadow-2xl z-50 animate-fade-in"
+    >
       <div className="border-b border-border-app px-3 py-2.5">
         <p className="text-xs font-bold text-content truncate">{user?.email}</p>
         {profile && (
-          <p className="text-[11px] font-semibold text-amber-500 mt-0.5">
+          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
             Level {profile.level} · {profile.levelTitle}
           </p>
         )}
@@ -81,43 +159,61 @@ export const AppLayout = () => {
       <div className="py-1">
         <Link
           to="/profile"
+          role="menuitem"
           onClick={() => setMenuOpen(false)}
-          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-content-2 hover:bg-surface-3 hover:text-content transition"
+          className={menuItemClass}
         >
-          <User size={15} />
+          <User size={15} aria-hidden />
           <span>Profile</span>
         </Link>
 
         <Link
           to="/settings"
+          role="menuitem"
           onClick={() => setMenuOpen(false)}
-          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-content-2 hover:bg-surface-3 hover:text-content transition"
+          className={menuItemClass}
         >
-          <Settings size={15} />
+          <Settings size={15} aria-hidden />
           <span>Settings</span>
         </Link>
 
         <Link
           to="/achievements"
+          role="menuitem"
           onClick={() => setMenuOpen(false)}
-          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-content-2 hover:bg-surface-3 hover:text-content transition"
+          className={menuItemClass}
         >
-          <Trophy size={15} />
-          <span>Badges & Trophies</span>
+          <Trophy size={15} aria-hidden />
+          <span>Trophy Room</span>
         </Link>
+
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            // Focus returns to the account button when the walkthrough closes.
+            closeMenu(true);
+            openWalkthrough(0);
+          }}
+          className={menuItemClass}
+        >
+          <Compass size={15} aria-hidden />
+          <span>How Pulse works</span>
+        </button>
       </div>
 
       <div className="border-t border-border-app pt-1">
         <button
           type="button"
+          role="menuitem"
           onClick={() => {
             setMenuOpen(false);
             clearAuth();
           }}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition"
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold text-rose-600 hover:bg-rose-500/10 focus-visible:bg-rose-500/10 transition dark:text-rose-400"
         >
-          <LogOut size={15} />
-          <span>Sign Out</span>
+          <LogOut size={15} aria-hidden />
+          <span>Sign out</span>
         </button>
       </div>
     </div>
@@ -125,6 +221,8 @@ export const AppLayout = () => {
 
   return (
     <div className="min-h-screen text-content">
+      <RewardOverlays />
+      <OnboardingWalkthrough />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:z-50 focus:bg-surface focus:p-4"
@@ -135,20 +233,20 @@ export const AppLayout = () => {
       {/* Mobile Branding Bar (logo + gamification only — no nav) */}
       <header className="sticky top-0 z-40 flex min-h-16 items-center gap-3 border-b border-border-app bg-surface/95 backdrop-blur-xl px-3 lg:hidden">
         <Link
-          to="/"
+          to="/habits"
           aria-label="Pulse home"
           className="flex min-h-11 shrink-0 items-center justify-center rounded-lg px-1"
         >
           <BrandMark className="h-7 w-7" />
         </Link>
 
-        <ProgressHeader xp={profile?.totalXP} gems={profile?.gems} streak={profile?.loginStreak} />
+        <ProgressHeader xp={profile?.totalXP} gems={profile?.gems} streak={profile?.loginStreak} freezes={profile?.streakFreezes} />
       </header>
 
       {/* Sidebar Navigation (Desktop only) */}
       <aside className="hidden fixed inset-y-0 left-0 z-30 w-60 border-r border-border-app bg-surface p-6 overflow-y-auto lg:block">
         <Link
-          to="/"
+          to="/habits"
           className="mb-8 flex items-center gap-3 font-display text-2xl font-bold"
         >
           <BrandMark className="h-9 w-9" />
@@ -165,7 +263,7 @@ export const AppLayout = () => {
               <span className="font-bold text-content group-hover:text-accent transition">
                 {profile.levelTitle}
               </span>
-              <span className="font-extrabold text-amber-500">
+              <span className="font-extrabold text-amber-600 dark:text-amber-400">
                 Lv.{profile.level}
               </span>
             </div>
@@ -176,9 +274,12 @@ export const AppLayout = () => {
                 neededXP={profile.xpNeeded}
               />
             </div>
-            <div className="mt-2.5 flex items-center justify-between text-[11px]">
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
               <StreakBadge streak={streak} size="sm" />
-              <GemCounter gems={gems} size="sm" />
+              <span className="flex items-center gap-1.5">
+                <GemCounter gems={gems} size="sm" />
+                <FreezeCounter freezes={profile.streakFreezes ?? 0} />
+              </span>
             </div>
           </Link>
         )}
@@ -216,26 +317,27 @@ export const AppLayout = () => {
         <div className="flex items-center gap-2" />
 
         <div className="flex items-center gap-4">
-          <ProgressHeader xp={profile?.totalXP} gems={profile?.gems} streak={profile?.loginStreak} />
+          <ProgressHeader xp={profile?.totalXP} gems={profile?.gems} streak={profile?.loginStreak} freezes={profile?.streakFreezes} />
 
           {/* Profile Icon Dropdown Trigger */}
           <div ref={desktopMenuRef} className="relative">
             <button
               type="button"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="User Profile & Settings menu"
+              ref={menuButtonRef}
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label="Account menu"
+              aria-haspopup="menu"
               aria-expanded={menuOpen}
+              aria-controls={menuOpen ? "profile-menu" : undefined}
               className="flex items-center gap-2.5 rounded-full border border-border-app bg-surface-2 pl-2 pr-3 py-1.5 transition hover:border-accent hover:bg-surface-3 group shadow-sm active:scale-95 cursor-pointer"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-accent via-violet-600 to-fuchsia-500 text-xs font-black text-white shadow-sm">
-                {user?.email?.[0]?.toUpperCase() ?? "U"}
-              </div>
+              <UserAvatar className="h-8 w-8 text-xs" />
               <div className="text-left">
                 <p className="text-xs font-bold text-content group-hover:text-accent transition truncate max-w-[130px]">
                   {user?.email?.split("@")[0] || "Profile"}
                 </p>
                 {profile && (
-                  <p className="text-[10px] font-semibold text-amber-500">
+                  <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
                     Lv.{profile.level} · {profile.levelTitle}
                   </p>
                 )}
@@ -261,15 +363,9 @@ export const AppLayout = () => {
         className="min-w-0 flex-1 overflow-x-hidden px-3.5 pt-5 pb-24 sm:px-6 lg:ml-60 lg:px-8 lg:py-8"
       >
         <div className="mx-auto max-w-6xl w-full min-w-0 overflow-x-hidden">
-          {ready ? (
-            <>
-              <ReminderWatcher />
-              <CreateHabitGlobalModal />
-              <Outlet />
-            </>
-          ) : (
-            <p role="status">Getting your workspace ready…</p>
-          )}
+          <CheckinBannerSlot />
+          <CreateHabitGlobalModal />
+          <Outlet />
         </div>
       </main>
 

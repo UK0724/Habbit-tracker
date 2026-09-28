@@ -390,3 +390,32 @@
   min-width: 0;
   padding: 0;
 }
+
+/* Hide scrollbars on horizontally scrollable segmented controls. */
+@layer utilities {
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Light theme contrast: the -300/-400 tints are tuned for dark surfaces and
+   fall below WCAG AA on white. Darken them to the -700 shade in light mode. */
+:root:not([data-theme="dark"]) :is(.text-amber-300, .text-amber-400) { color: rgb(180 83 9); }
+:root:not([data-theme="dark"]) :is(.text-yellow-300, .text-yellow-400) { color: rgb(161 98 7); }
+:root:not([data-theme="dark"]) :is(.text-orange-300, .text-orange-400) { color: rgb(194 65 12); }
+:root:not([data-theme="dark"]) :is(.text-emerald-300, .text-emerald-400) { color: rgb(4 120 87); }
+:root:not([data-theme="dark"]) :is(.text-teal-300, .text-teal-400) { color: rgb(15 118 110); }
+:root:not([data-theme="dark"]) :is(.text-green-300, .text-green-400) { color: rgb(21 128 61); }
+:root:not([data-theme="dark"]) :is(.text-rose-300, .text-rose-400) { color: rgb(190 18 60); }
+:root:not([data-theme="dark"]) :is(.text-red-300, .text-red-400) { color: rgb(185 28 28); }
+:root:not([data-theme="dark"]) :is(.text-sky-300, .text-sky-400) { color: rgb(3 105 161); }
+:root:not([data-theme="dark"]) :is(.text-cyan-300, .text-cyan-400) { color: rgb(14 116 144); }
+:root:not([data-theme="dark"]) :is(.text-blue-300, .text-blue-400) { color: rgb(29 78 216); }
+:root:not([data-theme="dark"]) :is(.text-indigo-300, .text-indigo-400) { color: rgb(67 56 202); }
+:root:not([data-theme="dark"]) :is(.text-violet-300, .text-violet-400) { color: rgb(109 40 217); }
+:root:not([data-theme="dark"]) :is(.text-fuchsia-300, .text-fuchsia-400) { color: rgb(162 28 175); }
+:root:not([data-theme="dark"]) :is(.text-slate-300, .text-slate-400) { color: rgb(71 85 105); }

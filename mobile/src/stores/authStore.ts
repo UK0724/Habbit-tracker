@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import * as SecureStore from "../services/storage";
 import { SECURE_STORE_KEYS } from "../constants/config";
+import { clearHabitReminders } from "../services/notifications";
 
 export interface AuthUser {
   id: string;
@@ -54,6 +55,11 @@ export const useAuthStore = create<AuthState>((set) => ({
       console.error("[authStore] Failed to clear saved user", error);
     }
     set({ token: null, user: null, isAuthenticated: false, isLoading: false });
+    // Scheduled reminders outlive the session; a signed-out or deleted user
+    // must not keep receiving them.
+    await clearHabitReminders().catch((error) =>
+      console.error("[authStore] Failed to clear habit reminders", error)
+    );
   },
 
   initializeAuth: async () => {

@@ -29,7 +29,9 @@ import {
   Cell
 } from "recharts";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useExpenseStore, Expense } from "../stores/expenseStore";
+import { applyReward } from "../../gamification/rewards";
 import { CATEGORIES, CATEGORY_CONFIG } from "../categories";
 import { useDialog } from "../../../shared/hooks/useDialog";
 import { getTodayDateString } from "../../../shared/lib/date";
@@ -51,11 +53,51 @@ export const ExpenseDashboardPage = () => {
   const {
     expenses,
     budgets,
+    error: storeError,
+    isLoading,
     addExpense,
     updateExpense,
     deleteExpense,
-    setBudgetLimit
+    setBudgetLimit,
+    fetchExpenses,
+    fetchBudgets,
+    clearError
   } = useExpenseStore();
+  const queryClient = useQueryClient();
+  const [listError, setListError] = useState("");
+  const [budgetError, setBudgetError] = useState("");
+
+  /** Expenses can auto-complete a linked habit (and award XP). */
+  const refreshLinkedData = () => {
+    void queryClient.invalidateQueries({ queryKey: ["habits"] });
+    void queryClient.invalidateQueries({ queryKey: ["habit"] });
+    void queryClient.invalidateQueries({ queryKey: ["habit-logs"] });
+    void queryClient.invalidateQueries({ queryKey: ["insights"] });
+    void queryClient.invalidateQueries({ queryKey: ["gamification"] });
+  };
+
+  const handleDelete = async (exp: Expense) => {
+    if (
+      !window.confirm(
+        `Delete this ₹${exp.amount.toLocaleString("en-IN")} ${exp.category} expense? This can't be undone.`
+      )
+    ) {
+      return;
+    }
+    setListError("");
+    try {
+      await deleteExpense(exp.id);
+      clearError();
+      refreshLinkedData();
+    } catch (err) {
+      clearError();
+      setListError(
+        err instanceof Error
+          ? `Could not delete the expense: ${err.message}`
+          : "Could not delete the expense. Please try again."
+      );
+    }
+  };
 
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -163,8 +205,8 @@ export const ExpenseDashboardPage = () => {
     e.preventDefault();
     if (savingRef.current) return;
     const amount = parseFloat(amountInput);
-    if (isNaN(amount) || amount <= 0) {
-      setSaveError("Please enter a valid positive amount.");
+    if (isNaN(amount) || amount < 0.01) {
+      setSaveError("Enter an amount of at least ₹0.01.");
       return;
     }
 
@@ -183,10 +225,14 @@ export const ExpenseDashboardPage = () => {
       if (editExpense) {
         await updateExpense(editExpense.id, payload);
       } else {
-        await addExpense(payload);
+        const saved = await addExpense(payload);
+        applyReward(queryClient, saved?.reward, { title: "Habit completed!" });
       }
+      clearError();
+      refreshLinkedData();
       setShowModal(false);
     } catch (err) {
+      clearError();
       setSaveError(
         err instanceof Error ? err.message : "Could not save. Try again."
       );
@@ -203,17 +249,28 @@ export const ExpenseDashboardPage = () => {
     setBudgetLimitInput(
       existing?.monthlyLimit ? String(existing.monthlyLimit) : ""
     );
+    setBudgetError("");
     setShowBudgetModal(true);
   };
 
   const handleSaveBudget = async (e: React.FormEvent) => {
     e.preventDefault();
     const limit = parseFloat(budgetLimitInput);
-    if (isNaN(limit) || limit < 0) return;
+    if (isNaN(limit) || limit < 0) {
+      setBudgetError("Enter 0 or a positive amount.");
+      return;
+    }
     setBudgetSaving(true);
+    setBudgetError("");
     try {
       await setBudgetLimit(selectedBudgetCat, limit);
+      clearError();
       setShowBudgetModal(false);
+    } catch (err) {
+      clearError();
+      setBudgetError(
+        err instanceof Error ? err.message : "Could not save the limit. Try again."
+      );
     } finally {
       setBudgetSaving(false);
     }
@@ -330,6 +387,40 @@ export const ExpenseDashboardPage = () => {
           </button>
         </div>
       </header>
+
+      {(storeError || listError) && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-600"
+        >
+          <span className="flex items-center gap-2">
+            <AlertCircle size={16} aria-hidden />
+            {listError ||
+              `Could not load your expenses: ${storeError ?? "unknown error"}`}
+          </span>
+          {storeError && !listError ? (
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => {
+                void fetchExpenses();
+                void fetchBudgets();
+              }}
+              className="min-h-10 rounded-xl border border-rose-500/40 px-3 text-xs font-bold hover:bg-rose-500/10 disabled:opacity-50"
+            >
+              {isLoading ? "Retrying…" : "Retry"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setListError("")}
+              className="min-h-10 rounded-xl px-3 text-xs font-bold hover:bg-rose-500/10"
+            >
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 4 KPI Summary Cards */}
       <section className="grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -547,11 +638,12 @@ export const ExpenseDashboardPage = () => {
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted"
                 />
                 <input
-                  type="text"
+                  type="search"
+                  aria-label="Search expenses"
                   placeholder="Search logs..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full rounded-xl border border-border-app bg-surface-2 pl-9 pr-3 py-1.5 text-xs text-content placeholder:text-content-muted outline-none focus:border-accent"
+                  className="w-full rounded-xl border border-border-app bg-surface-2 pl-9 pr-3 py-1.5 text-xs text-content placeholder:text-content-muted outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
                 />
               </div>
             </div>
@@ -636,19 +728,19 @@ export const ExpenseDashboardPage = () => {
                       </span>
                       <button
                         type="button"
-                        aria-label="Edit expense"
+                        aria-label={`Edit ${exp.description || exp.category} expense`}
                         onClick={() => handleOpenEdit(exp)}
-                        className="rounded-lg p-1.5 text-content-muted hover:bg-surface-3 hover:text-content transition"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg text-content-muted hover:bg-surface-3 hover:text-content transition"
                       >
-                        <Edit2 size={13} />
+                        <Edit2 size={16} aria-hidden />
                       </button>
                       <button
                         type="button"
-                        aria-label="Delete expense"
-                        onClick={() => deleteExpense(exp.id)}
-                        className="rounded-lg p-1.5 text-content-muted hover:bg-rose-500/10 hover:text-rose-400 transition"
+                        aria-label={`Delete ${exp.description || exp.category} expense`}
+                        onClick={() => void handleDelete(exp)}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg text-content-muted hover:bg-rose-500/10 hover:text-rose-600 transition"
                       >
-                        <Trash2 size={13} />
+                        <Trash2 size={16} aria-hidden />
                       </button>
                     </div>
                   </div>
@@ -706,19 +798,19 @@ export const ExpenseDashboardPage = () => {
                           <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"
-                              aria-label="Edit expense"
+                              aria-label={`Edit ${exp.description || exp.category} expense`}
                               onClick={() => handleOpenEdit(exp)}
-                              className="rounded-lg p-1.5 text-content-muted hover:bg-surface-3 hover:text-content transition"
+                              className="flex h-10 w-10 items-center justify-center rounded-lg text-content-muted hover:bg-surface-3 hover:text-content transition"
                             >
-                              <Edit2 size={13} />
+                              <Edit2 size={16} aria-hidden />
                             </button>
                             <button
                               type="button"
-                              aria-label="Delete expense"
-                              onClick={() => deleteExpense(exp.id)}
-                              className="rounded-lg p-1.5 text-content-muted hover:bg-rose-500/10 hover:text-rose-400 transition"
+                              aria-label={`Delete ${exp.description || exp.category} expense`}
+                              onClick={() => void handleDelete(exp)}
+                              className="flex h-10 w-10 items-center justify-center rounded-lg text-content-muted hover:bg-rose-500/10 hover:text-rose-600 transition"
                             >
-                              <Trash2 size={13} />
+                              <Trash2 size={16} aria-hidden />
                             </button>
                           </div>
                         </td>
@@ -970,7 +1062,7 @@ export const ExpenseDashboardPage = () => {
               {saveError && (
                 <div
                   role="alert"
-                  className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-bold text-rose-500"
+                  className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-bold text-rose-600"
                 >
                   {saveError}
                 </div>
@@ -979,7 +1071,10 @@ export const ExpenseDashboardPage = () => {
               <form onSubmit={handleSaveExpense} className="space-y-4">
                 {/* Amount with Quick Pills */}
                 <div>
-                  <label className="block text-xs font-bold text-content-2 mb-1.5">
+                  <label
+                    htmlFor="expense-amount"
+                    className="block text-xs font-bold text-content-2 mb-1.5"
+                  >
                     Amount (₹)
                   </label>
                   <div className="relative">
@@ -987,14 +1082,16 @@ export const ExpenseDashboardPage = () => {
                       ₹
                     </span>
                     <input
+                      id="expense-amount"
                       type="number"
+                      inputMode="decimal"
                       placeholder="e.g. 250"
                       value={amountInput}
                       onChange={(e) => setAmountInput(e.target.value)}
                       required
-                      step="any"
-                      min="1"
-                      className="w-full rounded-2xl border border-border-app bg-surface pl-9 pr-4 py-3 text-lg font-bold text-content outline-none focus:border-accent"
+                      step="0.01"
+                      min="0.01"
+                      className="w-full rounded-2xl border border-border-app bg-surface pl-9 pr-4 py-3 text-lg font-bold text-content outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
                     />
                   </div>
 
@@ -1027,10 +1124,17 @@ export const ExpenseDashboardPage = () => {
 
                 {/* Category Selection Grid */}
                 <div>
-                  <label className="block text-xs font-bold text-content-2 mb-1.5">
+                  <p
+                    id="expense-category-label"
+                    className="block text-xs font-bold text-content-2 mb-1.5"
+                  >
                     Category
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  </p>
+                  <div
+                    role="group"
+                    aria-labelledby="expense-category-label"
+                    className="grid grid-cols-2 sm:grid-cols-4 gap-2"
+                  >
                     {CATEGORIES.map((cat) => {
                       const isSelected = categoryInput === cat;
                       const meta = CATEGORY_CONFIG[cat] ?? {
@@ -1043,6 +1147,7 @@ export const ExpenseDashboardPage = () => {
                         <button
                           key={cat}
                           type="button"
+                          aria-pressed={isSelected}
                           onClick={() => setCategoryInput(cat)}
                           className={cn(
                             "flex items-center gap-1.5 rounded-2xl border p-2.5 text-xs font-bold transition cursor-pointer",
@@ -1062,30 +1167,42 @@ export const ExpenseDashboardPage = () => {
                 {/* Date & Payment Method */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-content-2 mb-1.5">
+                    <label
+                      htmlFor="expense-date"
+                      className="block text-xs font-bold text-content-2 mb-1.5"
+                    >
                       Date
                     </label>
                     <input
+                      id="expense-date"
                       type="date"
                       value={dateInput}
                       onChange={(e) => setDateInput(e.target.value)}
                       required
                       max={todayStr}
-                      className="w-full rounded-2xl border border-border-app bg-surface px-4 py-2.5 text-sm text-content outline-none focus:border-accent"
+                      className="w-full rounded-2xl border border-border-app bg-surface px-4 py-2.5 text-sm text-content outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-content-2 mb-1.5">
+                    <p
+                      id="expense-payment-label"
+                      className="block text-xs font-bold text-content-2 mb-1.5"
+                    >
                       Payment Method
-                    </label>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    </p>
+                    <div
+                      role="group"
+                      aria-labelledby="expense-payment-label"
+                      className="grid grid-cols-3 gap-1.5"
+                    >
                       {["UPI", "Card", "Cash"].map((method) => {
                         const isSelected = paymentMethodInput === method;
                         return (
                           <button
                             key={method}
                             type="button"
+                            aria-pressed={isSelected}
                             onClick={() => setPaymentMethodInput(method)}
                             className={cn(
                               "rounded-xl border py-2 text-xs font-bold transition text-center cursor-pointer",
@@ -1104,15 +1221,19 @@ export const ExpenseDashboardPage = () => {
 
                 {/* Description */}
                 <div>
-                  <label className="block text-xs font-bold text-content-2 mb-1.5">
+                  <label
+                    htmlFor="expense-description"
+                    className="block text-xs font-bold text-content-2 mb-1.5"
+                  >
                     Description / Merchant (Optional)
                   </label>
                   <input
+                    id="expense-description"
                     type="text"
                     placeholder="e.g. Groceries at supermarket, Uber to office..."
                     value={descriptionInput}
                     onChange={(e) => setDescriptionInput(e.target.value)}
-                    className="w-full rounded-2xl border border-border-app bg-surface px-4 py-2.5 text-sm text-content outline-none focus:border-accent"
+                    className="w-full rounded-2xl border border-border-app bg-surface px-4 py-2.5 text-sm text-content outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
                   />
                 </div>
 
@@ -1184,10 +1305,14 @@ export const ExpenseDashboardPage = () => {
 
               <form onSubmit={handleSaveBudget} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-content-2 mb-1.5">
+                  <label
+                    htmlFor="budget-category"
+                    className="block text-xs font-bold text-content-2 mb-1.5"
+                  >
                     Category
                   </label>
                   <select
+                    id="budget-category"
                     value={selectedBudgetCat}
                     onChange={(e) => {
                       setSelectedBudgetCat(e.target.value);
@@ -1200,7 +1325,7 @@ export const ExpenseDashboardPage = () => {
                           : ""
                       );
                     }}
-                    className="w-full rounded-2xl border border-border-app bg-surface px-4 py-2.5 text-sm text-content outline-none focus:border-accent"
+                    className="w-full rounded-2xl border border-border-app bg-surface px-4 py-2.5 text-sm text-content outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
                   >
                     {CATEGORIES.map((c) => (
                       <option key={c} value={c}>
@@ -1211,7 +1336,10 @@ export const ExpenseDashboardPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-content-2 mb-1.5">
+                  <label
+                    htmlFor="budget-limit"
+                    className="block text-xs font-bold text-content-2 mb-1.5"
+                  >
                     Monthly Limit (₹)
                   </label>
                   <div className="relative">
@@ -1219,20 +1347,31 @@ export const ExpenseDashboardPage = () => {
                       ₹
                     </span>
                     <input
+                      id="budget-limit"
                       type="number"
+                      inputMode="decimal"
                       placeholder="e.g. 5000 (0 for no limit)"
                       value={budgetLimitInput}
                       onChange={(e) => setBudgetLimitInput(e.target.value)}
                       required
                       min="0"
                       step="any"
-                      className="w-full rounded-2xl border border-border-app bg-surface pl-9 pr-4 py-2.5 text-sm font-bold text-content outline-none focus:border-accent"
+                      className="w-full rounded-2xl border border-border-app bg-surface pl-9 pr-4 py-2.5 text-sm font-bold text-content outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
                     />
                   </div>
                   <p className="mt-1.5 text-[11px] text-content-muted">
                     Set to 0 if you want to remove the limit for this category.
                   </p>
                 </div>
+
+                {budgetError ? (
+                  <p
+                    role="alert"
+                    className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-600"
+                  >
+                    {budgetError}
+                  </p>
+                ) : null}
 
                 <div className="flex items-center justify-end gap-2.5 border-t border-border-app pt-4">
                   <button

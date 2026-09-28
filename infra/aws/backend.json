@@ -1,0 +1,198 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Pulse API, execution role and logging policy. Import existing resources first; one stack per environment.",
+  "Parameters": {
+    "Environment": {
+      "Type": "String",
+      "AllowedValues": [
+        "dev",
+        "prod"
+      ]
+    },
+    "ExecutionRoleName": {
+      "Type": "String",
+      "AllowedPattern": "pulse-(dev|prod)-api-role-[A-Za-z0-9]+"
+    },
+    "LoggingPolicyName": {
+      "Type": "String",
+      "AllowedPattern": "AWSLambdaBasicExecutionRole-[a-f0-9-]+"
+    },
+    "ArtifactsBucket": {
+      "Type": "String"
+    },
+    "ApiCodeKey": {
+      "Type": "String",
+      "Description": "Immutable content-addressed ZIP key; never overwrite a deployed key."
+    },
+    "MongoUri": {
+      "Type": "String",
+      "NoEcho": true,
+      "MinLength": 1,
+      "AllowedPattern": "mongodb\\+srv://.+"
+    },
+    "JwtSecret": {
+      "Type": "String",
+      "NoEcho": true,
+      "MinLength": 32
+    },
+    "SmtpUser": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Sender Gmail address for password-reset email (blank disables email)."
+    },
+    "SmtpPass": {
+      "Type": "String",
+      "Default": "",
+      "NoEcho": true,
+      "Description": "Gmail app password (16 characters, 2-Step Verification required). Never commit."
+    }
+  },
+  "Mappings": {
+    "Origins": {
+      "dev": {
+        "Origin": "https://habbit-dev.abuk.in"
+      },
+      "prod": {
+        "Origin": "https://habbit.abuk.in"
+      }
+    }
+  },
+  "Resources": {
+    "ApiLoggingPolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "ManagedPolicyName": {
+          "Ref": "LoggingPolicyName"
+        },
+        "Path": "/service-role/",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "logs:CreateLogGroup",
+              "Resource": {
+                "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*"
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": [
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/pulse-${Environment}-api:*"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "ApiExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "RoleName": {
+          "Ref": "ExecutionRoleName"
+        },
+        "Path": "/service-role/",
+        "MaxSessionDuration": 3600,
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          {
+            "Ref": "ApiLoggingPolicy"
+          }
+        ]
+      }
+    },
+    "ApiFunction": {
+      "Type": "AWS::Lambda::Function",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "pulse-${Environment}-api"
+        },
+        "Runtime": "nodejs24.x",
+        "Architectures": [
+          "x86_64"
+        ],
+        "Handler": "index.handler",
+        "MemorySize": 256,
+        "Timeout": 20,
+        "EphemeralStorage": {
+          "Size": 512
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "ApiExecutionRole",
+            "Arn"
+          ]
+        },
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ArtifactsBucket"
+          },
+          "S3Key": {
+            "Ref": "ApiCodeKey"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "NODE_ENV": "production",
+            "CLIENT_ORIGIN": {
+              "Fn::FindInMap": [
+                "Origins",
+                {
+                  "Ref": "Environment"
+                },
+                "Origin"
+              ]
+            },
+            "MONGODB_URI": {
+              "Ref": "MongoUri"
+            },
+            "JWT_SECRET": {
+              "Ref": "JwtSecret"
+            },
+            "SMTP_USER": {
+              "Ref": "SmtpUser"
+            },
+            "SMTP_PASS": {
+              "Ref": "SmtpPass"
+            },
+            "MAIL_FROM": {
+              "Fn::Sub": "Pulse <${SmtpUser}>"
+            },
+            "APP_URL": {
+              "Fn::FindInMap": [
+                "Origins",
+                {
+                  "Ref": "Environment"
+                },
+                "Origin"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

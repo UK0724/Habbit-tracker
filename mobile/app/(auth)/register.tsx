@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,37 +6,43 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  type TextInput
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Sparkles, Mail, Lock, AlertCircle } from "lucide-react-native";
 import { Input } from "../../src/components/Input";
 import { Button } from "../../src/components/Button";
-import {
-  COLORS,
-  SPACING,
-  TYPOGRAPHY,
-  BORDER_RADIUS
-} from "../../src/constants/theme";
-import { authApi } from "../../src/services/api";
+import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from "../../src/constants/theme";
+import { PRIVACY_POLICY_URL, openLink } from "../../src/constants/links";
+import { authApi, errorMessage as describeError } from "../../src/services/api";
 import { useAuthStore } from "../../src/stores/authStore";
 import { hapticError, hapticSuccess } from "../../src/utils/haptics";
 
+const utf8Length = (value: string) => {
+  let bytes = 0;
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+    bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+  }
+  return bytes;
+};
+
 const registerSchema = z
   .object({
-    email: z
+    email: z.string().trim().min(1, "Enter your email").email("Enter a valid email address"),
+    password: z
       .string()
-      .trim()
-      .min(1, "Email is required")
-      .email("Please enter a valid email"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string().min(1, "Please confirm your password")
+      .min(8, "Use at least 8 characters")
+      .refine((value) => utf8Length(value) <= 72, "That password is too long"),
+    confirmPassword: z.string().min(1, "Confirm your password")
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
+    message: "Passwords don't match",
     path: ["confirmPassword"]
   });
 
@@ -47,6 +53,8 @@ export default function RegisterScreen() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
 
   const {
     control,
@@ -54,14 +62,11 @@ export default function RegisterScreen() {
     formState: { errors }
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-      confirmPassword: ""
-    }
+    defaultValues: { email: "", password: "", confirmPassword: "" }
   });
 
   const onSubmit = async (data: RegisterFormData) => {
+    if (isLoading) return;
     setErrorMessage(null);
     setIsLoading(true);
     try {
@@ -73,43 +78,43 @@ export default function RegisterScreen() {
       await hapticSuccess();
       await setAuth(res.token, res.user);
       router.replace("/(app)");
-    } catch (error: any) {
+    } catch (error) {
       await hapticError();
-      setErrorMessage(
-        error?.message || "Registration failed. Please try again."
-      );
+      setErrorMessage(describeError(error, "Couldn't create your account. Please try again."));
     } finally {
       setIsLoading(false);
     }
   };
 
+  const submit = handleSubmit(onSubmit);
+
   return (
+    // Edge-to-edge (Android 15 / targetSdk 35): keep content clear of the
+    // status and navigation bars.
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom", "left", "right"]}>
     <KeyboardAvoidingView
       style={styles.keyboardContainer}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Header Branding */}
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <View style={styles.iconCircle}>
-            <Sparkles size={40} color={COLORS.xp} />
+            <Sparkles size={40} color={COLORS.xpText} />
           </View>
-          <Text style={styles.appTitle}>Create Hero</Text>
+          <Text style={styles.appTitle} accessibilityRole="header">
+            Join Pulse
+          </Text>
           <Text style={styles.appSubtitle}>
-            Begin your journey to mastery and unlock powerful achievements
+            Turn your habits into daily quests and unlock badges as you go.
           </Text>
         </View>
 
-        {/* Form Card */}
         <View style={styles.formCard}>
-          <Text style={styles.cardHeading}>Adventurer Registration</Text>
+          <Text style={styles.cardHeading}>Create account</Text>
 
           {errorMessage && (
-            <View style={styles.errorBanner}>
-              <AlertCircle size={18} color={COLORS.danger} />
+            <View style={styles.errorBanner} accessibilityRole="alert" accessibilityLiveRegion="polite">
+              <AlertCircle size={18} color={COLORS.dangerText} />
               <Text style={styles.errorBannerText}>{errorMessage}</Text>
             </View>
           )}
@@ -119,11 +124,16 @@ export default function RegisterScreen() {
             name="email"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="EMAIL"
-                placeholder="hero@example.com"
+                label="Email"
+                placeholder="you@example.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => passwordRef.current?.focus()}
                 value={value}
                 onBlur={onBlur}
                 onChangeText={onChange}
@@ -138,9 +148,16 @@ export default function RegisterScreen() {
             name="password"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="PASSWORD"
+                ref={passwordRef}
+                label="Password"
                 placeholder="At least 8 characters"
                 secureTextEntry
+                autoCapitalize="none"
+                autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => confirmRef.current?.focus()}
                 value={value}
                 onBlur={onBlur}
                 onChangeText={onChange}
@@ -155,9 +172,15 @@ export default function RegisterScreen() {
             name="confirmPassword"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="CONFIRM PASSWORD"
-                placeholder="Repeat password"
+                ref={confirmRef}
+                label="Confirm password"
+                placeholder="Type it again"
                 secureTextEntry
+                autoCapitalize="none"
+                autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="done"
+                onSubmitEditing={() => void submit()}
                 value={value}
                 onBlur={onBlur}
                 onChangeText={onChange}
@@ -168,30 +191,48 @@ export default function RegisterScreen() {
           />
 
           <Button
-            title={isLoading ? "Forging Hero..." : "Begin Quest"}
-            onPress={handleSubmit(onSubmit)}
+            title={isLoading ? "Creating account…" : "Create account"}
+            onPress={() => void submit()}
             loading={isLoading}
             fullWidth
             size="lg"
             style={styles.submitButton}
           />
 
-          {/* Login Link */}
+          <View style={styles.legalRow}>
+            <Text style={styles.legalText}>Learn how Pulse handles your data in our</Text>
+            <TouchableOpacity
+              style={styles.inlineLink}
+              accessibilityRole="link"
+              accessibilityHint="Opens in your browser"
+              onPress={() => void openLink(PRIVACY_POLICY_URL)}
+            >
+              <Text style={styles.linkTextSmall}>Privacy Policy</Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.footerRow}>
             <Text style={styles.footerText}>Already have an account?</Text>
-            <Link href="/(auth)/login" asChild>
-              <TouchableOpacity>
-                <Text style={styles.linkText}>Sign In</Text>
-              </TouchableOpacity>
-            </Link>
+            <TouchableOpacity
+              style={styles.inlineLink}
+              accessibilityRole="link"
+              onPress={() => (router.canGoBack() ? router.back() : router.replace("/(auth)/login"))}
+            >
+              <Text style={styles.linkText}>Sign in</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background
+  },
   keyboardContainer: {
     flex: 1,
     backgroundColor: COLORS.background
@@ -211,21 +252,19 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     backgroundColor: COLORS.xpLight,
     borderWidth: 2,
-    borderColor: "rgba(139, 92, 246, 0.4)",
+    borderColor: COLORS.xpBorder,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: SPACING.md
   },
   appTitle: {
     ...TYPOGRAPHY.hero,
-    color: COLORS.text,
     textAlign: "center",
     marginBottom: SPACING.xs
   },
   appSubtitle: {
     ...TYPOGRAPHY.bodySecondary,
     textAlign: "center",
-    color: COLORS.textMuted,
     paddingHorizontal: SPACING.lg
   },
   formCard: {
@@ -237,15 +276,14 @@ const styles = StyleSheet.create({
   },
   cardHeading: {
     ...TYPOGRAPHY.title2,
-    marginBottom: SPACING.lg,
-    color: COLORS.text
+    marginBottom: SPACING.lg
   },
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.dangerLight,
     borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.3)",
+    borderColor: COLORS.dangerBorder,
     borderRadius: BORDER_RADIUS.md,
     padding: SPACING.md,
     marginBottom: SPACING.lg,
@@ -253,26 +291,48 @@ const styles = StyleSheet.create({
   },
   errorBannerText: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.danger,
+    color: COLORS.dangerText,
     flex: 1
   },
   submitButton: {
     marginTop: SPACING.sm,
-    marginBottom: SPACING.lg
+    marginBottom: SPACING.sm
+  },
+  legalRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: SPACING.xs
+  },
+  legalText: {
+    ...TYPOGRAPHY.caption,
+    textAlign: "center"
   },
   footerRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "center",
     alignItems: "center",
-    gap: 6
+    gap: 4
   },
   footerText: {
-    ...TYPOGRAPHY.bodySecondary,
-    color: COLORS.textMuted
+    ...TYPOGRAPHY.bodySecondary
+  },
+  inlineLink: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: SPACING.xs
   },
   linkText: {
     ...TYPOGRAPHY.body,
-    color: COLORS.primary,
+    color: COLORS.primaryText,
     fontWeight: "700"
+  },
+  linkTextSmall: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.primaryText,
+    fontWeight: "700",
+    textDecorationLine: "underline"
   }
 });

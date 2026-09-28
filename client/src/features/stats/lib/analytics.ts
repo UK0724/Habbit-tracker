@@ -10,6 +10,7 @@ export type DayCell = {
   status: ActionStatus | null;
   value: number | null;
   hasLog: boolean;
+  frozen?: boolean;
 };
 
 export type ActionAnalytics = {
@@ -229,7 +230,8 @@ export const buildContributionGrid = (logs: HabitLog[], weeks = 18) => {
         date,
         status: log?.status ?? null,
         value: log?.value ?? null,
-        hasLog: Boolean(log)
+        hasLog: Boolean(log),
+        frozen: log?.frozen === true
       });
     }
     columns.push(column);

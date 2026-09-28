@@ -1,4 +1,3 @@
-import { env } from "../../config/env.js";
 import { Types } from "mongoose";
 import { UserModel } from "../auth/user.model.js";
 import { HabitModel } from "../habits/habit.model.js";
@@ -15,11 +14,13 @@ import {
   ACHIEVEMENT_MAP,
   LEVEL_THRESHOLDS,
   LEVEL_TITLES,
+  GEM_REWARDS,
+  STREAK_RESTORE_COST,
+  STREAK_RESTORE_WINDOW_MS,
   XP_REWARDS,
   getXPForNextLevel,
-  type AchievementDefinition
+  type Achievement
 } from "./gamification.constants.js";
-import { issueAdToken, verifyAndConsumeAdToken } from "./adToken.service.js";
 import { type PushPayload, sendPush } from "./push.service.js";
 import { AppError } from "../../utils/appError.js";
 
@@ -42,7 +43,7 @@ const shiftDate = (date: string, days: number): string => {
 };
 
 /** Ensures a UserGameProfile exists for the user, creating one if needed. */
-const ensureProfile = async (userId: string) => {
+export const ensureProfile = async (userId: string) => {
   return UserGameProfileModel.findOneAndUpdate(
     { userId },
     { $setOnInsert: { userId } },
@@ -66,7 +67,7 @@ const xpStages = (amount: number) => [
     }
   }
 ];
-const unlockAchievement = async (userId: string, id: string, today: string) => {
+export const unlockAchievement = async (userId: string, id: string, today: string) => {
   const def = ACHIEVEMENT_MAP.get(id)!;
   const profile = await UserGameProfileModel.findOneAndUpdate(
     { userId, "achievements.id": { $ne: id } },
@@ -75,7 +76,8 @@ const unlockAchievement = async (userId: string, id: string, today: string) => {
         $set: {
           achievements: {
             $concatArrays: ["$achievements", [{ id, unlockedAt: today }]]
-          }
+          },
+          gems: { $add: [{ $ifNull: ["$gems", 0] }, def.gemBonus] }
         }
       },
       ...xpStages(def.xpBonus)
@@ -91,35 +93,122 @@ const unlockAchievement = async (userId: string, id: string, today: string) => {
   });
   return true;
 };
+export type LevelUp = { level: number; title: string };
+export type RewardSummary = {
+  xpAwarded: number;
+  newAchievements: Achievement[];
+  levelUp: LevelUp | null;
+  gemsAwarded: number;
+  /** This action earned the Legendary Day bonus (included in xpAwarded). */
+  legendaryDay: boolean;
+  /** Set when logging today performed the day's check-in automatically. */
+  checkin: CheckinResult | null;
+};
+
+/** Diffs the profile around a reward so clients can celebrate exactly what changed. */
+export const summarizeReward = async <
+  T extends { xpAwarded: number; newAchievements: Achievement[] } & Partial<
+    Pick<RewardSummary, "legendaryDay" | "checkin">
+  >
+>(
+  userId: string,
+  run: () => Promise<T>
+): Promise<T & RewardSummary> => {
+  const before = await ensureProfile(userId);
+  const result = await run();
+  const after = (await UserGameProfileModel.findOne({ userId })) ?? before;
+  return {
+    ...result,
+    legendaryDay: result.legendaryDay ?? false,
+    checkin: result.checkin ?? null,
+    levelUp:
+      after.level > before.level
+        ? { level: after.level, title: LEVEL_TITLES[after.level - 1] ?? "Apex" }
+        : null,
+    gemsAwarded: Math.max(0, after.gems - before.gems)
+  };
+};
+
+const restoreInfo = (profile: { brokenStreak?: number | null; brokenAt?: Date | null }) => {
+  const expiresAt =
+    profile.brokenStreak && profile.brokenAt
+      ? new Date(profile.brokenAt.getTime() + STREAK_RESTORE_WINDOW_MS)
+      : null;
+  const canRestore = !!expiresAt && expiresAt.getTime() > Date.now();
+  return {
+    canRestore,
+    restoreCost: STREAK_RESTORE_COST,
+    restoreExpiresAt: canRestore ? expiresAt!.toISOString() : null,
+    brokenStreak: canRestore
+      ? { previousStreak: profile.brokenStreak!, restoreExpiresAt: expiresAt!.toISOString() }
+      : null
+  };
+};
+
+export type CheckinResult = {
+  alreadyCheckedIn: boolean;
+  streak: number;
+  longestStreak: number;
+  streakBroken: boolean;
+  freezeUsed: boolean;
+  xpAwarded: number;
+  previousStreak: number;
+  canRestore: boolean;
+  restoreCost: number;
+  restoreExpiresAt: string | null;
+  /** No active habit yet: nothing was recorded and the streak hasn't started. */
+  needsHabit: boolean;
+  newAchievements: Achievement[];
+};
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const gamificationService = {
   // ── Daily Check-in ──────────────────────────────────────────────────────────
 
-  dailyCheckin: async (
-    userId: string
-  ): Promise<{
-    alreadyCheckedIn: boolean;
-    streak: number;
-    longestStreak: number;
-    streakBroken: boolean;
-    freezeUsed: boolean;
-    xpAwarded: number;
-  }> => {
+  dailyCheckin: (userId: string) =>
+    summarizeReward(userId, () => gamificationService.claimCheckin(userId)),
+
+  claimCheckin: async (userId: string): Promise<CheckinResult> => {
     const profile = await ensureProfile(userId);
     const today = await getUserToday(userId);
 
     // Already checked in today
     if (profile.lastLoginDate === today) {
+      const { canRestore, restoreCost, restoreExpiresAt } = restoreInfo(profile);
       return {
         alreadyCheckedIn: true,
         streak: profile.loginStreak,
         longestStreak: profile.longestStreak,
         streakBroken: false,
         freezeUsed: false,
-        xpAwarded: 0
+        xpAwarded: 0,
+        previousStreak: profile.loginStreak,
+        canRestore,
+        restoreCost,
+        restoreExpiresAt,
+        needsHabit: false,
+        newAchievements: []
       };
     }
+    // The streak starts with the first habit, not the first app open.
+    if (!(await HabitModel.exists({ userId, archived: { $ne: true } }))) {
+      return {
+        alreadyCheckedIn: false,
+        streak: profile.loginStreak,
+        longestStreak: profile.longestStreak,
+        streakBroken: false,
+        freezeUsed: false,
+        xpAwarded: 0,
+        previousStreak: profile.loginStreak,
+        canRestore: false,
+        restoreCost: STREAK_RESTORE_COST,
+        restoreExpiresAt: null,
+        needsHabit: true,
+        newAchievements: []
+      };
+    }
+    const previousStreak = profile.loginStreak;
 
     const yesterday = shiftDate(today, -1);
     const twoDaysAgo = shiftDate(today, -2);
@@ -171,14 +260,23 @@ export const gamificationService = {
             lastLoginDate: today,
             loginStreak: profile.loginStreak,
             longestStreak: { $max: ["$longestStreak", profile.loginStreak] },
-            streakFreezes: { $subtract: ["$streakFreezes", freezeUsed ? 1 : 0] }
+            streakFreezes: { $subtract: ["$streakFreezes", freezeUsed ? 1 : 0] },
+            gems: {
+              $add: [
+                { $ifNull: ["$gems", 0] },
+                bonus ? GEM_REWARDS.STREAK_MILESTONE : 0
+              ]
+            },
+            ...(streakBroken
+              ? { brokenStreak: previousStreak, brokenAt: new Date() }
+              : {})
           }
         },
         ...xpStages(XP_REWARDS.CHECKIN + bonus)
       ],
       { new: true }
     );
-    if (!claimed) return gamificationService.dailyCheckin(userId);
+    if (!claimed) return gamificationService.claimCheckin(userId);
     const xpAwarded = XP_REWARDS.CHECKIN + bonus;
     await XPEventModel.create({
       userId,
@@ -193,17 +291,74 @@ export const gamificationService = {
         amount: bonus,
         reason: "streak_bonus"
       });
-    await gamificationService.checkAchievements(userId);
+    const newAchievements: Achievement[] = [];
+    if (streakBroken && (await unlockAchievement(userId, "comeback_kid", today)))
+      newAchievements.push(ACHIEVEMENT_MAP.get("comeback_kid")!);
+    newAchievements.push(...(await gamificationService.checkAchievements(userId)));
 
+    const { canRestore, restoreCost, restoreExpiresAt } = restoreInfo(claimed);
     return {
       alreadyCheckedIn: false,
       streak: profile.loginStreak,
       longestStreak: profile.longestStreak,
       streakBroken,
       freezeUsed,
-      xpAwarded
+      xpAwarded,
+      previousStreak,
+      canRestore,
+      restoreCost,
+      restoreExpiresAt,
+      needsHabit: false,
+      newAchievements
     };
   },
+
+  // ── Restore Streak With Gems ────────────────────────────────────────────────
+
+  restoreStreak: (userId: string) =>
+    summarizeReward(userId, async () => {
+      await ensureProfile(userId);
+      const restored = await UserGameProfileModel.findOneAndUpdate(
+        {
+          userId,
+          gems: { $gte: STREAK_RESTORE_COST },
+          brokenStreak: { $gt: 0 },
+          brokenAt: { $gt: new Date(Date.now() - STREAK_RESTORE_WINDOW_MS) }
+        },
+        [
+          {
+            $set: {
+              gems: { $subtract: ["$gems", STREAK_RESTORE_COST] },
+              loginStreak: { $add: ["$loginStreak", "$brokenStreak"] }
+            }
+          },
+          {
+            $set: {
+              longestStreak: { $max: ["$longestStreak", "$loginStreak"] },
+              brokenStreak: null,
+              brokenAt: null
+            }
+          }
+        ],
+        { new: true }
+      );
+      if (!restored) {
+        const profile = await ensureProfile(userId);
+        throw new AppError(
+          restoreInfo(profile).canRestore
+            ? `Not enough gems to restore your streak (costs ${STREAK_RESTORE_COST} gems)`
+            : "There is no broken streak to restore right now",
+          400
+        );
+      }
+      const newAchievements = await gamificationService.checkAchievements(userId);
+      return {
+        streak: restored.loginStreak,
+        gems: restored.gems,
+        xpAwarded: 0,
+        newAchievements
+      };
+    }),
 
   // ── Award XP ────────────────────────────────────────────────────────────────
 
@@ -218,7 +373,7 @@ export const gamificationService = {
     totalXP: number;
     level: number;
     newLevel: number | null;
-    newAchievements: AchievementDefinition[];
+    newAchievements: Achievement[];
   }> => {
     const profile = await ensureProfile(userId);
     const today = await getUserToday(userId);
@@ -282,8 +437,10 @@ export const gamificationService = {
     }
 
     // Check all achievements (only when gaining XP)
+    const fromLog = ["action_complete", "measurable_hit", "measurable_logged"].includes(reason) &&
+      rewardDate === today;
     const newAchievements =
-      amount > 0 ? await gamificationService.checkAchievements(userId) : [];
+      amount > 0 ? await gamificationService.checkAchievements(userId, { fromLog }) : [];
 
     return {
       xpAwarded: amount,
@@ -296,17 +453,19 @@ export const gamificationService = {
 
   // ── Check Achievements ───────────────────────────────────────────────────────
 
+  /** `fromLog`: triggered by logging a habit right now (enables time-of-day badges). */
   checkAchievements: async (
-    userId: string
-  ): Promise<AchievementDefinition[]> => {
+    userId: string,
+    options: { fromLog?: boolean } = {}
+  ): Promise<Achievement[]> => {
     const profile = await ensureProfile(userId);
     const today = await getUserToday(userId);
 
     const unlockedIds = new Set(profile.achievements.map((a) => a.id));
-    const newlyUnlocked: AchievementDefinition[] = [];
+    const newlyUnlocked: Achievement[] = [];
 
     // Helper: unlock if not already
-    const tryUnlock = async (def: AchievementDefinition) => {
+    const tryUnlock = async (def: Achievement) => {
       if (unlockedIds.has(def.id)) return;
       unlockedIds.add(def.id);
       if (await unlockAchievement(userId, def.id, today))
@@ -345,11 +504,31 @@ export const gamificationService = {
     });
     const todayXP = todayXPEvents.reduce((sum, e) => sum + e.amount, 0);
 
-    // Log count today
+    // Logs today that count as activity (skips don't)
     const logsToday = await HabitLogModel.countDocuments({
       habitId: { $in: userHabitIds },
-      date: today
+      date: today,
+      status: { $ne: "skipped" }
     });
+
+    // Longest run of consecutive days with at least one completed/logged habit
+    const activeDates = (
+      (await HabitLogModel.distinct("date", {
+        habitId: { $in: userHabitIds },
+        $or: [{ status: "done" }, { value: { $ne: null } }]
+      })) as string[]
+    ).sort();
+    const longestRun = (dates: string[]) => {
+      let best = 0, run = 0, previous: string | null = null;
+      for (const date of dates) {
+        run = previous && shiftDate(previous, 1) === date ? run + 1 : 1;
+        best = Math.max(best, run);
+        previous = date;
+      }
+      return best;
+    };
+    const activeDayRun = longestRun(activeDates);
+    const perfectDayRun = longestRun([...(profile.perfectDates ?? [])].sort());
 
     // legendary_day events count (perfect_day)
     const perfectDayCount = await XPEventModel.countDocuments({
@@ -382,10 +561,10 @@ export const gamificationService = {
       }).format(new Date()),
       10
     );
-    if (nowHour < 8 && totalLogs >= 1) {
+    if (options.fromLog && nowHour < 8) {
       await tryUnlock(ACHIEVEMENT_MAP.get("early_bird")!);
     }
-    if (nowHour >= 22 && totalLogs >= 1) {
+    if (options.fromLog && nowHour >= 22) {
       await tryUnlock(ACHIEVEMENT_MAP.get("night_owl")!);
     }
 
@@ -402,11 +581,10 @@ export const gamificationService = {
     if (profile.loginStreak >= 365)
       await tryUnlock(ACHIEVEMENT_MAP.get("legend")!);
 
-    // no_excuses / iron_will: streak with no skips
-    // We use loginStreak as the proxy since each checkin = no skip day
-    if (profile.loginStreak >= 14)
+    // no_excuses / iron_will: consecutive days with a completed habit
+    if (activeDayRun >= 14)
       await tryUnlock(ACHIEVEMENT_MAP.get("no_excuses")!);
-    if (profile.loginStreak >= 30)
+    if (activeDayRun >= 30)
       await tryUnlock(ACHIEVEMENT_MAP.get("iron_will")!);
 
     // ── Performance ──────────────────────────────────────────────────────────
@@ -419,7 +597,7 @@ export const gamificationService = {
     if (todayXP >= 1000) await tryUnlock(ACHIEVEMENT_MAP.get("overachiever")!);
 
     // legendary_week: 7 consecutive perfect days
-    if (perfectDayCount >= 7)
+    if (perfectDayRun >= 7)
       await tryUnlock(ACHIEVEMENT_MAP.get("legendary_week")!);
 
     // ── Consistency ──────────────────────────────────────────────────────────
@@ -430,11 +608,14 @@ export const gamificationService = {
 
     // ── Levels ───────────────────────────────────────────────────────────────
 
-    if (profile.level >= 10)
-      await tryUnlock(ACHIEVEMENT_MAP.get("rising_star")!);
-    if (profile.level >= 25) await tryUnlock(ACHIEVEMENT_MAP.get("warrior")!);
-    if (profile.level >= 50) await tryUnlock(ACHIEVEMENT_MAP.get("champion")!);
-    if (profile.level >= 100) await tryUnlock(ACHIEVEMENT_MAP.get("apex")!);
+    // Re-read: bonus XP from badges unlocked above can raise the level.
+    const level =
+      (await UserGameProfileModel.findOne({ userId }).select("level"))?.level ??
+      profile.level;
+    if (level >= 10) await tryUnlock(ACHIEVEMENT_MAP.get("rising_star")!);
+    if (level >= 25) await tryUnlock(ACHIEVEMENT_MAP.get("warrior")!);
+    if (level >= 50) await tryUnlock(ACHIEVEMENT_MAP.get("champion")!);
+    if (level >= 100) await tryUnlock(ACHIEVEMENT_MAP.get("apex")!);
 
     // ── Meta / Collector ─────────────────────────────────────────────────────
 
@@ -442,7 +623,7 @@ export const gamificationService = {
     const totalUnlocked = unlockedIds.size;
     if (totalUnlocked >= 10) await tryUnlock(ACHIEVEMENT_MAP.get("collector")!);
     if (totalUnlocked >= 25) await tryUnlock(ACHIEVEMENT_MAP.get("master")!);
-    if (totalUnlocked >= 30)
+    if (totalUnlocked >= ACHIEVEMENTS.length - 1)
       await tryUnlock(ACHIEVEMENT_MAP.get("completionist")!);
 
     // ── Save & notify ────────────────────────────────────────────────────────
@@ -455,8 +636,23 @@ export const gamificationService = {
       });
     }
 
+    // Bonus XP from these unlocks can cross level or collector thresholds.
+    if (newlyUnlocked.length)
+      newlyUnlocked.push(...(await gamificationService.checkAchievements(userId)));
     return newlyUnlocked;
   },
+
+  // ── Share Progress ──────────────────────────────────────────────────────────
+
+  shareProgress: (userId: string) =>
+    summarizeReward(userId, async () => {
+      const today = await getUserToday(userId);
+      const newAchievements: Achievement[] = [];
+      if (await unlockAchievement(userId, "social_proof", today))
+        newAchievements.push(ACHIEVEMENT_MAP.get("social_proof")!);
+      newAchievements.push(...(await gamificationService.checkAchievements(userId)));
+      return { xpAwarded: 0, newAchievements };
+    }),
 
   // ── Get Profile ─────────────────────────────────────────────────────────────
 
@@ -483,6 +679,8 @@ export const gamificationService = {
       lastLoginDate: profile.lastLoginDate,
       streakFreezes: profile.streakFreezes,
       achievementCount: profile.achievements.length,
+      achievementTotal: ACHIEVEMENTS.length,
+      brokenStreak: restoreInfo(profile).brokenStreak,
       today
     };
   },
@@ -504,7 +702,10 @@ export const gamificationService = {
 
   // ── Use Streak Freeze ────────────────────────────────────────────────────────
 
-  useStreakFreeze: async (userId: string) => {
+  useStreakFreeze: (userId: string) =>
+    summarizeReward(userId, () => gamificationService.buyStreakFreeze(userId)),
+
+  buyStreakFreeze: async (userId: string) => {
     await ensureProfile(userId);
     const profile = await UserGameProfileModel.findOneAndUpdate(
       { userId, gems: { $gte: 2 } },
@@ -516,56 +717,20 @@ export const gamificationService = {
         "Not enough gems to purchase a streak freeze (costs 2 gems)",
         400
       );
-    await unlockAchievement(userId, "wise_spender", await getUserToday(userId));
-
-    return {
-      gems: profile.gems,
-      streakFreezes: profile.streakFreezes
-    };
-  },
-
-  // ── Restore Streak With Ad ────────────────────────────────────────────────────
-
-  restoreStreakWithAd: async (userId: string, adToken: string) => {
-    if (env.NODE_ENV === "production")
-      throw new AppError("Ad rewards are not available", 503);
-    const valid = await verifyAndConsumeAdToken(adToken, userId);
-    if (!valid) {
-      throw new AppError("Invalid or expired ad token", 400);
-    }
-
-    const profile = await ensureProfile(userId);
-    const today = await getUserToday(userId);
-
-    // Restore streak to at least 1
-    if (profile.loginStreak === 0) {
-      profile.loginStreak = 1;
-    }
-    profile.lastLoginDate = today;
-    await profile.save();
-
-    // Unlock comeback_kid
-    const def = ACHIEVEMENT_MAP.get("comeback_kid")!;
-    if (!profile.achievements.find((a) => a.id === def.id)) {
-      await unlockAchievement(userId, def.id, today);
-    }
-
-    return {
-      streak: profile.loginStreak,
-      restored: true
-    };
-  },
-
-  // ── Issue Ad Token ────────────────────────────────────────────────────────────
-
-  issueAdToken: async (userId: string) => {
-    if (env.NODE_ENV === "production")
-      throw new AppError(
-        "Ad rewards are not available until server-side ad verification is configured",
-        503
+    const newAchievements: Achievement[] = [];
+    if (await unlockAchievement(userId, "wise_spender", await getUserToday(userId)))
+      newAchievements.push(
+        ACHIEVEMENT_MAP.get("wise_spender")!,
+        ...(await gamificationService.checkAchievements(userId))
       );
-    const token = issueAdToken(userId);
-    return { adToken: token };
+    const current = (await UserGameProfileModel.findOne({ userId })) ?? profile;
+
+    return {
+      gems: current.gems,
+      streakFreezes: current.streakFreezes,
+      xpAwarded: 0,
+      newAchievements
+    };
   },
 
   // ── Subscribe Push ────────────────────────────────────────────────────────────
@@ -590,8 +755,11 @@ export const gamificationService = {
 
   // ── Unsubscribe Push ──────────────────────────────────────────────────────────
 
-  unsubscribePush: async (userId: string) => {
-    await PushSubscriptionModel.deleteMany({ userId });
+  // Without an endpoint (older clients) every device is unsubscribed.
+  unsubscribePush: async (userId: string, endpoint?: string) => {
+    await PushSubscriptionModel.deleteMany(
+      endpoint ? { userId, endpoint } : { userId }
+    );
     return { unsubscribed: true };
   },
 
@@ -614,14 +782,49 @@ export const gamificationService = {
  * Awards XP, checks for legendary_day bonus, returns xpAwarded + newAchievements.
  */
 type RewardLog = { date: string; status: string | null; value: number | null };
-export const handleHabitLogXP = async (
+export const handleHabitLogXP = (
   userId: string,
   habit: { _id: Types.ObjectId; type: string } & Parameters<
     typeof completed
   >[0],
   previous?: RewardLog,
   next?: RewardLog
-): Promise<{ xpAwarded: number; newAchievements: AchievementDefinition[] }> => {
+): Promise<RewardSummary> =>
+  summarizeReward(userId, () => applyHabitLogXP(userId, habit, previous, next));
+
+const applyHabitLogXP = async (
+  userId: string,
+  habit: { _id: Types.ObjectId; type: string } & Parameters<
+    typeof completed
+  >[0],
+  previous?: RewardLog,
+  next?: RewardLog
+) => {
+  // Logging today counts as showing up: check in so the login streak and its
+  // badges work even for users who never press "Check in".
+  let checkin: CheckinResult | null = null;
+  if (next && next.date === (await getUserToday(userId))) {
+    const result = await gamificationService.claimCheckin(userId);
+    if (!result.alreadyCheckedIn) checkin = result;
+  }
+  const logResult = await applyLogXP(userId, habit, previous, next);
+  return {
+    ...logResult,
+    // Check-in XP is reported in `checkin`, so clients don't show it twice.
+    xpAwarded: logResult.xpAwarded,
+    newAchievements: [...(checkin?.newAchievements ?? []), ...logResult.newAchievements],
+    checkin
+  };
+};
+
+const applyLogXP = async (
+  userId: string,
+  habit: { _id: Types.ObjectId; type: string } & Parameters<
+    typeof completed
+  >[0],
+  previous?: RewardLog,
+  next?: RewardLog
+): Promise<{ xpAwarded: number; newAchievements: Achievement[]; legendaryDay: boolean }> => {
   const reward = (log?: RewardLog) => {
     if (!log || log.status === "skipped") return 0;
     if (habit.type === "action")
@@ -652,12 +855,14 @@ export const handleHabitLogXP = async (
           habit._id.toString(),
           date
         )
-      : { xpAwarded: 0, newAchievements: [] as AchievementDefinition[] };
+      : { xpAwarded: 0, newAchievements: [] as Achievement[] };
   if (!next || !completed(habit, next))
     return {
       xpAwarded: result.xpAwarded,
-      newAchievements: result.newAchievements
+      newAchievements: result.newAchievements,
+      legendaryDay: false
     };
+  let legendaryDay = false;
 
   // Check for legendary_day against habits still due on this date. Weekly
   // habits whose quota was met earlier in the week and skipped habits are
@@ -711,12 +916,18 @@ export const handleHabitLogXP = async (
           date
         );
         result.xpAwarded += bonus.xpAwarded;
+        legendaryDay = bonus.xpAwarded > 0;
+        result.newAchievements = [
+          ...result.newAchievements,
+          ...bonus.newAchievements
+        ];
       }
     }
   }
 
   return {
     xpAwarded: result.xpAwarded,
-    newAchievements: result.newAchievements
+    newAchievements: result.newAchievements,
+    legendaryDay
   };
 };

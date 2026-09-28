@@ -15,9 +15,15 @@ import {
   getArchivedHabits,
   getHabit,
   getHabits,
+  repairHabitStreak,
   setHabitArchived,
   updateHabit
 } from "../services/habitsApi";
+import { pushToast } from "../../../stores/xpToastStore";
+import {
+  applyReward,
+  invalidateGamification
+} from "../../gamification/rewards";
 
 const invalidateHabitCollections = async (
   queryClient: QueryClient,
@@ -31,17 +37,9 @@ const invalidateHabitCollections = async (
     queryClient.invalidateQueries({
       queryKey: ["archived-habits"]
     }),
-    queryClient.invalidateQueries({
-      queryKey: ["today-logs"]
-    }),
     habitId
       ? queryClient.invalidateQueries({
           queryKey: ["habit", habitId]
-        })
-      : Promise.resolve(),
-    habitId
-      ? queryClient.invalidateQueries({
-          queryKey: ["habit-stats", habitId]
         })
       : Promise.resolve(),
     habitId
@@ -89,7 +87,11 @@ export const useCreateHabit = () => {
   return useMutation({
     mutationFn: (input: CreateHabitInput) => createHabit(input),
     onSuccess: async (habit) => {
-      await invalidateHabitCollections(queryClient, habit.id);
+      await Promise.all([
+        invalidateHabitCollections(queryClient, habit.id),
+        // The first habit starts the streak (Day 1) server-side.
+        invalidateGamification(queryClient)
+      ]);
     }
   });
 };
@@ -115,6 +117,42 @@ export const useDeleteHabit = (habitId: string) => {
       queryClient.removeQueries({
         queryKey: ["habit", habitId]
       });
+    }
+  });
+};
+
+/** Excuse a missed day with a streak freeze (or gems) so the streak continues. */
+export const useRepairStreak = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      habitId,
+      date
+    }: {
+      habitId: string;
+      date: string;
+      /** For the confirmation toast. */
+      gemCost?: number;
+    }) =>
+      repairHabitStreak(habitId, date),
+    onSuccess: async (data, variables) => {
+      // Celebrates badges such as Second Chance; no XP is awarded.
+      applyReward(queryClient, data, { skipXpToast: true });
+      pushToast({
+        amount: data?.paidWith === "gems" ? -(variables.gemCost ?? 3) : -1,
+        label: data?.paidWith === "gems" ? "💎" : "🛡️",
+        title: "Streak repaired ❄️",
+        tone: "gems"
+      });
+      await Promise.all([
+        invalidateHabitCollections(queryClient, variables.habitId),
+        invalidateGamification(queryClient)
+      ]);
+    },
+    onError: async (_error, variables) => {
+      // The offer may be stale (logged elsewhere, window passed): refresh it.
+      await invalidateHabitCollections(queryClient, variables.habitId);
     }
   });
 };

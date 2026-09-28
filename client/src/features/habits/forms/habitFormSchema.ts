@@ -35,8 +35,6 @@ export const habitFormSchema = z
       .max(20, "Unit must be 20 characters or less")
       .optional(),
     requireCompletionComment: z.boolean(),
-    linkToJobTracker: z.boolean().optional(),
-    linkToDSAPrep: z.boolean().optional(),
     linkToExpenseTracker: z.boolean().optional(),
     color: z.enum(habitColorValues),
     goalDirection: z.enum(["up", "down", "range", "record"]).optional(),
@@ -46,7 +44,28 @@ export const habitFormSchema = z
       .optional()
   })
   .superRefine((value, context) => {
-    if(value.goalDirection === "range" && (value.target == null || value.targetMax == null || value.targetMax < value.target)) context.addIssue({code:z.ZodIssueCode.custom,path:["target"],message:"Enter a minimum and maximum in ascending order"});
+    if (value.type === "measurable" && value.goalDirection === "range") {
+      if (value.target == null) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["target"],
+          message: "Enter the lowest value that counts"
+        });
+      }
+      if (value.targetMax == null) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["targetMax"],
+          message: "Enter the highest value that counts"
+        });
+      } else if (value.target != null && value.targetMax < value.target) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["targetMax"],
+          message: "The upper limit must be at least the lower limit"
+        });
+      }
+    }
     if (value.type === "measurable" && !value.unit) {
       context.addIssue({
         code: z.ZodIssueCode.custom,

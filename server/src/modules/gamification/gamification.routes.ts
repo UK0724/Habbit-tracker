@@ -6,9 +6,9 @@ import {
   getProfileController,
   getAchievementsController,
   checkinController,
-  issueAdTokenController,
   restoreStreakController,
   useStreakFreezeController,
+  shareProgressController,
   getVapidKeyController,
   subscribePushController,
   unsubscribePushController
@@ -26,18 +26,12 @@ gamificationRouter.get("/achievements", getAchievementsController);
 // Daily check-in
 gamificationRouter.post("/checkin", checkinController);
 
-// Ad-token flow for streak restore
-gamificationRouter.post("/ad-token", issueAdTokenController);
-gamificationRouter.post(
-  "/restore",
-  validateRequest({
-    body: z.object({ adToken: z.string().min(1).max(2048) }).strict()
-  }),
-  restoreStreakController
-);
+// Restore a broken streak with gems (within 24h of the break)
+gamificationRouter.post("/restore-streak", restoreStreakController);
 
 // Streak freeze (costs 2 gems)
 gamificationRouter.post("/freeze", useStreakFreezeController);
+gamificationRouter.post("/share", shareProgressController);
 
 // Push notifications
 gamificationRouter.get("/push/vapid-key", getVapidKeyController);

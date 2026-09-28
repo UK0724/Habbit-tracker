@@ -1,4 +1,6 @@
 import { userToday } from "./workspaceSync.js";
+import { gamificationService } from "../gamification/gamification.service.js";
+import { STREAK_REPAIR_SOURCE, streakRepairOffer, type StreakRepairOffer } from "./streakRepair.service.js";
 import { summarize, type Rules } from "./rules.js";
 import {
   HabitLogDocument,
@@ -20,8 +22,6 @@ type HabitPayload = {
   type: HabitType;
   unit?: string;
   requireCompletionComment?: boolean;
-  linkToJobTracker?: boolean;
-  linkToDSAPrep?: boolean;
   linkToExpenseTracker?: boolean;
   color: string;
   goalDirection?: GoalDirection;
@@ -64,8 +64,6 @@ export type HabitResponse = {
   requireCompletionComment: boolean;
   color: string;
   archived: boolean;
-  linkToJobTracker?: boolean;
-  linkToDSAPrep?: boolean;
   linkToExpenseTracker?: boolean;
   goalDirection: GoalDirection;
   target?: number | null;
@@ -75,6 +73,7 @@ export type HabitResponse = {
   targetMax?: number | null;
   reminderTime?: string;
   ruleHistory?: (Rules & { effectiveDate: string })[];
+  startDate?: string;
 
   createdAt: string;
   updatedAt: string;
@@ -87,6 +86,8 @@ export type HabitLogResponse = {
   status: "done" | "not_done" | "skipped" | null;
   value: number | null;
   comment?: string;
+  /** A missed day excused by a paid streak repair. */
+  frozen?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -96,12 +97,15 @@ export type RecentDay = {
   status: "done" | "not_done" | "skipped" | null;
   value: number | null;
   hasLog: boolean;
+  frozen: boolean;
 };
 
 export type HabitListItemResponse = HabitResponse & {
   selectedDateLog: HabitLogResponse | null;
   stats: HabitStats;
   recentDays: RecentDay[];
+  /** Set when a recent missed day can be repaired to keep the streak. */
+  streakRepair: StreakRepairOffer | null;
 };
 
 const currencyLikeUnits = new Set(["₹", "$", "€", "£", "¥"]);
@@ -143,6 +147,7 @@ export const serializeHabit = (habit: HabitDocument): HabitResponse => ({
   targetMax: habit.targetMax,
   reminderTime: habit.reminderTime,
   ruleHistory: habit.ruleHistory,
+  startDate: habit.startDate,
   id: habit._id.toString(),
   title: habit.title,
   description: habit.description || undefined,
@@ -151,8 +156,6 @@ export const serializeHabit = (habit: HabitDocument): HabitResponse => ({
   requireCompletionComment: Boolean(habit.requireCompletionComment),
   color: habit.color,
   archived: Boolean(habit.archived),
-  linkToJobTracker: Boolean(habit.linkToJobTracker),
-  linkToDSAPrep: Boolean(habit.linkToDSAPrep),
   linkToExpenseTracker: Boolean(habit.linkToExpenseTracker),
   goalDirection: habit.goalDirection ?? "up",
   target: typeof habit.target === "number" ? habit.target : undefined,
@@ -167,6 +170,7 @@ export const serializeHabitLog = (log: HabitLogDocument): HabitLogResponse => ({
   status: log.status,
   value: log.value,
   comment: log.comment || undefined,
+  ...(log.source === STREAK_REPAIR_SOURCE ? { frozen: true } : {}),
   createdAt: log.createdAt.toISOString(),
   updatedAt: log.updatedAt.toISOString()
 });
@@ -290,7 +294,8 @@ export const buildRecentDays = (
       date,
       status: log?.status ?? null,
       value: log?.value ?? null,
-      hasLog: Boolean(log)
+      hasLog: Boolean(log),
+      frozen: log?.source === STREAK_REPAIR_SOURCE
     });
   }
 
@@ -354,7 +359,8 @@ export const listHabits = async (
         ? serializeHabitLog(selectedLogByHabit.get(habit._id.toString())!)
         : null,
       stats: buildHabitStats(habit, habitLogs, today),
-      recentDays: buildRecentDays(habitLogs, selectedDate, 7)
+      recentDays: buildRecentDays(habitLogs, selectedDate, 7),
+      streakRepair: streakRepairOffer(habit, habitLogs, today)
     } satisfies HabitListItemResponse;
   });
 };
@@ -384,6 +390,7 @@ export const createHabit = async (payload: HabitPayload) => {
 
   const habit = await HabitModel.create({
     ...payload,
+    startDate: await userToday(payload.userId),
     description: normalizedDescription,
     unit: normalizedUnit,
     requireCompletionComment:
@@ -393,12 +400,21 @@ export const createHabit = async (payload: HabitPayload) => {
     goalDirection,
     target: payload.type === "action" ? undefined : payload.target
   });
+  // First habit: today's check-in starts the streak (Day 1). Best effort.
+  if ((await HabitModel.countDocuments({ userId: payload.userId })) === 1)
+    await gamificationService.claimCheckin(payload.userId).catch((error: unknown) =>
+      console.error("[habits] Could not start the streak", error)
+    );
   return serializeHabit(habit);
 };
 
 export const getHabit = async (id: string, userId: string) => {
   const habit = await getHabitByIdOrThrow(id, userId);
-  return serializeHabit(habit);
+  const logs = await HabitLogModel.find({ habitId: habit._id });
+  return {
+    ...serializeHabit(habit),
+    streakRepair: streakRepairOffer(habit, logs, await userToday(userId))
+  };
 };
 
 export const listArchivedHabits = async (userId: string) => {
@@ -492,14 +508,6 @@ export const updateHabit = async (
       ? (payload.requireCompletionComment ?? habit.requireCompletionComment)
       : false;
   habit.color = payload.color ?? habit.color;
-  habit.linkToJobTracker =
-    nextType === "action"
-      ? (payload.linkToJobTracker ?? habit.linkToJobTracker)
-      : false;
-  habit.linkToDSAPrep =
-    nextType === "action"
-      ? (payload.linkToDSAPrep ?? habit.linkToDSAPrep)
-      : false;
   habit.linkToExpenseTracker =
     nextType === "action"
       ? (payload.linkToExpenseTracker ?? habit.linkToExpenseTracker)

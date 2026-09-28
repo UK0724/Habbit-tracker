@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Volume2,VolumeX,Bell,BellOff,Check,Sun,Moon,Monitor, type LucideIcon } from "lucide-react";
+import { Volume2,VolumeX,Bell,BellOff,Check,Sun,Moon,Monitor,Compass, type LucideIcon } from "lucide-react";
 import { TrackingPreferences } from "../components/TrackingPreferences";
 import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { deleteAccountApi } from "../services/authApi";
 import { PageHeader } from "../components/ui/PageHeader";
 import { SectionCard } from "../components/ui/SectionCard";
 import { ACCENT_PRESETS,ThemeMode } from "../shared/lib/theme";
@@ -12,6 +14,8 @@ import { useAuthStore } from "../stores/authStore";
 import { useThemeStore } from "../stores/themeStore";
 import { isSoundEnabled,setSoundEnabled,playSound } from "../shared/lib/sounds";
 import { usePushNotifications } from "../features/notifications/usePushNotifications";
+import { AvatarUploader } from "../features/account/components/AvatarUploader";
+import { useOnboardingStore } from "../features/onboarding/onboardingStore";
 
 const MODES: { value: ThemeMode; label: string; icon: LucideIcon }[] = [
   { value: "light", label: "Light", icon: Sun },
@@ -39,6 +43,7 @@ export const SettingsPage = () => {
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const openWalkthrough = useOnboardingStore((s) => s.open);
 
   const handleSoundToggle = (enabled: boolean) => {
     setSoundOn(enabled);
@@ -60,6 +65,24 @@ export const SettingsPage = () => {
     clearAuth();
     queryClient.clear();
     navigate("/login");
+  };
+
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const handleDeleteAccount = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!window.confirm("Permanently delete your account and all data? This cannot be undone.")) return;
+    setDeleteError("");
+    setIsDeletingAccount(true);
+    try {
+      await deleteAccountApi(deletePassword);
+      handleLogout();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Could not delete account.");
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   return (
@@ -235,7 +258,26 @@ export const SettingsPage = () => {
 
       <TrackingPreferences />
 
+      <SectionCard
+        title="How Pulse works"
+        description="Replay the quick tour of habits, XP, badges, streak freezes and repairs."
+      >
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => openWalkthrough(0)}
+          className="font-bold"
+        >
+          <Compass className="mr-2 h-4 w-4" aria-hidden />
+          How Pulse works
+        </Button>
+      </SectionCard>
+
       <SectionCard title="Account" description="Details tied to your login.">
+        <div className="mb-5">
+          <p className="field-label">Profile photo</p>
+          <AvatarUploader size="md" className="mt-2" />
+        </div>
         <div>
           <p className="field-label">Email</p>
           <p className="break-words rounded-2xl bg-surface-2 px-4 py-3 text-sm font-medium text-content-2">
@@ -248,6 +290,33 @@ export const SettingsPage = () => {
         <Button type="button" variant="danger" onClick={handleLogout}>
           Sign out
         </Button>
+      </SectionCard>
+
+      <SectionCard
+        title="Delete account"
+        description="Permanently removes your account and all of its data. This cannot be undone."
+      >
+        <form onSubmit={handleDeleteAccount} className="space-y-3">
+          <label htmlFor="delete-password" className="field-label">
+            Current password
+          </label>
+          <Input
+            id="delete-password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={deletePassword}
+            onChange={(e) => setDeletePassword(e.target.value)}
+          />
+          {deleteError ? (
+            <p role="alert" className="text-sm font-medium text-rose-600">
+              {deleteError}
+            </p>
+          ) : null}
+          <Button type="submit" variant="danger" disabled={isDeletingAccount}>
+            {isDeletingAccount ? "Deleting…" : "Delete account"}
+          </Button>
+        </form>
       </SectionCard>
     </div>
   );

@@ -7,6 +7,8 @@ export interface StreakBadgeProps {
   count: number;
   size?: "sm" | "md" | "lg";
   showLabel?: boolean;
+  /** Weekly habits count their streak in weeks. */
+  unit?: "day" | "week";
   style?: ViewStyle;
 }
 
@@ -14,76 +16,39 @@ export const StreakBadge: React.FC<StreakBadgeProps> = ({
   count,
   size = "md",
   showLabel = false,
+  unit = "day",
   style
 }) => {
   const isZero = count <= 0;
-
-  const iconSizes = {
-    sm: 12,
-    md: 16,
-    lg: 20
-  };
-
-  const getContainerStyle = (): ViewStyle => {
-    let base: ViewStyle = { ...styles.container };
-
-    switch (size) {
-      case "sm":
-        base.paddingVertical = 2;
-        base.paddingHorizontal = 6;
-        break;
-      case "lg":
-        base.paddingVertical = 6;
-        base.paddingHorizontal = 12;
-        break;
-      case "md":
-      default:
-        base.paddingVertical = 4;
-        base.paddingHorizontal = 8;
-        break;
-    }
-
-    if (isZero) {
-      base.backgroundColor = COLORS.surfaceElevated;
-      base.borderColor = COLORS.border;
-    } else {
-      base.backgroundColor = "rgba(249, 115, 22, 0.15)";
-      base.borderColor = "rgba(249, 115, 22, 0.4)";
-    }
-
-    return base;
-  };
-
-  const getTextSize = () => {
-    switch (size) {
-      case "sm":
-        return 11;
-      case "lg":
-        return 15;
-      case "md":
-      default:
-        return 13;
-    }
-  };
+  const iconSize = size === "sm" ? 12 : size === "lg" ? 20 : 16;
+  const fontSize = size === "sm" ? 11 : size === "lg" ? 15 : 13;
+  const label = `${count} ${unit}${count === 1 ? "" : "s"}`;
 
   return (
-    <View style={[getContainerStyle(), style]}>
+    <View
+      accessible
+      accessibilityLabel={`${label} streak`}
+      style={[
+        styles.container,
+        {
+          paddingVertical: size === "sm" ? 2 : size === "lg" ? 6 : 4,
+          paddingHorizontal: size === "sm" ? 6 : size === "lg" ? 12 : 8,
+          backgroundColor: isZero ? COLORS.surfaceElevated : COLORS.streakLight,
+          borderColor: isZero ? COLORS.border : COLORS.streakBorder
+        },
+        style
+      ]}
+    >
       <Flame
-        size={iconSizes[size]}
+        size={iconSize}
         color={isZero ? COLORS.textMuted : COLORS.streak}
         fill={isZero ? "transparent" : COLORS.streak}
       />
       <Text
-        style={[
-          styles.countText,
-          {
-            fontSize: getTextSize(),
-            color: isZero ? COLORS.textMuted : COLORS.streak
-          }
-        ]}
+        maxFontSizeMultiplier={1.4}
+        style={[styles.countText, { fontSize, color: isZero ? COLORS.textMuted : COLORS.streak }]}
       >
-        {count}
-        {showLabel ? (count === 1 ? " day" : " days") : ""}
+        {showLabel ? label : count}
       </Text>
     </View>
   );

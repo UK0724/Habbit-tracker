@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { forwardRef, useState } from "react";
 import {
   View,
   Text,
@@ -20,37 +20,54 @@ export interface InputProps extends TextInputProps {
   containerStyle?: ViewStyle;
 }
 
-export const Input: React.FC<InputProps> = ({
-  label,
-  error,
-  helperText,
-  leftIcon,
-  rightIcon,
-  secureTextEntry,
-  containerStyle,
-  style,
-  onFocus,
-  onBlur,
-  ...props
-}) => {
+export const Input = forwardRef<TextInput, InputProps>(function Input(
+  {
+    label,
+    error,
+    helperText,
+    leftIcon,
+    rightIcon,
+    secureTextEntry,
+    containerStyle,
+    style,
+    onFocus,
+    onBlur,
+    editable,
+    accessibilityLabel,
+    accessibilityHint,
+    ...props
+  },
+  ref
+) {
   const [isFocused, setIsFocused] = useState(false);
   const [isSecure, setIsSecure] = useState(secureTextEntry);
+  const disabled = editable === false;
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && (
+        <Text style={styles.label} importantForAccessibility="no" accessible={false}>
+          {label}
+        </Text>
+      )}
       <View
         style={[
           styles.inputWrapper,
           isFocused && styles.inputFocused,
-          Boolean(error) && styles.inputError
+          Boolean(error) && styles.inputError,
+          disabled && styles.inputDisabled
         ]}
       >
         {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
         <TextInput
+          ref={ref}
           style={[styles.input, style]}
           placeholderTextColor={COLORS.textMuted}
           secureTextEntry={isSecure}
+          editable={editable}
+          accessibilityLabel={accessibilityLabel ?? label}
+          accessibilityHint={error ? `Error: ${error}` : accessibilityHint ?? helperText}
+          accessibilityState={{ disabled }}
           onFocus={(event) => {
             setIsFocused(true);
             onFocus?.(event);
@@ -63,14 +80,15 @@ export const Input: React.FC<InputProps> = ({
         />
         {secureTextEntry ? (
           <TouchableOpacity
-            style={styles.iconRight}
+            style={styles.eyeButton}
             onPress={() => setIsSecure(!isSecure)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={isSecure ? "Show password" : "Hide password"}
           >
             {isSecure ? (
               <EyeOff size={18} color={COLORS.textMuted} />
             ) : (
-              <Eye size={18} color={COLORS.primary} />
+              <Eye size={18} color={COLORS.primaryText} />
             )}
           </TouchableOpacity>
         ) : (
@@ -78,23 +96,23 @@ export const Input: React.FC<InputProps> = ({
         )}
       </View>
       {error ? (
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.errorText} accessibilityLiveRegion="polite">
+          {error}
+        </Text>
       ) : helperText ? (
         <Text style={styles.helperText}>{helperText}</Text>
       ) : null}
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
     marginBottom: SPACING.md
   },
   label: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
-    fontWeight: "600"
+    ...TYPOGRAPHY.label,
+    marginBottom: SPACING.xs
   },
   inputWrapper: {
     flexDirection: "row",
@@ -113,10 +131,13 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: COLORS.danger
   },
+  inputDisabled: {
+    opacity: 0.6
+  },
   input: {
     flex: 1,
     color: COLORS.text,
-    fontSize: 14,
+    fontSize: 15,
     paddingVertical: SPACING.sm
   },
   iconLeft: {
@@ -125,9 +146,16 @@ const styles = StyleSheet.create({
   iconRight: {
     marginLeft: SPACING.sm
   },
+  eyeButton: {
+    width: 44,
+    height: 44,
+    marginRight: -SPACING.sm,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   errorText: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.danger,
+    color: COLORS.dangerText,
     marginTop: SPACING.xs
   },
   helperText: {

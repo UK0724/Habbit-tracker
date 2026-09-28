@@ -1,47 +1,38 @@
 import { create } from "zustand";
-interface XPToastItem {
+
+export type ToastTone = "gain" | "loss" | "gems";
+
+export interface XPToastItem {
   id: string;
   amount: number;
-  label?: string;
+  label: string;
   title?: string;
-  x?: number;
-  y?: number;
+  tone: ToastTone;
 }
+
+type ToastInput = Omit<XPToastItem, "id">;
 
 interface XPToastStore {
   toasts: XPToastItem[];
-  addToast: (
-    amount: number,
-    label?: string,
-    x?: number,
-    y?: number,
-    title?: string
-  ) => void;
+  addToast: (toast: ToastInput) => void;
   removeToast: (id: string) => void;
 }
 
 export const useXPToastStore = create<XPToastStore>((set) => ({
   toasts: [],
-  addToast: (amount, label = "XP", x, y, title) => {
+  addToast: (toast) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     set((state) => ({
-      toasts: [...state.toasts, { id, amount, label, x, y, title }]
+      // Keep the stack short so bursts of rewards do not flood the screen.
+      toasts: [...state.toasts.slice(-3), { ...toast, id }]
     }));
     setTimeout(() => {
       set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }));
-    }, 2000);
+    }, 2400);
   },
   removeToast: (id) =>
     set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))
 }));
 
-export const triggerXPToast = (
-  amount: number,
-  label: string = "XP",
-  x?: number,
-  y?: number,
-  title?: string
-) => {
-  useXPToastStore.getState().addToast(amount, label, x, y, title);
-};
-
+export const pushToast = (toast: ToastInput) =>
+  useXPToastStore.getState().addToast(toast);
