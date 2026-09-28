@@ -1,5 +1,19 @@
 # AWS deployment status
+## Current release — 2026-09-29
 
+This status supersedes the historical preparation notes below.
+
+- Application commit: ce4866601ea2ea7227d4b31db398c4756951d04e, pushed to origin/master before deployment.
+- Both API stacks: UPDATE_COMPLETE using artifact api/b12372c767c73b16cdd8784954c44f0a642763356b92f1712f947f6acd36ed50.zip in pulse-artifacts-061525403372-ap-south-1.
+- Change sets: release-ce48666-dev and release-ce48666-prod. Only ApiFunction code changed; no replacement or IAM changes. Existing templates and secrets preserved.
+- Frontend entry: assets/index-C2T8NSGN.js, VITE_API_BASE_URL=/api. Both web buckets updated assets-first. A stalled production asset was retried successfully; all generated JS/CSS assets returned HTTP 200.
+- Live: https://habbit-dev.abuk.in and https://habbit.abuk.in. DNS and distributions unchanged.
+- Passed: backend/web builds and lint; Lambda, account deletion, rewards/streak-repair/avatar tests; mobile typecheck, expenses, reminders, permissions, assets, sharing and onboarding; service-worker checks.
+- Both environments passed live auth, habits/logs, expenses, avatar route, gamification, cross-user isolation and account deletion checks. This release's disposable test accounts were removed.
+- Both sites serve the new JavaScript with correct MIME, render login and serve privacy/delete-account/forgot-password deep links. No observed production browser errors.
+- API rollback for both: ApiCodeKey api/40e566cd6f5b471bfc8dd5d5d6c83bd2f7107ab182ebc14e149a1a6e9fd2766b.zip via reviewed change set. Web rollback: restore pre-release root object versions in S3; old hashed assets remain.
+- SMTP credentials were absent in the previous release and not changed here; email delivery remains unverified. Scheduled reminders, CI automation and mobile binary/store release are not included.
+- Local backend template has optional SMTP parameters not adopted by live stacks; this release reused the live templates.
 Target region: `ap-south-1` (Mumbai). Budget target: no incremental charges.
 Do not treat Free Tier allowances or billing alerts as a hard spending cap.
 
@@ -137,4 +151,5 @@ errors. Six isolated smoke users remain; their test habits and expenses were rem
 
 Scheduled reminders and GitHub deployment automation remain pending. AWS hosting
 usage outside free allowances can still incur charges.
+
 
