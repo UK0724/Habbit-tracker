@@ -3,6 +3,9 @@ dist
 .DS_Store
 .env
 .env.local
+.env.*
+!.env.example
+!.env.*.example
 *.log
 coverage
 
@@ -18,6 +21,16 @@ output-*-lint.txt
 .playwright-cli/
 mobile/.expo/
 mobile/android/
+mobile/ios/
+.gradle/
+local.properties
+*.apk
+*.aab
+*.apks
+*.jks
+*.keystore
+/android-tools/
+/habbit-test-caches/
 mobile/credentials.json
 mobile/credentials/
 mobile/*.jks
