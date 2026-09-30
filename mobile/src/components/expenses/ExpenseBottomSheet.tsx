@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,6 +24,7 @@ export function ExpenseBottomSheet({
   visible,
   title,
   onClose,
+  onShow,
   closeDisabled = false,
   footer,
   children
@@ -30,11 +32,13 @@ export function ExpenseBottomSheet({
   visible: boolean;
   title: string;
   onClose: () => void;
+  onShow?: () => void;
   closeDisabled?: boolean;
   footer: React.ReactNode;
   children: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const close = () => {
     if (!closeDisabled) onClose();
   };
@@ -45,9 +49,13 @@ export function ExpenseBottomSheet({
       animationType="slide"
       statusBarTranslucent
       onRequestClose={close}
+      onShow={onShow}
     >
       <KeyboardAvoidingView
-        style={styles.flex}
+        // Android can first measure a newly opened Modal at its content height
+        // before reporting the dialog size. Bound that first layout to the
+        // window; flexShrink still lets adjustResize make room for the keyboard.
+        style={[styles.viewport, { height: windowHeight }]}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.backdrop}>
@@ -97,7 +105,7 @@ export function ExpenseBottomSheet({
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
+  viewport: { flexShrink: 1 },
   flexShrink: { flexGrow: 0, flexShrink: 1 },
   backdrop: {
     flex: 1,

@@ -72,8 +72,11 @@ export function ExpenseSheet({
   const [note, setNote] = useState("");
   const [amountError, setAmountError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | null>(null);
+  // Keep validation visible beside Add/Save even when Amount is scrolled away.
+  const submitError = formError ?? amountError;
   const [showIosPicker, setShowIosPicker] = useState(false);
   const amountRef = useRef<TextInput>(null);
+  const saveInFlight = useRef(false);
 
   // Fresh form every time the sheet opens.
   useEffect(() => {
@@ -88,11 +91,6 @@ export function ExpenseSheet({
     setShowIosPicker(false);
     save.reset();
     remove.reset();
-    // Focusing right after the slide-in animation avoids a keyboard flicker.
-    const timer = expense ? null : setTimeout(() => amountRef.current?.focus(), 350);
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, expense?.id]);
 
@@ -127,8 +125,14 @@ export function ExpenseSheet({
     AccessibilityInfo.announceForAccessibility(message);
   };
 
+  const handleClose = () => {
+    if (!busy && !saveInFlight.current) onClose();
+  };
+
   const handleSave = () => {
-    if (busy) return;
+    // Mutation state updates on a later render; block a second tap immediately.
+    if (busy || saveInFlight.current) return;
+    setFormError(null);
     const parsed = parseAmount(amount);
     if (parsed.error !== null) {
       setAmountError(parsed.error);
@@ -138,7 +142,6 @@ export function ExpenseSheet({
     }
     setAmountError(undefined);
     if (date > today) return fail("The date can't be in the future.");
-    setFormError(null);
     const input = {
       amount: parsed.value,
       category,
@@ -146,6 +149,7 @@ export function ExpenseSheet({
       description: note.trim().slice(0, NOTE_MAX_LENGTH),
       paymentMethod: method
     };
+    saveInFlight.current = true;
     save.mutate(
       { id: expense?.id, input },
       {
@@ -154,13 +158,16 @@ export function ExpenseSheet({
           onSaved?.(saved ?? null, input.date);
           onClose();
         },
-        onError: (error) => fail(errorMessage(error, "Could not save. Please try again."))
+        onError: (error) => fail(errorMessage(error, "Could not save. Please try again.")),
+        onSettled: () => {
+          saveInFlight.current = false;
+        }
       }
     );
   };
 
   const handleDelete = () => {
-    if (!expense || busy) return;
+    if (!expense || busy || saveInFlight.current) return;
     confirmDeleteExpense(expense, () =>
       remove.mutate(expense.id, {
         onSuccess: () => {
@@ -176,20 +183,24 @@ export function ExpenseSheet({
     <ExpenseBottomSheet
       visible={visible}
       title={expense ? "Edit expense" : "Add expense"}
-      onClose={onClose}
+      onClose={handleClose}
+      onShow={() => {
+        // Wait for the native dialog instead of guessing its first-open timing.
+        if (visible && !expense) amountRef.current?.focus();
+      }}
       closeDisabled={busy}
       footer={
         <>
-          {formError ? (
+          {submitError ? (
             <Text style={styles.formError} accessibilityRole="alert" accessibilityLiveRegion="polite">
-              {formError}
+              {submitError}
             </Text>
           ) : null}
           <View style={styles.actions}>
             <Button
               title="Cancel"
               variant="secondary"
-              onPress={onClose}
+              onPress={handleClose}
               disabled={busy}
               style={styles.action}
             />

@@ -15,7 +15,7 @@
     "check:assets": "node tests/brandAssets.check.cjs",
     "check:achievements": "node tests/achievements.check.cjs && node tests/format.check.cjs && node tests/streakRepair.check.cjs && node tests/share.check.cjs && node tests/onboarding.check.cjs",
     "check:format": "node tests/format.check.cjs",
-    "check:expenses": "node tests/expenses.check.cjs",
+    "check:expenses": "node tests/expenses.check.cjs && node tests/expenseSheet.check.cjs",
     "check:onboarding": "node tests/onboarding.check.cjs",
     "generate:sounds": "node scripts/generate-sounds.cjs"
   },
@@ -51,6 +51,7 @@
   },
   "devDependencies": {
     "@types/react": "~18.3.12",
+    "react-test-renderer": "18.3.1",
     "typescript": "^5.3.3"
   },
   "private": true
