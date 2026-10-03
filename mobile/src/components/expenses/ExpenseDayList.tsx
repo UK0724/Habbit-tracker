@@ -1,6 +1,6 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from "../../constants/theme";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { COLORS, SPACING, TYPOGRAPHY } from "../../constants/theme";
 import {
   categoryMeta,
   dayLabel,
@@ -26,12 +26,12 @@ function ExpenseRow({
   const note = expense.description?.trim();
   const showNote = Boolean(note) && note !== expense.category;
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <Pressable
+      android_ripple={{ color: "rgba(255, 255, 255, 0.08)" }}
       onPress={() => onPress(expense)}
       onLongPress={() => onLongPress(expense)}
       delayLongPress={400}
-      style={[styles.row, !last && styles.rowDivider]}
+      style={({ pressed }) => [styles.row, !last && styles.rowDivider, pressed && styles.pressed]}
       accessibilityRole="button"
       accessibilityLabel={`${formatRupees(expense.amount)}, ${expense.category}, paid with ${expense.paymentMethod || "UPI"}${showNote ? `, ${note}` : ""}`}
       accessibilityHint="Opens the expense to edit. Long press to delete."
@@ -40,7 +40,7 @@ function ExpenseRow({
         if (event.nativeEvent.actionName === "delete") onLongPress(expense);
       }}
     >
-      <View style={[styles.icon, { backgroundColor: `${meta.color}26`, borderColor: `${meta.color}55` }]}>
+      <View style={[styles.icon, { backgroundColor: `${meta.color}22` }]}>
         <Text style={styles.emoji} maxFontSizeMultiplier={1.3}>
           {meta.emoji}
         </Text>
@@ -57,7 +57,7 @@ function ExpenseRow({
       <Text style={styles.amount} maxFontSizeMultiplier={1.5}>
         {formatRupees(expense.amount)}
       </Text>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -103,39 +103,31 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: SPACING.xs,
-    marginBottom: SPACING.sm,
+        marginBottom: SPACING.xs,
     gap: SPACING.sm
   },
-  headerDate: { ...TYPOGRAPHY.label, color: COLORS.textSecondary, flexShrink: 1 },
-  headerTotal: { ...TYPOGRAPHY.label, color: COLORS.textSecondary, fontVariant: ["tabular-nums"] },
-  card: {
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    overflow: "hidden"
-  },
+  headerDate: { fontSize: 13, fontWeight: "600", color: COLORS.textSecondary, flexShrink: 1 },
+  headerTotal: { fontSize: 13, fontWeight: "500", color: COLORS.textMuted, fontVariant: ["tabular-nums"] },
+  card: {},
   row: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 60,
-    paddingHorizontal: SPACING.md,
+    minHeight: 64,
     paddingVertical: SPACING.sm,
-    gap: SPACING.md
+    gap: SPACING.lg
   },
-  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
+  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border, marginLeft: 0 },
+  pressed: { opacity: 0.85 },
   icon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center"
   },
   emoji: { fontSize: 18 },
   copy: { flex: 1, minWidth: 0 },
-  title: { ...TYPOGRAPHY.body, fontWeight: "600" },
+  title: { ...TYPOGRAPHY.body, fontSize: 16 },
   subtitle: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, marginTop: 2 },
-  amount: { ...TYPOGRAPHY.title3, fontVariant: ["tabular-nums"] }
+  amount: { ...TYPOGRAPHY.body, fontSize: 16, fontWeight: "600", fontVariant: ["tabular-nums"] }
 });

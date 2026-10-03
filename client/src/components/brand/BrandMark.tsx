@@ -6,20 +6,27 @@ type BrandMarkProps = {
 };
 
 /**
- * Character's mark: a stylized hero crest with an embedded star core —
- * representing personal growth, character building, and everyday mastery.
+ * Pulse's mark: a check whose tail rises into growth, ending in an amber
+ * streak dot. Same geometry as mobile/scripts/generate-brand.cjs.
  */
 export const BrandMark = ({ className }: BrandMarkProps) => (
   <span
     className={cn(
-      "inline-flex items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-fuchsia-500 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20",
+      "inline-flex items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20",
       className
     )}
     aria-hidden
   >
-    <svg viewBox="0 0 24 24" className="h-3/5 w-3/5" fill="currentColor">
-      {/* Dynamic Spark / Growth Bolt */}
-      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+    <svg viewBox="0 0 64 64" className="h-4/5 w-4/5">
+      <polyline
+        points="14,34 25,45 36,30 42,36 51,19"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="51" cy="19" r="4.5" fill="#fbbf24" />
     </svg>
   </span>
 );

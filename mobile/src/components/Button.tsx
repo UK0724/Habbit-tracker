@@ -1,6 +1,7 @@
 import React from "react";
 import {
-  TouchableOpacity,
+  Pressable,
+  Platform,
   Text,
   StyleSheet,
   ActivityIndicator,
@@ -46,6 +47,21 @@ const LABEL_COLOR: Record<ButtonVariant, string> = {
   ghost: COLORS.primaryText
 };
 
+/** Ripple tint per variant: light on filled buttons, primary on text buttons. */
+const RIPPLE_COLOR: Record<ButtonVariant, string> = {
+  primary: "rgba(255, 255, 255, 0.24)",
+  secondary: COLORS.pressed,
+  success: "rgba(4, 41, 28, 0.2)",
+  danger: "rgba(255, 255, 255, 0.24)",
+  outline: COLORS.primaryLight,
+  ghost: COLORS.primaryLight
+};
+
+/**
+ * Flat, filled buttons (Material 3 style): filled = primary action,
+ * secondary = tonal fill without a border, ghost = text button.
+ * Only `outline` keeps a border, as an explicit opt-in.
+ */
 export const Button: React.FC<ButtonProps> = ({
   title,
   onPress,
@@ -92,8 +108,6 @@ export const Button: React.FC<ButtonProps> = ({
     switch (variant) {
       case "secondary":
         base.backgroundColor = COLORS.surfaceElevated;
-        base.borderWidth = 1;
-        base.borderColor = COLORS.border;
         break;
       case "success":
         base.backgroundColor = COLORS.success;
@@ -108,8 +122,6 @@ export const Button: React.FC<ButtonProps> = ({
         break;
       case "ghost":
         base.backgroundColor = "transparent";
-        base.elevation = 0;
-        base.shadowOpacity = 0;
         break;
       case "primary":
       default:
@@ -124,17 +136,23 @@ export const Button: React.FC<ButtonProps> = ({
 
   const fontSize = size === "sm" ? 13 : size === "lg" ? 16 : 14;
   const color = LABEL_COLOR[variant];
+  const inactive = disabled || loading;
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.75}
+    <Pressable
       onPress={handlePress}
-      disabled={disabled || loading}
+      disabled={inactive}
+      android_ripple={inactive ? undefined : { color: RIPPLE_COLOR[variant], foreground: true }}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled: disabled || loading, busy: loading }}
-      style={[getContainerStyle(), style]}
+      accessibilityState={{ disabled: inactive, busy: loading }}
+      style={({ pressed }) => [
+        getContainerStyle(),
+        // Android shows the ripple; other platforms dim on press.
+        pressed && Platform.OS !== "android" ? styles.pressed : undefined,
+        style
+      ]}
     >
       {loading ? (
         <ActivityIndicator size="small" color={color} />
@@ -155,7 +173,7 @@ export const Button: React.FC<ButtonProps> = ({
           {icon && iconPosition === "right" && <>{icon}</>}
         </>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
@@ -165,11 +183,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2
+    // Clips the Android ripple to the rounded shape.
+    overflow: "hidden"
+  },
+  pressed: {
+    opacity: 0.75
   },
   textBase: {
     fontWeight: "600",

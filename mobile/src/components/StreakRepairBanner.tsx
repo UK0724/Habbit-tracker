@@ -1,8 +1,18 @@
 import React, { useRef } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle
+} from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Snowflake } from "lucide-react-native";
-import { BORDER_RADIUS, COLORS, SPACING, TYPOGRAPHY } from "../constants/theme";
+import { BORDER_RADIUS, COLORS, SPACING } from "../constants/theme";
 import { gamificationApi, type GamificationProfile, type StreakRepairOffer } from "../services/api";
 import { useRepairHabitStreak } from "../hooks/useStreakActions";
 import { planRepair, repairHeadline } from "../utils/streakRepair";
@@ -13,10 +23,24 @@ export interface StreakRepairBannerProps {
   offer: StreakRepairOffer;
   /** Read-only (e.g. yesterday's placeholder list while today loads). */
   disabled?: boolean;
+  /** Left padding so the row lines up with list-row text (Today list). */
+  inset?: number;
+  style?: StyleProp<ViewStyle>;
 }
 
-/** "Streak broken on Sat, Sep 26 — Repair for 🛡️1" with a confirm step. */
-export function StreakRepairBanner({ habitId, habitTitle, offer, disabled = false }: StreakRepairBannerProps) {
+/**
+ * "Streak broken on Sat, Sep 26 · Repair for 🛡️1" with a confirm step.
+ * A subtle inline row (no box): cyan text plus a small text button, placed
+ * directly under the affected habit.
+ */
+export function StreakRepairBanner({
+  habitId,
+  habitTitle,
+  offer,
+  disabled = false,
+  inset = 0,
+  style
+}: StreakRepairBannerProps) {
   const { data: profile, isLoading } = useQuery<GamificationProfile>({
     queryKey: ["gamificationProfile"],
     queryFn: gamificationApi.getProfile
@@ -56,18 +80,22 @@ export function StreakRepairBanner({ habitId, habitTitle, offer, disabled = fals
   const buttonLabel = !walletKnown ? "Repair" : plan.label;
 
   return (
-    <View style={styles.banner} accessibilityRole="summary">
+    <View style={[styles.banner, { paddingLeft: inset }, style]} accessibilityRole="summary">
       <View style={styles.copy}>
-        <Snowflake size={16} color={COLORS.frozen} />
+        <Snowflake size={14} color={COLORS.frozen} />
         <Text style={styles.headline} maxFontSizeMultiplier={1.3}>
           {headline}
         </Text>
       </View>
-      <TouchableOpacity
-        style={[styles.button, !canPress && styles.buttonDisabled]}
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          pressed && Platform.OS !== "android" ? styles.buttonPressed : undefined
+        ]}
         onPress={onPress}
         disabled={!canPress}
-        activeOpacity={0.75}
+        android_ripple={canPress ? { color: COLORS.frozenLight } : undefined}
+        hitSlop={4}
         accessibilityRole="button"
         accessibilityLabel={`${headline} for ${habitTitle}. ${buttonLabel.replace(/[🛡️💎]/gu, "")}`}
         accessibilityState={{ disabled: !canPress, busy }}
@@ -76,14 +104,14 @@ export function StreakRepairBanner({ habitId, habitTitle, offer, disabled = fals
           <ActivityIndicator size="small" color={COLORS.frozen} />
         ) : (
           <Text
-            style={[styles.buttonText, !plan.affordable && walletKnown && styles.buttonTextMuted]}
+            style={[styles.buttonText, (!canPress || (!plan.affordable && walletKnown)) && styles.buttonTextMuted]}
             maxFontSizeMultiplier={1.3}
             numberOfLines={1}
           >
             {buttonLabel}
           </Text>
         )}
-      </TouchableOpacity>
+      </Pressable>
     </View>
   );
 }
@@ -94,15 +122,8 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: SPACING.sm,
-    backgroundColor: COLORS.frozenLight,
-    borderColor: COLORS.frozenBorder,
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.md,
-    paddingVertical: 6,
-    paddingLeft: SPACING.md,
-    paddingRight: 6,
-    marginBottom: SPACING.sm
+    columnGap: SPACING.sm,
+    paddingRight: SPACING.xs
   },
   copy: {
     flexDirection: "row",
@@ -110,33 +131,32 @@ const styles = StyleSheet.create({
     gap: 6,
     flexGrow: 1,
     flexShrink: 1,
-    flexBasis: 150
+    flexBasis: 150,
+    paddingVertical: SPACING.xs
   },
   headline: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.text,
-    fontWeight: "700",
+    fontSize: 13,
+    fontWeight: "500",
+    color: COLORS.frozen,
     flexShrink: 1
   },
   button: {
-    minHeight: 40,
+    minHeight: 44,
     minWidth: 44,
     paddingHorizontal: SPACING.md,
     borderRadius: BORDER_RADIUS.sm,
-    backgroundColor: COLORS.surfaceElevated,
-    borderWidth: 1,
-    borderColor: COLORS.frozenBorder,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    marginLeft: "auto"
+    marginLeft: "auto",
+    overflow: "hidden"
   },
-  buttonDisabled: {
-    borderColor: COLORS.border,
-    opacity: 0.8
+  buttonPressed: {
+    backgroundColor: COLORS.frozenLight
   },
   buttonText: {
-    ...TYPOGRAPHY.label,
+    fontSize: 14,
+    fontWeight: "700",
     color: COLORS.frozen
   },
   buttonTextMuted: {

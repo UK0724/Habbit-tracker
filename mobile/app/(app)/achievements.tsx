@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   RefreshControl,
   useWindowDimensions
 } from "react-native";
@@ -22,7 +22,6 @@ import {
   type Tier
 } from "../../src/constants/theme";
 import { ProgressHeader } from "../../src/components/ProgressHeader";
-import { Card } from "../../src/components/Card";
 import { ErrorState, Skeleton } from "../../src/components/StateViews";
 import { gamificationApi, type AchievementItem } from "../../src/services/api";
 import { useCelebrationStore } from "../../src/stores/achievementStore";
@@ -41,6 +40,8 @@ const CATEGORY_LABEL: Record<(typeof CATEGORY_ORDER)[number], string> = {
   special: "Special",
   other: "More badges"
 };
+
+const RIPPLE = { color: "rgba(255, 255, 255, 0.08)" } as const;
 
 const rewardText = (badge: AchievementItem) =>
   `+${badge.xpBonus} XP${badge.gemBonus ? ` · +${badge.gemBonus} 💎` : ""}`;
@@ -165,14 +166,14 @@ export default function AchievementsScreen() {
             </View>
           </View>
         ) : isError ? (
-          <Card>
+          <View>
             <ErrorState
               title="Couldn't load your badges"
               error={error}
               retrying={isFetching}
               onRetry={() => void refetch()}
             />
-          </Card>
+          </View>
         ) : (
           <>
             {/* Hero */}
@@ -199,13 +200,14 @@ export default function AchievementsScreen() {
             {/* Next up */}
             {nextUp.length > 0 && (
               <View style={styles.nextUp}>
-                <Text style={styles.sectionTitle} accessibilityRole="header">
+                <Text style={[styles.sectionTitle, styles.nextUpTitle]} accessibilityRole="header">
                   Next up
                 </Text>
-                {nextUp.map((badge) => (
-                  <TouchableOpacity
+                {nextUp.map((badge, index) => (
+                  <Pressable
                     key={badge.id}
-                    style={styles.nextRow}
+                    style={({ pressed }) => [styles.nextRow, index > 0 && styles.nextRowDivider, pressed && styles.pressed]}
+                    android_ripple={RIPPLE}
                     accessibilityRole="button"
                     accessibilityLabel={`Next up: ${badge.name}. ${badge.description}. Reward ${rewardText(badge)}`}
                     onPress={() => viewAchievement(badge)}
@@ -214,10 +216,10 @@ export default function AchievementsScreen() {
                     <View style={styles.nextCopy}>
                       <Text style={styles.nextName}>{badge.name}</Text>
                       <Text style={styles.nextDesc}>{badge.description}</Text>
+                      <Text style={styles.nextReward}>{rewardText(badge)}</Text>
                     </View>
-                    <Text style={styles.reward}>{rewardText(badge)}</Text>
-                    <ChevronRight size={16} color={COLORS.textMuted} />
-                  </TouchableOpacity>
+                    <ChevronRight size={20} color={COLORS.textMuted} />
+                  </Pressable>
                 ))}
               </View>
             )}
@@ -227,15 +229,17 @@ export default function AchievementsScreen() {
               {filters.map((chip) => {
                 const selected = filter === chip.key;
                 return (
-                  <TouchableOpacity
+                  <Pressable
                     key={chip.key}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     onPress={() => setFilter(chip.key)}
+                    android_ripple={RIPPLE}
+                    hitSlop={4}
                     style={[styles.filterChip, selected && styles.filterChipActive]}
                   >
                     <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>{chip.label}</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               })}
             </ScrollView>
@@ -260,19 +264,16 @@ export default function AchievementsScreen() {
                       const locked = !badge.unlocked;
                       const unlockedOn = shortDate(badge.unlockedAt);
                       return (
-                        <TouchableOpacity
+                        <Pressable
                           key={badge.id}
-                          activeOpacity={0.8}
+                          android_ripple={RIPPLE}
                           accessibilityRole="button"
                           accessibilityLabel={`${badge.name}, ${badge.tier}. ${
                             locked ? `Locked. ${badge.description}` : `Unlocked${unlockedOn ? ` ${unlockedOn}` : ""}`
                           }. Reward ${rewardText(badge)}`}
                           accessibilityHint={locked ? "Shows how to unlock" : "Shows details"}
                           onPress={() => viewAchievement(badge)}
-                          style={[
-                            styles.tile,
-                            { width: tileWidth, borderColor: locked ? COLORS.border : tier.border }
-                          ]}
+                          style={({ pressed }) => [styles.tile, { width: tileWidth }, pressed && styles.pressed]}
                         >
                           <View style={[styles.tileIcon, { backgroundColor: locked ? COLORS.surfaceElevated : tier.bg }]}>
                             <Text style={[styles.tileEmoji, locked && styles.tileEmojiLocked]}>{badge.emoji || "🏆"}</Text>
@@ -283,16 +284,13 @@ export default function AchievementsScreen() {
                             )}
                           </View>
                           <Text style={[styles.tileName, locked && styles.tileNameLocked]}>{badge.name}</Text>
-                          <View style={[styles.tierPill, { backgroundColor: locked ? COLORS.surfaceElevated : tier.bg }]}>
-                            <Text style={[styles.tierPillText, { color: locked ? COLORS.textMuted : tier.fg }]}>
-                              {badge.tier.charAt(0).toUpperCase() + badge.tier.slice(1)}
-                            </Text>
-                          </View>
-                          <Text style={styles.reward}>{rewardText(badge)}</Text>
+                          <Text style={[styles.tierText, { color: locked ? COLORS.textMuted : tier.fg }]}>
+                            {badge.tier.charAt(0).toUpperCase() + badge.tier.slice(1)} · {rewardText(badge)}
+                          </Text>
                           <Text style={[styles.tileStatus, !locked && styles.tileStatusUnlocked]}>
                             {locked ? "Locked · tap for how" : unlockedOn ? `Unlocked ${unlockedOn}` : "Unlocked"}
                           </Text>
-                        </TouchableOpacity>
+                        </Pressable>
                       );
                     })}
                   </View>
@@ -329,13 +327,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
-    gap: SPACING.lg,
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: SPACING.lg
+    gap: SPACING.xxl,
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.md
   },
   ringCenter: {
     ...StyleSheet.absoluteFillObject,
@@ -374,18 +368,30 @@ const styles = StyleSheet.create({
   },
   nextUp: {
     marginBottom: SPACING.lg,
-    gap: SPACING.sm
+    marginHorizontal: -SPACING.lg
+  },
+  nextUpTitle: {
+    paddingHorizontal: SPACING.lg
   },
   nextRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: SPACING.md,
-    minHeight: 56,
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border
+    gap: SPACING.lg,
+    minHeight: 64,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md
+  },
+  nextRowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.border
+  },
+  nextReward: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.xpText,
+    marginTop: 2
+  },
+  pressed: {
+    opacity: 0.85
   },
   nextEmoji: {
     fontSize: 26,
@@ -407,17 +413,14 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.md
   },
   filterChip: {
-    minHeight: 44,
+    minHeight: 40,
     justifyContent: "center",
     paddingHorizontal: 14,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border
+    overflow: "hidden"
   },
   filterChipActive: {
-    backgroundColor: COLORS.primaryLight,
-    borderColor: COLORS.primary
+    backgroundColor: COLORS.primaryLight
   },
   filterChipText: {
     ...TYPOGRAPHY.caption,
@@ -446,10 +449,11 @@ const styles = StyleSheet.create({
     gap: SPACING.sm
   },
   tile: {
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    padding: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    overflow: "hidden",
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.md,
     alignItems: "center",
     gap: 6
   },
@@ -485,14 +489,9 @@ const styles = StyleSheet.create({
   tileNameLocked: {
     color: COLORS.textSecondary
   },
-  tierPill: {
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: BORDER_RADIUS.xs
-  },
-  tierPillText: {
-    ...TYPOGRAPHY.micro,
-    fontWeight: "800"
+  tierText: {
+    ...TYPOGRAPHY.caption,
+    textAlign: "center"
   },
   reward: {
     ...TYPOGRAPHY.micro,

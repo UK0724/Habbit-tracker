@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { Redirect, Tabs } from "expo-router";
-import { ActivityIndicator, Platform, Text, View } from "react-native";
+import { ActivityIndicator, Text, View, useWindowDimensions } from "react-native";
 import { CalendarCheck2, ListTodo, Trophy, User, Wallet } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { dayState, shift, weekStart } from "@habit-tracker/shared";
@@ -48,9 +48,28 @@ const reminderPlan = (habits: HabitListItem[], today: string) => {
   return { handledToday, suppressedUntil, signature: parts.join("\n") };
 };
 
+/**
+ * Tab bar metrics (see tabContentHeight). The icon box and item padding are
+ * react-navigation's own (uikit variant: 28dp tall icon box, 5dp padding).
+ */
+const TAB_ICON_SIZE = 28;
+const TAB_ITEM_PADDING = 5;
+const TAB_LABEL_GAP = 3;
+const TAB_LABEL_FONT_SIZE = 11;
+const TAB_LABEL_LINE_HEIGHT = 15;
+const TAB_LABEL_MAX_SCALE = 1.3;
+const TAB_BAR_PADDING_TOP = 6;
+
 export default function AppLayout() {
   const insets = useSafeAreaInsets();
-  const tabBottomPadding = Math.max(insets.bottom, 12);
+  const { fontScale } = useWindowDimensions();
+  const tabBottomPadding = Math.max(insets.bottom, 8);
+  // The bar's height is derived from what it holds (react-navigation needs a
+  // number): item padding + icon + label line at the capped font scale, so
+  // labels are never clipped at font scale 1.0–1.3.
+  const labelScale = Math.min(Math.max(fontScale || 1, 1), TAB_LABEL_MAX_SCALE);
+  const tabContentHeight =
+    TAB_ITEM_PADDING * 2 + TAB_ICON_SIZE + TAB_LABEL_GAP + Math.ceil(TAB_LABEL_LINE_HEIGHT * labelScale);
   const { isLoading, isAuthenticated } = useAuthStore();
   const userId = useAuthStore((state) => state.user?.id);
   const today = useLocalDate();
@@ -102,24 +121,29 @@ export default function AppLayout() {
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
           backgroundColor: COLORS.surface,
-          borderTopColor: COLORS.border,
+          borderTopColor: COLORS.divider,
           borderTopWidth: 1,
-          height: 48 + (Platform.OS === "android" ? 12 : 8) + tabBottomPadding,
-          paddingBottom: tabBottomPadding,
-          paddingTop: Platform.OS === "android" ? 12 : 8
+          height: TAB_BAR_PADDING_TOP + tabContentHeight + tabBottomPadding,
+          paddingTop: TAB_BAR_PADDING_TOP,
+          paddingBottom: tabBottomPadding
         },
         tabBarActiveTintColor: COLORS.primaryText,
         tabBarInactiveTintColor: COLORS.textMuted,
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "600"
-        },
-        // Labels scale with the system font, but only so far: the bar has a fixed height.
+        // Labels scale with the system font up to 1.3×; the bar height above
+        // is sized for that, so they are never clipped.
         tabBarLabel: ({ color, children }) => (
           <Text
             numberOfLines={1}
-            maxFontSizeMultiplier={1.3}
-            style={{ color, fontSize: 11, fontWeight: "600" }}
+            maxFontSizeMultiplier={TAB_LABEL_MAX_SCALE}
+            style={{
+              color,
+              fontSize: TAB_LABEL_FONT_SIZE,
+              lineHeight: TAB_LABEL_LINE_HEIGHT,
+              fontWeight: "600",
+              marginTop: TAB_LABEL_GAP,
+              includeFontPadding: false,
+              textAlign: "center"
+            }}
           >
             {children}
           </Text>

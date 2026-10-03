@@ -153,3 +153,7 @@ Scheduled reminders and GitHub deployment automation remain pending. AWS hosting
 usage outside free allowances can still incur charges.
 
 
+
+## SMTP configuration — 2026-09-29
+
+Both backend stacks adopted the repository SMTP-capable template through configure-smtp-dev and configure-smtp-prod. Both reached UPDATE_COMPLETE. Sender: learnverse02@gmail.com. SmtpPass is supplied as a NoEcho parameter; no secret is stored in this record. Only ApiFunction configuration changed; existing code keys, database/JWT parameters and IAM were preserved. Both API health endpoints returned HTTP 200. Email delivery has not yet been verified with a real password-reset email. This supersedes the earlier note that SMTP parameters were not adopted.

@@ -8,9 +8,17 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
+import DateTimePicker, {
+  DateTimePickerAndroid
+} from "@react-native-community/datetimepicker";
 import { CalendarDays, Trash2 } from "lucide-react-native";
-import { BORDER_RADIUS, COLORS, SPACING, TOUCH_TARGET, TYPOGRAPHY } from "../../constants/theme";
+import {
+  BORDER_RADIUS,
+  COLORS,
+  SPACING,
+  TOUCH_TARGET,
+  TYPOGRAPHY
+} from "../../constants/theme";
 import { Button } from "../Button";
 import { Input } from "../Input";
 import { errorMessage } from "../../services/api";
@@ -31,6 +39,12 @@ import { ExpenseBottomSheet } from "./ExpenseBottomSheet";
 import { ChoiceChip } from "./ChoiceChip";
 import { confirmDeleteExpense } from "./confirmDeleteExpense";
 import { useDeleteExpense, useSaveExpense } from "./useExpenses";
+import {
+  UpiPaymentPanel,
+  type UpiPaymentRequest,
+  type UpiPaymentState
+} from "./UpiPaymentPanel";
+import { paymentMatchesDraft } from "../../utils/upi";
 
 const QUICK_AMOUNTS = [50, 100, 250, 500, 1000];
 
@@ -72,8 +86,23 @@ export function ExpenseSheet({
   const [note, setNote] = useState("");
   const [amountError, setAmountError] = useState<string | undefined>();
   const [formError, setFormError] = useState<string | null>(null);
+  // Keep validation visible beside Add/Save even when Amount is scrolled away.
+  const submitError = formError ?? amountError;
   const [showIosPicker, setShowIosPicker] = useState(false);
   const amountRef = useRef<TextInput>(null);
+  const saveInFlight = useRef(false);
+  const [upiState, setUpiState] = useState<UpiPaymentState>("idle");
+  // A payment handoff is not a receipt. Keep the immediate guard alongside
+  // rendered state so a fast Add tap cannot race the payment setup callback.
+  const upiRef = useRef<{
+    state: UpiPaymentState;
+    payment?: UpiPaymentRequest;
+  }>({ state: "idle" });
+  const paymentDraftRef = useRef({
+    amount: "",
+    note: "",
+    method: PAYMENT_METHODS[0] as string
+  });
 
   // Fresh form every time the sheet opens.
   useEffect(() => {
@@ -83,23 +112,27 @@ export function ExpenseSheet({
     setMethod(expense?.paymentMethod || PAYMENT_METHODS[0]);
     setDate(expense?.date ?? (initialDate > today ? today : initialDate));
     setNote(expense?.description ?? "");
+    paymentDraftRef.current = {
+      amount: expense ? amountInputText(expense.amount) : "",
+      note: expense?.description ?? "",
+      method: expense?.paymentMethod || PAYMENT_METHODS[0]
+    };
     setAmountError(undefined);
     setFormError(null);
     setShowIosPicker(false);
+    upiRef.current = { state: "idle" };
+    setUpiState("idle");
     save.reset();
     remove.reset();
-    // Focusing right after the slide-in animation avoids a keyboard flicker.
-    const timer = expense ? null : setTimeout(() => amountRef.current?.focus(), 350);
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, expense?.id]);
 
   const categories: string[] = [...EXPENSE_CATEGORIES];
-  if (expense && !categories.includes(expense.category)) categories.push(expense.category);
+  if (expense && !categories.includes(expense.category))
+    categories.push(expense.category);
   const methods: string[] = [...PAYMENT_METHODS];
-  if (expense?.paymentMethod && !methods.includes(expense.paymentMethod)) methods.push(expense.paymentMethod);
+  if (expense?.paymentMethod && !methods.includes(expense.paymentMethod))
+    methods.push(expense.paymentMethod);
 
   const yesterday = yesterdayOf(today);
   const customDate = date !== today && date !== yesterday;
@@ -127,9 +160,59 @@ export function ExpenseSheet({
     AccessibilityInfo.announceForAccessibility(message);
   };
 
+  const handleClose = () => {
+    if (!busy && !saveInFlight.current) onClose();
+  };
+
+  const updatePaymentDraft = (
+    change: Partial<typeof paymentDraftRef.current>
+  ) => {
+    const next = { ...paymentDraftRef.current, ...change };
+    paymentDraftRef.current = next;
+    // Native input and button events can arrive in the same render batch. Revoke
+    // confirmation now, not in a later effect, before a captured Add handler runs.
+    if (
+      upiRef.current.state === "confirmed" &&
+      (next.method !== "UPI" ||
+        !paymentMatchesDraft(upiRef.current.payment, next.amount, next.note))
+    ) {
+      upiRef.current = { ...upiRef.current, state: "unconfirmed" };
+      setUpiState("unconfirmed");
+    }
+    if (change.amount !== undefined) {
+      setAmount(change.amount);
+      setAmountError(undefined);
+    }
+    if (change.note !== undefined) setNote(change.note);
+    if (change.method !== undefined) setMethod(change.method);
+    setFormError(null);
+  };
+
+  const handleUpiStateChange = (
+    state: UpiPaymentState,
+    payment?: UpiPaymentRequest
+  ) => {
+    const draft = paymentDraftRef.current;
+    const nextState =
+      state === "confirmed" &&
+      !paymentMatchesDraft(payment, draft.amount, draft.note)
+        ? "unconfirmed"
+        : state;
+    upiRef.current = { state: nextState, payment };
+    setUpiState(nextState);
+    if (nextState !== "idle") {
+      paymentDraftRef.current = { ...draft, method: "UPI" };
+      setMethod("UPI");
+    }
+    setFormError(null);
+  };
+
   const handleSave = () => {
-    if (busy) return;
-    const parsed = parseAmount(amount);
+    // Mutation state updates on a later render; block a second tap immediately.
+    if (busy || saveInFlight.current) return;
+    setFormError(null);
+    const draft = paymentDraftRef.current;
+    const parsed = parseAmount(draft.amount);
     if (parsed.error !== null) {
       setAmountError(parsed.error);
       void hapticError();
@@ -137,15 +220,29 @@ export function ExpenseSheet({
       return;
     }
     setAmountError(undefined);
+    if (upiRef.current.state === "unconfirmed") {
+      return fail(
+        "Check the UPI payment result, or return to manual entry before adding this expense."
+      );
+    }
+    if (
+      upiRef.current.state === "confirmed" &&
+      (draft.method !== "UPI" ||
+        !paymentMatchesDraft(upiRef.current.payment, draft.amount, draft.note))
+    ) {
+      return fail(
+        "The expense no longer matches the UPI payment you confirmed. Review it or return to manual entry."
+      );
+    }
     if (date > today) return fail("The date can't be in the future.");
-    setFormError(null);
     const input = {
       amount: parsed.value,
       category,
       date,
-      description: note.trim().slice(0, NOTE_MAX_LENGTH),
-      paymentMethod: method
+      description: draft.note.trim().slice(0, NOTE_MAX_LENGTH),
+      paymentMethod: draft.method
     };
+    saveInFlight.current = true;
     save.mutate(
       { id: expense?.id, input },
       {
@@ -154,53 +251,68 @@ export function ExpenseSheet({
           onSaved?.(saved ?? null, input.date);
           onClose();
         },
-        onError: (error) => fail(errorMessage(error, "Could not save. Please try again."))
+        onError: (error) =>
+          fail(errorMessage(error, "Could not save. Please try again.")),
+        onSettled: () => {
+          saveInFlight.current = false;
+        }
       }
     );
   };
 
   const handleDelete = () => {
-    if (!expense || busy) return;
-    confirmDeleteExpense(expense, () =>
+    if (!expense || busy || saveInFlight.current) return;
+    confirmDeleteExpense(expense, () => {
+      if (busy || saveInFlight.current) return;
+      saveInFlight.current = true;
+      setFormError(null);
       remove.mutate(expense.id, {
         onSuccess: () => {
           void hapticSuccess();
           onClose();
         },
-        onError: (error) => fail(errorMessage(error, "Could not delete. Please try again."))
-      })
-    );
+        onError: (error) =>
+          fail(errorMessage(error, "Could not delete. Please try again.")),
+        onSettled: () => { saveInFlight.current = false; }
+      });
+    });
   };
 
   return (
     <ExpenseBottomSheet
+      presentation="fullScreen"
       visible={visible}
       title={expense ? "Edit expense" : "Add expense"}
-      onClose={onClose}
+      onClose={handleClose}
+      onShow={() => {
+        // Wait for the native dialog instead of guessing its first-open timing.
+        if (visible && !expense) amountRef.current?.focus();
+      }}
       closeDisabled={busy}
       footer={
         <>
-          {formError ? (
-            <Text style={styles.formError} accessibilityRole="alert" accessibilityLiveRegion="polite">
-              {formError}
+          {submitError ? (
+            <Text
+              style={styles.formError}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
+              {submitError}
             </Text>
           ) : null}
-          <View style={styles.actions}>
-            <Button
-              title="Cancel"
-              variant="secondary"
-              onPress={onClose}
-              disabled={busy}
-              style={styles.action}
-            />
-            <Button
-              title={expense ? "Save changes" : "Add expense"}
-              onPress={handleSave}
-              loading={save.isPending}
-              disabled={remove.isPending}
-              style={styles.action}
-            />
-          </View>
+          {upiState === "unconfirmed" ? (
+            <Text style={styles.paymentHint} accessibilityLiveRegion="polite">
+              Finish the UPI check, or return to manual entry.
+            </Text>
+          ) : null}
+          <Button
+            title={expense ? "Save changes" : "Add expense"}
+            onPress={handleSave}
+            loading={save.isPending}
+            disabled={remove.isPending || upiState === "unconfirmed"}
+            fullWidth
+            size="lg"
+          />
           {expense ? (
             <Button
               title="Delete expense"
@@ -219,10 +331,7 @@ export function ExpenseSheet({
         ref={amountRef}
         label="Amount (₹)"
         value={amount}
-        onChangeText={(text) => {
-          setAmount(text);
-          if (amountError) setAmountError(undefined);
-        }}
+        onChangeText={(text) => updatePaymentDraft({ amount: text })}
         placeholder="0"
         keyboardType="decimal-pad"
         inputMode="decimal"
@@ -244,9 +353,9 @@ export function ExpenseSheet({
             disabled={busy}
             accessibilityLabel={`Add ${value} rupees`}
             onPress={() => {
-              const current = parseAmount(amount).value ?? 0;
-              setAmount(amountInputText(current + value));
-              setAmountError(undefined);
+              const current =
+                parseAmount(paymentDraftRef.current.amount).value ?? 0;
+              updatePaymentDraft({ amount: amountInputText(current + value) });
             }}
           />
         ))}
@@ -278,7 +387,7 @@ export function ExpenseSheet({
             label={name}
             selected={method === name}
             disabled={busy}
-            onPress={() => setMethod(name)}
+            onPress={() => updatePaymentDraft({ method: name })}
           />
         ))}
       </View>
@@ -287,7 +396,12 @@ export function ExpenseSheet({
         Date
       </Text>
       <View style={styles.chipRow} accessibilityRole="radiogroup">
-        <ChoiceChip label="Today" selected={date === today} disabled={busy} onPress={() => setDate(today)} />
+        <ChoiceChip
+          label="Today"
+          selected={date === today}
+          disabled={busy}
+          onPress={() => setDate(today)}
+        />
         <ChoiceChip
           label="Yesterday"
           selected={date === yesterday}
@@ -299,12 +413,22 @@ export function ExpenseSheet({
           onPress={openDatePicker}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel={customDate ? `Date: ${dayLabel(date, today)}. Change date` : "Pick another date"}
+          accessibilityLabel={
+            customDate
+              ? `Date: ${dayLabel(date, today)}. Change date`
+              : "Pick another date"
+          }
         >
-          <CalendarDays size={18} color={customDate ? COLORS.text : COLORS.textSecondary} />
+          <CalendarDays
+            size={18}
+            color={customDate ? COLORS.text : COLORS.textSecondary}
+          />
           <Text
             maxFontSizeMultiplier={1.5}
-            style={[styles.dateButtonText, customDate && styles.dateButtonTextActive]}
+            style={[
+              styles.dateButtonText,
+              customDate && styles.dateButtonTextActive
+            ]}
           >
             {customDate ? dayLabel(date, today) : "Pick date"}
           </Text>
@@ -328,15 +452,30 @@ export function ExpenseSheet({
       <Input
         label="Note (optional)"
         value={note}
-        onChangeText={setNote}
+        onChangeText={(text) => updatePaymentDraft({ note: text })}
         placeholder="What was it for?"
         maxLength={NOTE_MAX_LENGTH}
         editable={!busy}
         multiline
-        helperText={note.length > NOTE_MAX_LENGTH - 40 ? `${note.length}/${NOTE_MAX_LENGTH}` : undefined}
+        helperText={
+          note.length > NOTE_MAX_LENGTH - 40
+            ? `${note.length}/${NOTE_MAX_LENGTH}`
+            : undefined
+        }
         containerStyle={styles.noteContainer}
         style={styles.noteInput}
       />
+      {Platform.OS === "android" && !expense ? (
+        <UpiPaymentPanel
+          visible={visible}
+          amount={amount}
+          note={note}
+          paymentState={upiState}
+          disabled={busy}
+          onDraftChange={updatePaymentDraft}
+          onPaymentStateChange={handleUpiStateChange}
+        />
+      ) : null}
     </ExpenseBottomSheet>
   );
 }
@@ -344,7 +483,11 @@ export function ExpenseSheet({
 const styles = StyleSheet.create({
   rupee: { fontSize: 20, fontWeight: "700", color: COLORS.textSecondary },
   amountInput: { fontSize: 22, fontWeight: "700" },
-  label: { ...TYPOGRAPHY.label, marginTop: SPACING.md, marginBottom: SPACING.sm },
+  label: {
+    ...TYPOGRAPHY.label,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm
+  },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   dateButton: {
     minHeight: TOUCH_TARGET,
@@ -357,13 +500,24 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     backgroundColor: COLORS.surface
   },
-  dateButtonActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
-  dateButtonText: { fontSize: 14, fontWeight: "600", color: COLORS.textSecondary },
+  dateButtonActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryLight
+  },
+  dateButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textSecondary
+  },
   dateButtonTextActive: { color: COLORS.text },
   noteContainer: { marginTop: SPACING.lg },
-  noteInput: { minHeight: 48, maxHeight: 120, textAlignVertical: "top", paddingTop: 12 },
+  noteInput: {
+    minHeight: 48,
+    maxHeight: 120,
+    textAlignVertical: "top",
+    paddingTop: 12
+  },
   formError: { ...TYPOGRAPHY.body, color: COLORS.dangerText },
-  actions: { flexDirection: "row", gap: SPACING.md },
-  action: { flex: 1 },
+  paymentHint: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary },
   deleteText: { color: COLORS.dangerText }
 });

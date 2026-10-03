@@ -1,8 +1,7 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { PiggyBank } from "lucide-react-native";
 import { BORDER_RADIUS, COLORS, SPACING, TOUCH_TARGET, TYPOGRAPHY } from "../../constants/theme";
-import { Card } from "../Card";
 import { ErrorState } from "../StateViews";
 import {
   budgetStatus,
@@ -14,6 +13,8 @@ import {
 import { plural } from "../../utils/format";
 
 type CategoryTotals = ReturnType<typeof totalsByCategory>;
+
+const RIPPLE = { color: "rgba(255, 255, 255, 0.08)" } as const;
 
 function ProgressBar({
   ratio,
@@ -57,7 +58,7 @@ export function MonthSummaryCard({
   const status = budgetStatus(total, budgetTotal);
   const barColor = status?.over ? COLORS.danger : status && status.percent >= 80 ? COLORS.warning : COLORS.success;
   return (
-    <Card style={styles.card}>
+    <View style={styles.summary}>
       <Text style={styles.eyebrow}>Spent in {monthName}</Text>
       <Text
         style={styles.total}
@@ -90,26 +91,17 @@ export function MonthSummaryCard({
           />
         </View>
       ) : null}
-    </Card>
+    </View>
   );
 }
 
 export function CategoryBreakdown({ totals }: { totals: CategoryTotals }) {
   if (!totals.length) return null;
   return (
-    <Card style={styles.card}>
+    <View style={styles.section}>
       <Text style={styles.cardTitle} accessibilityRole="header">
         By category
       </Text>
-      {/* Stacked share bar */}
-      <View style={styles.stack} accessible={false} importantForAccessibility="no-hide-descendants">
-        {totals.map((item) => (
-          <View
-            key={item.category}
-            style={{ flex: Math.max(item.share, 0.001), backgroundColor: categoryMeta(item.category).color }}
-          />
-        ))}
-      </View>
       {totals.map((item) => {
         const meta = categoryMeta(item.category);
         const percent = Math.round(item.share * 100);
@@ -120,16 +112,27 @@ export function CategoryBreakdown({ totals }: { totals: CategoryTotals }) {
             accessible
             accessibilityLabel={`${item.category}: ${formatRupees(item.total)}, ${percent} percent, ${plural(item.count, "expense")}`}
           >
-            <View style={[styles.dot, { backgroundColor: meta.color }]} />
-            <Text style={styles.categoryName} numberOfLines={1}>
-              {meta.emoji} {item.category}
+            <Text style={styles.categoryEmoji} maxFontSizeMultiplier={1.3}>
+              {meta.emoji}
             </Text>
-            <Text style={styles.percent}>{percent}%</Text>
-            <Text style={styles.amount}>{formatRupees(item.total)}</Text>
+            <View style={styles.categoryBody}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.categoryName} numberOfLines={1}>
+                  {item.category}
+                </Text>
+                <Text style={styles.amount}>{formatRupees(item.total)}</Text>
+              </View>
+              <View style={styles.thinTrack}>
+                <View style={[styles.fill, { width: `${Math.max(2, percent)}%`, backgroundColor: meta.color }]} />
+              </View>
+              <Text style={styles.percent}>
+                {percent}% · {plural(item.count, "expense")}
+              </Text>
+            </View>
           </View>
         );
       })}
-    </Card>
+    </View>
   );
 }
 
@@ -151,26 +154,29 @@ export function BudgetProgressCard({
   retrying: boolean;
 }) {
   return (
-    <Card style={styles.card}>
+    <View style={styles.section}>
       <View style={styles.rowBetween}>
-        <Text style={styles.cardTitle} accessibilityRole="header">
+        <Text style={[styles.cardTitle, styles.cardTitleInline]} accessibilityRole="header">
           Budgets
         </Text>
-        <TouchableOpacity
-          style={styles.linkButton}
+        <Pressable
+          style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
+          android_ripple={RIPPLE}
+          hitSlop={4}
           onPress={onEdit}
           disabled={loading || Boolean(error)}
           accessibilityRole="button"
           accessibilityLabel="Set budgets"
         >
           <Text style={styles.linkText}>{budgets.length ? "Edit" : "Set budgets"}</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
       {error ? (
         <ErrorState compact title="Couldn't load budgets" error={error} onRetry={onRetry} retrying={retrying} />
       ) : loading ? null : budgets.length === 0 ? (
-        <TouchableOpacity
-          style={styles.emptyBudget}
+        <Pressable
+          style={({ pressed }) => [styles.emptyBudget, pressed && styles.pressed]}
+          android_ripple={RIPPLE}
           onPress={onEdit}
           accessibilityRole="button"
           accessibilityLabel="No budgets yet. Set monthly limits per category"
@@ -179,7 +185,7 @@ export function BudgetProgressCard({
           <Text style={styles.emptyBudgetText}>
             Set monthly limits per category to see how close you are.
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       ) : (
         budgets.map((budget) => {
           const spent = spentByCategory.get(budget.category) ?? 0;
@@ -188,7 +194,7 @@ export function BudgetProgressCard({
           const meta = categoryMeta(budget.category);
           const color = status.over ? COLORS.danger : status.percent >= 80 ? COLORS.warning : meta.color;
           return (
-            <View key={budget.category} style={[styles.budgetRow, status.over && styles.budgetRowOver]}>
+            <View key={budget.category} style={styles.budgetRow}>
               <View style={styles.rowBetween}>
                 <Text style={styles.categoryName} numberOfLines={1}>
                   {meta.emoji} {budget.category}
@@ -212,58 +218,66 @@ export function BudgetProgressCard({
           );
         })
       )}
-    </Card>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.border },
-  eyebrow: { ...TYPOGRAPHY.label, textTransform: "uppercase", letterSpacing: 0.5 },
-  total: { fontSize: 34, fontWeight: "800", color: COLORS.text, marginTop: SPACING.xs, fontVariant: ["tabular-nums"] },
+  summary: { paddingTop: SPACING.sm, paddingBottom: SPACING.lg },
+  section: {
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.border
+  },
+  eyebrow: { ...TYPOGRAPHY.bodySecondary },
+  total: { fontSize: 36, fontWeight: "700", color: COLORS.text, marginTop: 2, fontVariant: ["tabular-nums"] },
   meta: { ...TYPOGRAPHY.bodySecondary, marginTop: 2 },
-  metaStrong: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, fontWeight: "700", flexShrink: 1 },
-  budgetBlock: { marginTop: SPACING.md, gap: SPACING.sm },
+  metaStrong: { ...TYPOGRAPHY.bodySecondary, flexShrink: 1 },
+  budgetBlock: { marginTop: SPACING.lg, gap: SPACING.sm },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: SPACING.sm, flexWrap: "wrap" },
   track: {
-    height: 10,
+    height: 6,
     borderRadius: BORDER_RADIUS.full,
     backgroundColor: COLORS.surfaceElevated,
     overflow: "hidden"
   },
-  fill: { height: "100%", borderRadius: BORDER_RADIUS.full },
-  cardTitle: { ...TYPOGRAPHY.title3 },
-  stack: {
-    flexDirection: "row",
-    height: 12,
+  thinTrack: {
+    height: 4,
     borderRadius: BORDER_RADIUS.full,
+    backgroundColor: COLORS.surfaceElevated,
     overflow: "hidden",
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-    gap: 2
+    marginTop: 6
   },
-  categoryRow: { flexDirection: "row", alignItems: "center", minHeight: TOUCH_TARGET - 8, gap: SPACING.sm },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  categoryName: { ...TYPOGRAPHY.body, flex: 1, fontWeight: "600" },
-  percent: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, minWidth: 36, textAlign: "right" },
-  amount: { ...TYPOGRAPHY.body, fontWeight: "700", fontVariant: ["tabular-nums"], textAlign: "right" },
-  linkButton: { minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET, justifyContent: "center", alignItems: "flex-end" },
-  linkText: { fontSize: 14, fontWeight: "700", color: COLORS.primaryText },
+  fill: { height: "100%", borderRadius: BORDER_RADIUS.full },
+  cardTitle: { fontSize: 13, fontWeight: "600", color: COLORS.primaryText, marginBottom: SPACING.xs },
+  cardTitleInline: { marginBottom: 0 },
+  categoryRow: { flexDirection: "row", alignItems: "center", minHeight: 56, gap: SPACING.md, paddingVertical: SPACING.sm },
+  categoryEmoji: { fontSize: 20, width: 28, textAlign: "center" },
+  categoryBody: { flex: 1, minWidth: 0 },
+  categoryName: { ...TYPOGRAPHY.body, fontSize: 15, flex: 1 },
+  percent: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, marginTop: 4 },
+  amount: { ...TYPOGRAPHY.body, fontSize: 15, fontWeight: "600", fontVariant: ["tabular-nums"], textAlign: "right" },
+  linkButton: {
+    minHeight: TOUCH_TARGET,
+    minWidth: TOUCH_TARGET,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.full,
+    overflow: "hidden"
+  },
+  linkText: { fontSize: 14, fontWeight: "600", color: COLORS.primaryText },
+  pressed: { opacity: 0.85 },
   emptyBudget: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.md,
-    minHeight: TOUCH_TARGET,
+    minHeight: 56,
     paddingVertical: SPACING.sm
   },
   emptyBudgetText: { ...TYPOGRAPHY.bodySecondary, flex: 1 },
-  budgetRow: { marginTop: SPACING.md, gap: 6 },
-  budgetRowOver: {
-    backgroundColor: COLORS.dangerLight,
-    borderWidth: 1,
-    borderColor: COLORS.dangerBorder,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.sm
-  },
-  budgetAmounts: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary, fontVariant: ["tabular-nums"] },
-  budgetNote: { ...TYPOGRAPHY.caption }
+  budgetRow: { paddingVertical: SPACING.sm, gap: 6 },
+  budgetAmounts: { ...TYPOGRAPHY.bodySecondary, fontVariant: ["tabular-nums"] },
+  budgetNote: { ...TYPOGRAPHY.caption, color: COLORS.textSecondary }
 });

@@ -5,21 +5,27 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  TouchableOpacity,
+  Pressable,
   Alert
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Trophy, Sparkles, CheckCircle, PlusCircle, Rocket } from "lucide-react-native";
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from "../../src/constants/theme";
+import { PlusCircle } from "lucide-react-native";
+import { COLORS, LIST, SPACING, TYPOGRAPHY } from "../../src/constants/theme";
 import { ProgressHeader } from "../../src/components/ProgressHeader";
-import { XPBar } from "../../src/components/XPBar";
-import { LevelBadge } from "../../src/components/LevelBadge";
-import { HabitCard } from "../../src/components/HabitCard";
-import { Card } from "../../src/components/Card";
+import { HabitRow } from "../../src/components/HabitRow";
+import {
+  Divider,
+  LeadingDot,
+  LIST_TEXT_INSET,
+  ListRow,
+  RowSkeleton,
+  SectionLabel
+} from "../../src/components/List";
+import { Fab, FAB_CLEARANCE } from "../../src/components/Fab";
 import { Button } from "../../src/components/Button";
-import { CardSkeleton, ErrorState, Skeleton } from "../../src/components/StateViews";
+import { ErrorState, Skeleton } from "../../src/components/StateViews";
 import { StreakRepairBanner } from "../../src/components/StreakRepairBanner";
 import {
   errorMessage,
@@ -34,9 +40,23 @@ import { openWalkthrough } from "../../src/stores/onboardingStore";
 import { useRewardCelebration } from "../../src/hooks/useRewardCelebration";
 import { habitsListKey, useHabitsList } from "../../src/hooks/useHabitsList";
 import { localDateString, useLocalDate } from "../../src/utils/date";
+import { formatSchedule, weeklyProgress } from "../../src/utils/format";
+import { habitColor } from "../../src/utils/habitColor";
 import { hapticError } from "../../src/utils/haptics";
 import { dayState, completed } from "@habit-tracker/shared";
 import type { HabitListItem, HabitLog, ActionStatus } from "@habit-tracker/shared";
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Monday, Sep 29" for YYYY-MM-DD (noon, so no timezone shifts the day). */
+const longDate = (date: string) => {
+  const parsed = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return `${WEEKDAYS[parsed.getDay()]}, ${MONTHS[parsed.getMonth()]} ${parsed.getDate()}`;
+};
+
+const LEGENDARY_BONUS_XP = 25;
 
 type LogChange =
   | { kind: "save"; status: ActionStatus | null; value: number | null }
@@ -78,7 +98,6 @@ export default function TodayScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const celebrate = useRewardCelebration();
-  const user = useAuthStore((state) => state.user);
   const today = useLocalDate();
   const listKey = habitsListKey(today);
   const [refreshing, setRefreshing] = useState(false);
@@ -170,7 +189,7 @@ export default function TodayScreen() {
       // Roll back only this habit so other in-flight cards keep their state.
       if (context?.previous) patchHabit(context.key, habit.id, () => context.previous!);
       void hapticError();
-      Alert.alert("Couldn't save your quest", errorMessage(error));
+      Alert.alert("Couldn't save", errorMessage(error));
     },
     onSuccess: ({ reward, log }, { habit, date, change }, context) => {
       if (context?.userId !== useAuthStore.getState().user?.id) return;
@@ -241,235 +260,253 @@ export default function TodayScreen() {
     mutateLog(habit, { kind: "save", status: "done", value: null });
   };
 
+  const openEdit = (habit: HabitListItem) =>
+    router.push({ pathname: "/habits/new", params: { editId: habit.id } }, { withAnchor: true });
+
+  const openNewHabit = () => router.push("/habits/new", { withAnchor: true });
+
   const hasNoHabits = habitsQuery.isSuccess && activeHabits.length === 0;
-  const name = user?.email.split("@")[0];
+  // Resting habits without a repair offer: listed quietly under "Not due today".
+  const restingOther = activeHabits.filter(
+    (h) => !h.streakRepair && dayState(h, h.recentDays ?? [], today, today) === "rest"
+  );
+  const showSummary = habitsQuery.isSuccess && !hasNoHabits;
+  const xpToGo =
+    profile && profile.xpNeeded != null ? Math.max(0, profile.xpNeeded - profile.xpIntoLevel) : null;
+  const levelText = profile
+    ? xpToGo == null
+      ? `Level ${profile.level} · Max level`
+      : `Level ${profile.level} · ${xpToGo.toLocaleString()} XP to go`
+    : null;
+  const bonusText = isLegendaryDay
+    ? "Legendary Day earned ✓"
+    : totalQuests === 0
+      ? "Nothing due today. Enjoy the break."
+      : totalQuests === 1
+        ? `Finish it for a +${LEGENDARY_BONUS_XP} XP Legendary Day bonus`
+        : `Finish all ${totalQuests} for a +${LEGENDARY_BONUS_XP} XP Legendary Day bonus`;
+  const progress = totalQuests > 0 ? completedQuests / totalQuests : 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <ProgressHeader />
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
-        }
-      >
-        {/* ── Hero ── */}
-        <View style={styles.heroCard}>
-          <Text style={styles.heroGreeting}>Welcome back{name ? "," : ""}</Text>
-          {name ? (
-            <Text style={styles.heroUsername} numberOfLines={1}>
-              {name}
+      <View style={styles.container}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={[styles.content, !hasNoHabits && { paddingBottom: FAB_CLEARANCE }]}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+          }
+        >
+          {/* ── Header: date + title ── */}
+          <View style={styles.header}>
+            <Text style={styles.date} maxFontSizeMultiplier={1.5}>
+              {longDate(today)}
             </Text>
-          ) : null}
-          {profileQuery.isLoading ? (
-            <View style={styles.heroSkeleton} accessible accessibilityLabel="Loading your level">
-              <Skeleton width={140} height={26} radius={13} />
-              <Skeleton height={10} style={{ marginTop: SPACING.md }} />
-            </View>
-          ) : profile ? (
-            <>
-              <View style={styles.levelRow}>
-                <LevelBadge level={profile.level} title={profile.levelTitle} size="md" />
-              </View>
-              <XPBar
-                currentXP={profile.xpIntoLevel}
-                neededXP={profile.xpNeeded}
-                level={profile.level}
-                title={profile.levelTitle}
-                showDetails
-              />
-            </>
-          ) : (
-            <ErrorState
-              compact
-              title="Couldn't load your level"
-              error={profileQuery.error}
-              retrying={profileQuery.isFetching}
-              onRetry={() => void profileQuery.refetch()}
-            />
-          )}
-        </View>
+            <Text style={styles.title} accessibilityRole="header">
+              Today
+            </Text>
+          </View>
 
-        {/* ── Legendary Day banner (only once the user has habits) ── */}
-        {habitsQuery.isSuccess && !hasNoHabits && (
-          <View
-            style={[styles.challengeBanner, isLegendaryDay && styles.challengeBannerLegendary]}
-            accessible
-            accessibilityLabel={
-              isLegendaryDay
-                ? "Legendary Day! All of today's quests are done."
-                : totalQuests === 0
-                  ? "All clear today. No quests are due."
-                  : `${completedQuests} of ${totalQuests} quests done. Finish them all for the Legendary Day bonus.`
-            }
-          >
-            <View style={styles.challengeIconContainer}>
-              {isLegendaryDay ? (
-                <Trophy size={26} color={COLORS.gold} />
-              ) : (
-                <Sparkles size={24} color={COLORS.primaryText} />
-              )}
+          {/* ── Progress summary: plain text on the background, no box ── */}
+          {habitsQuery.isLoading ? (
+            <View style={styles.summary} accessible accessibilityLabel="Loading today's progress">
+              <Skeleton width={140} height={22} />
+              <Skeleton height={4} style={{ marginTop: SPACING.md }} />
             </View>
-            <View style={styles.challengeTextContainer}>
-              <Text style={styles.challengeTitle}>
-                {isLegendaryDay ? "Legendary Day!" : totalQuests === 0 ? "All clear today" : "Legendary Day bonus"}
-              </Text>
-              <Text style={styles.challengeSubtitle}>
-                {isLegendaryDay
-                  ? "Every quest done today. +25 XP bonus earned 🏆"
-                  : totalQuests === 0
-                    ? "No quests are due today. Enjoy the break."
-                    : `Finish ${totalQuests === 1 ? "today's quest" : `all ${totalQuests} quests`} to earn +25 XP.`}
-              </Text>
-              {totalQuests > 0 && (
-                <View style={styles.challengeProgressRow}>
-                  <View style={styles.miniTrack}>
+          ) : showSummary ? (
+            <View style={styles.summary}>
+              <View
+                accessible
+                accessibilityLabel={`${
+                  totalQuests === 0 ? "Nothing due today" : `${completedQuests} of ${totalQuests} done`
+                }. ${levelText ?? ""}. ${bonusText.replace("✓", "")}`}
+              >
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryCount} maxFontSizeMultiplier={1.4}>
+                    {totalQuests === 0 ? "All clear" : `${completedQuests} of ${totalQuests} done`}
+                  </Text>
+                  {levelText ? (
+                    <Text style={styles.summaryLevel} numberOfLines={1} maxFontSizeMultiplier={1.4}>
+                      {levelText}
+                    </Text>
+                  ) : profileQuery.isLoading ? (
+                    <Skeleton width={120} height={14} />
+                  ) : null}
+                </View>
+                {totalQuests > 0 ? (
+                  <View style={styles.track}>
                     <View
                       style={[
-                        styles.miniFill,
-                        isLegendaryDay && styles.miniFillDone,
-                        { width: `${Math.round((completedQuests / totalQuests) * 100)}%` }
+                        styles.fill,
+                        isLegendaryDay && styles.fillDone,
+                        { width: `${Math.round(progress * 100)}%` }
                       ]}
                     />
                   </View>
-                  <Text style={styles.challengeProgressText}>
-                    {completedQuests} / {totalQuests}
+                ) : null}
+                <Text style={[styles.bonus, isLegendaryDay && styles.bonusDone]} maxFontSizeMultiplier={1.5}>
+                  {bonusText}
+                </Text>
+              </View>
+              {!profile && profileQuery.isError ? (
+                <Pressable
+                  onPress={() => void profileQuery.refetch()}
+                  disabled={profileQuery.isFetching}
+                  accessibilityRole="button"
+                  accessibilityLabel="Couldn't load your level. Retry"
+                  style={styles.inlineRetry}
+                >
+                  <Text style={styles.inlineRetryText}>
+                    {profileQuery.isFetching ? "Loading your level…" : "Couldn't load your level · Retry"}
                   </Text>
-                </View>
-              )}
+                </Pressable>
+              ) : null}
             </View>
-          </View>
-        )}
+          ) : null}
 
-        {/* ── Today's Quests ── */}
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionHeading}>
-            <Text style={styles.sectionTitle} accessibilityRole="header">
-              Today's Quests
-            </Text>
-            {habitsQuery.isSuccess && !hasNoHabits && (
-              <Text style={styles.sectionSubtitle}>
-                {displayHabits.length} {displayHabits.length === 1 ? "habit" : "habits"} due today
-              </Text>
-            )}
-          </View>
-          {!hasNoHabits && (
-            <TouchableOpacity
-              style={styles.addHabitButton}
-              accessibilityRole="button"
-              accessibilityLabel="New habit"
-              onPress={() => router.push("/habits/new", { withAnchor: true })}
-            >
-              <PlusCircle size={18} color={COLORS.primaryText} />
-              <Text style={styles.addHabitText}>New</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {habitsQuery.isLoading ? (
-          <>
-            <CardSkeleton />
-            <CardSkeleton />
-            <CardSkeleton lines={1} />
-          </>
-        ) : habitsQuery.isError && !habitsQuery.data ? (
-          <Card>
+          {/* ── Habit list ── */}
+          {habitsQuery.isLoading ? (
+            <View style={styles.list}>
+              <RowSkeleton />
+              <Divider />
+              <RowSkeleton />
+              <Divider />
+              <RowSkeleton />
+            </View>
+          ) : habitsQuery.isError && !habitsQuery.data ? (
             <ErrorState
-              title="Couldn't load today's quests"
+              title="Couldn't load today's habits"
               error={habitsQuery.error}
               retrying={habitsQuery.isFetching}
               onRetry={() => void habitsQuery.refetch()}
             />
-          </Card>
-        ) : hasNoHabits ? (
-          <Card style={styles.emptyCard}>
-            <Rocket size={44} color={COLORS.primaryText} />
-            <Text style={styles.emptyTitle} accessibilityRole="header">
-              Add your first habit to start your streak 🔥
-            </Text>
-            <Text style={styles.emptyText}>
-              Each day you complete it you earn XP, grow your streak and unlock badges in the Trophy Room.
-            </Text>
-            <View style={styles.emptyActions}>
-              <Button
-                title="Create a habit"
-                icon={<PlusCircle size={16} color={COLORS.white} />}
-                onPress={() => router.push("/habits/new", { withAnchor: true })}
-                fullWidth
-              />
-              <Button
-                title="How Pulse works"
-                variant="secondary"
-                onPress={openWalkthrough}
-                accessibilityHint="Opens a short introduction to habits, XP and streaks"
-                fullWidth
-              />
+          ) : hasNoHabits ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle} accessibilityRole="header">
+                Add your first habit to start your streak 🔥
+              </Text>
+              <Text style={styles.emptyText}>
+                Each day you complete it you earn XP, grow your streak and unlock badges in the Trophy Room.
+              </Text>
+              <View style={styles.emptyActions}>
+                <Button
+                  title="Create a habit"
+                  icon={<PlusCircle size={16} color={COLORS.white} />}
+                  onPress={openNewHabit}
+                  fullWidth
+                />
+                <Button
+                  title="How Pulse works"
+                  variant="ghost"
+                  onPress={openWalkthrough}
+                  accessibilityHint="Opens a short introduction to habits, XP and streaks"
+                  fullWidth
+                />
+              </View>
             </View>
-          </Card>
-        ) : displayHabits.length === 0 ? (
-          <Card style={styles.emptyCard}>
-            <CheckCircle size={44} color={COLORS.success} />
-            <Text style={styles.emptyTitle}>Nothing due today</Text>
-            <Text style={styles.emptyText}>
-              Your habits are resting today. Check back tomorrow, or add another habit.
-            </Text>
-            <Button title="New habit" variant="secondary" onPress={() => router.push("/habits/new", { withAnchor: true })} />
-          </Card>
-        ) : (
-          displayHabits.map((habit) => (
-            <HabitCard
-              key={habit.id}
-              habit={habit}
-              date={today}
-              // Yesterday's list shown while the new day loads: read-only.
-              saving={savingIds.has(habit.id) || habitsQuery.isPlaceholderData}
-              xpFloat={floats[habit.id] ?? null}
-              onXpFloatDone={() => {
-                const float = floats[habit.id];
-                if (float) clearFloat(habit.id, float.trigger);
-              }}
-              onComplete={() => handleComplete(habit)}
-              onSkip={() => mutateLog(habit, { kind: "save", status: "skipped", value: null })}
-              onUndo={() => mutateLog(habit, { kind: "delete" })}
-              onSaveMeasurable={(value, date) =>
-                mutateLog(habit, { kind: "save", status: null, value }, date)
-              }
-              onPressCard={() => openHabit(habit)}
-            />
-          ))
-        )}
-
-        {habitsQuery.isSuccess && restingRepairs.length > 0 && (
-          <View style={styles.repairSection}>
-            <Text style={styles.sectionTitle} accessibilityRole="header">
-              Streaks to repair
-            </Text>
-            {restingRepairs.map((habit) =>
-              habit.streakRepair ? (
-                <Card key={habit.id} style={styles.repairCard}>
-                  <TouchableOpacity
-                    onPress={() => openHabit(habit)}
-                    accessibilityRole="button"
-                    accessibilityHint="Opens habit details"
-                  >
-                    <Text style={styles.repairTitle} numberOfLines={1}>
-                      {habit.title}
-                    </Text>
-                  </TouchableOpacity>
-                  <StreakRepairBanner
-                    habitId={habit.id}
-                    habitTitle={habit.title}
-                    offer={habit.streakRepair}
-                    disabled={habitsQuery.isPlaceholderData}
+          ) : displayHabits.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>Nothing due today</Text>
+              <Text style={styles.emptyText}>
+                Your habits are resting today. Check back tomorrow, or add another habit.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.list}>
+              {displayHabits.map((habit, index) => (
+                <React.Fragment key={habit.id}>
+                  {index > 0 ? <Divider /> : null}
+                  <HabitRow
+                    habit={habit}
+                    date={today}
+                    // Yesterday's list shown while the new day loads: read-only.
+                    saving={savingIds.has(habit.id) || habitsQuery.isPlaceholderData}
+                    xpFloat={floats[habit.id] ?? null}
+                    onXpFloatDone={() => {
+                      const float = floats[habit.id];
+                      if (float) clearFloat(habit.id, float.trigger);
+                    }}
+                    onComplete={() => handleComplete(habit)}
+                    onSkip={() => mutateLog(habit, { kind: "save", status: "skipped", value: null })}
+                    onUndo={() => mutateLog(habit, { kind: "delete" })}
+                    onSaveMeasurable={(value, date) =>
+                      mutateLog(habit, { kind: "save", status: null, value }, date)
+                    }
+                    onPressCard={() => openHabit(habit)}
+                    onEdit={() => openEdit(habit)}
                   />
-                </Card>
-              ) : null
-            )}
-          </View>
-        )}
-      </ScrollView>
+                </React.Fragment>
+              ))}
+            </View>
+          )}
+
+          {habitsQuery.isSuccess && restingRepairs.length > 0 && (
+            <>
+              <SectionLabel>Streaks to repair</SectionLabel>
+              <View style={styles.list}>
+                {restingRepairs.map((habit, index) =>
+                  habit.streakRepair ? (
+                    <React.Fragment key={habit.id}>
+                      {index > 0 ? <Divider /> : null}
+                      <ListRow
+                        title={habit.title}
+                        subtitle={`${formatSchedule(habit)} · not due today`}
+                        leading={<LeadingDot color={habitColor(habit.color)} />}
+                        chevron
+                        onPress={() => openHabit(habit)}
+                        accessibilityHint="Opens habit details"
+                      />
+                      <StreakRepairBanner
+                        habitId={habit.id}
+                        habitTitle={habit.title}
+                        offer={habit.streakRepair}
+                        disabled={habitsQuery.isPlaceholderData}
+                        inset={LIST_TEXT_INSET}
+                        style={styles.repairInline}
+                      />
+                    </React.Fragment>
+                  ) : null
+                )}
+              </View>
+            </>
+          )}
+
+          {habitsQuery.isSuccess && restingOther.length > 0 && (
+            <>
+              <SectionLabel>Not due today</SectionLabel>
+              <View style={styles.list}>
+                {restingOther.map((habit, index) => {
+                  const weekly = weeklyProgress(habit, habit.recentDays ?? [], today);
+                  return (
+                    <React.Fragment key={habit.id}>
+                      {index > 0 ? <Divider /> : null}
+                      <ListRow
+                        title={habit.title}
+                        subtitle={
+                          weekly
+                            ? `${weekly.done}/${weekly.target} this week · done for the week`
+                            : formatSchedule(habit)
+                        }
+                        leading={<LeadingDot color={habitColor(habit.color)} dimmed />}
+                        muted
+                        chevron
+                        onPress={() => openHabit(habit)}
+                        accessibilityHint="Opens habit details"
+                      />
+                    </React.Fragment>
+                  );
+                })}
+              </View>
+            </>
+          )}
+        </ScrollView>
+
+        {!hasNoHabits ? (
+          <Fab onPress={openNewHabit} accessibilityLabel="New habit" />
+        ) : null}
+      </View>
     </SafeAreaView>
   );
 }
@@ -483,154 +520,105 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
-    padding: SPACING.md,
     paddingBottom: SPACING.xxxl
   },
-  heroCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: SPACING.md
+  header: {
+    paddingHorizontal: LIST.gutter,
+    paddingTop: SPACING.lg
   },
-  heroGreeting: {
-    ...TYPOGRAPHY.caption
+  date: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: COLORS.textSecondary
   },
-  heroUsername: {
-    ...TYPOGRAPHY.title1,
-    marginBottom: SPACING.md
-  },
-  heroSkeleton: {
-    marginTop: SPACING.sm
-  },
-  levelRow: {
-    marginBottom: SPACING.md
-  },
-  challengeBanner: {
-    flexDirection: "row",
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: SPACING.md,
-    alignItems: "center",
-    marginBottom: SPACING.lg,
-    gap: SPACING.md
-  },
-  challengeBannerLegendary: {
-    backgroundColor: COLORS.goldLight,
-    borderColor: COLORS.goldBorder
-  },
-  challengeIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.surfaceElevated,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  challengeTextContainer: {
-    flex: 1
-  },
-  challengeTitle: {
-    ...TYPOGRAPHY.title3
-  },
-  challengeSubtitle: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
+  title: {
+    ...TYPOGRAPHY.hero,
     marginTop: 2
   },
-  challengeProgressRow: {
+  summary: {
+    paddingHorizontal: LIST.gutter,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md
+  },
+  summaryRow: {
     flexDirection: "row",
-    alignItems: "center",
-    marginTop: 6,
-    gap: 8
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    columnGap: SPACING.md,
+    rowGap: 2
   },
-  miniTrack: {
-    flex: 1,
-    height: 6,
+  summaryCount: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.text
+  },
+  summaryLevel: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: COLORS.textSecondary,
+    flexShrink: 1
+  },
+  track: {
+    height: 4,
+    borderRadius: 2,
     backgroundColor: COLORS.surfaceElevated,
-    borderRadius: 3,
-    overflow: "hidden"
+    overflow: "hidden",
+    marginTop: SPACING.md
   },
-  miniFill: {
+  fill: {
     height: "100%",
-    backgroundColor: COLORS.primary,
-    borderRadius: 3
+    borderRadius: 2,
+    backgroundColor: COLORS.primary
   },
-  miniFillDone: {
+  fillDone: {
     backgroundColor: COLORS.gold
   },
-  challengeProgressText: {
-    ...TYPOGRAPHY.micro,
-    fontWeight: "700"
+  bonus: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm
   },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: SPACING.sm,
-    marginBottom: SPACING.md
+  bonusDone: {
+    color: COLORS.gold,
+    fontWeight: "600"
   },
-  sectionHeading: {
-    flex: 1,
-    minWidth: 0
-  },
-  sectionTitle: {
-    ...TYPOGRAPHY.title2
-  },
-  sectionSubtitle: {
-    ...TYPOGRAPHY.caption
-  },
-  addHabitButton: {
-    flexShrink: 0,
+  inlineRetry: {
     minHeight: 44,
-    minWidth: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surfaceElevated,
-    paddingHorizontal: 12,
-    borderRadius: BORDER_RADIUS.md,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: COLORS.border
+    justifyContent: "center",
+    alignSelf: "flex-start"
   },
-  addHabitText: {
-    ...TYPOGRAPHY.label,
+  inlineRetryText: {
+    fontSize: 13,
+    fontWeight: "600",
     color: COLORS.primaryText
   },
-  repairSection: {
-    marginTop: SPACING.md,
-    gap: SPACING.sm
+  list: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.divider
   },
-  repairCard: {
+  repairInline: {
+    marginTop: -SPACING.sm,
     paddingBottom: SPACING.xs
   },
-  repairTitle: {
-    ...TYPOGRAPHY.title3,
-    marginBottom: SPACING.sm
-  },
-  emptyCard: {
-    alignItems: "center",
-    paddingVertical: SPACING.xxxl
+  empty: {
+    paddingHorizontal: LIST.gutter + SPACING.sm,
+    paddingVertical: SPACING.xxxl,
+    alignItems: "center"
   },
   emptyTitle: {
     ...TYPOGRAPHY.title2,
-    marginTop: SPACING.md,
-    textAlign: "center",
-    paddingHorizontal: SPACING.md
-  },
-  emptyActions: {
-    alignSelf: "stretch",
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.md
+    textAlign: "center"
   },
   emptyText: {
     ...TYPOGRAPHY.bodySecondary,
     textAlign: "center",
-    marginTop: SPACING.xs,
-    marginBottom: SPACING.lg,
-    paddingHorizontal: SPACING.md
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xl
+  },
+  emptyActions: {
+    alignSelf: "stretch",
+    gap: SPACING.sm
   }
 });

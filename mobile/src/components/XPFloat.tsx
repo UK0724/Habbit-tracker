@@ -7,16 +7,22 @@ import { useReduceMotion } from "../hooks/useReduceMotion";
  * "+10 XP" that rises and fades from its parent (position the parent
  * relative). Re-runs whenever `trigger` changes; renders nothing for 0.
  * `onDone` fires once the animation finishes, so the owner can drop the
- * entry and a remount does not replay it.
+ * entry and a remount does not replay it. In a list row it rises from
+ * just left of the trailing checkbox (`right`), vertically centred-ish.
  */
 export function XPFloat({
   xp,
   trigger,
-  onDone
+  onDone,
+  right = 64,
+  top = 12
 }: {
   xp: number;
   trigger: number;
   onDone?: () => void;
+  /** Offset from the parent's right edge (dp). */
+  right?: number;
+  top?: number;
 }) {
   const progress = useRef(new Animated.Value(1)).current;
   const reduce = useReduceMotion();
@@ -47,13 +53,14 @@ export function XPFloat({
       maxFontSizeMultiplier={1.3}
       style={[
         styles.text,
+        { right, top },
         negative && styles.negative,
         {
           opacity: progress.interpolate({ inputRange: [0, 0.15, 0.7, 1], outputRange: [0, 1, 1, 0] }),
           transform: reduce
             ? []
             : [
-                { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [0, -46] }) },
+                { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [0, -34] }) },
                 { scale: progress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.7, 1.15, 1] }) }
               ]
         }
@@ -71,13 +78,11 @@ const styles = StyleSheet.create({
   },
   text: {
     position: "absolute",
-    right: 16,
-    top: 8,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "800",
     color: COLORS.xpText,
     textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowRadius: 6
+    textShadowRadius: 4
   },
   negative: {
     color: COLORS.textMuted

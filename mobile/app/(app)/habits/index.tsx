@@ -4,21 +4,22 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
+  Platform,
   RefreshControl
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Plus, Search, ChevronRight, Layers, Archive } from "lucide-react-native";
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from "../../../src/constants/theme";
+import { Plus, Search } from "lucide-react-native";
+import { COLORS, LIST, SPACING, TYPOGRAPHY, BORDER_RADIUS } from "../../../src/constants/theme";
 import { ProgressHeader } from "../../../src/components/ProgressHeader";
 import { Input } from "../../../src/components/Input";
-import { StreakBadge } from "../../../src/components/StreakBadge";
-import { Card } from "../../../src/components/Card";
 import { Button } from "../../../src/components/Button";
-import { CardSkeleton, ErrorState } from "../../../src/components/StateViews";
+import { Divider, LeadingDot, ListRow, RowSkeleton } from "../../../src/components/List";
+import { Fab, FAB_CLEARANCE } from "../../../src/components/Fab";
+import { ErrorState } from "../../../src/components/StateViews";
 import { habitColor } from "../../../src/utils/habitColor";
-import { formatGoal, formatSchedule } from "../../../src/utils/format";
+import { librarySubtitle } from "../../../src/utils/habitRow";
 import { useHabitsList } from "../../../src/hooks/useHabitsList";
 import { useLocalDate } from "../../../src/utils/date";
 import type { HabitListItem } from "@habit-tracker/shared";
@@ -32,12 +33,6 @@ const EMPTY_COPY: Record<FilterType, { title: string; body: string }> = {
   measurable: { title: "No measurable habits", body: "Track an amount like minutes, pages or steps." },
   expense: { title: "No expense habits", body: "Expense habits are set up on the web at habbit.abuk.in." },
   archived: { title: "Nothing archived", body: "Habits you archive show up here and can be restored." }
-};
-
-const TYPE_LABEL: Record<string, string> = {
-  action: "Check off",
-  measurable: "Measurable",
-  expense: "Expense"
 };
 
 export default function HabitsListScreen() {
@@ -91,29 +86,19 @@ export default function HabitsListScreen() {
     ? { title: "No matches", body: `Nothing matches "${searchQuery.trim()}". Try another word.` }
     : EMPTY_COPY[activeFilter];
 
+  const openNewHabit = () => router.push("/habits/new");
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <ProgressHeader />
       <View style={styles.container}>
         <View style={styles.header}>
-          <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle} accessibilityRole="header">
-              Habits
-            </Text>
-            <Text style={styles.headerSubtitle}>
-              {habitsQuery.isSuccess ? `${activeCount} active` : " "}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.createButton}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="New habit"
-            onPress={() => router.push("/habits/new")}
-          >
-            <Plus size={18} color={COLORS.white} />
-            <Text style={styles.createButtonText}>New</Text>
-          </TouchableOpacity>
+          <Text style={styles.headerTitle} accessibilityRole="header">
+            Habits
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            {habitsQuery.isSuccess ? `${activeCount} active` : " "}
+          </Text>
         </View>
 
         <View style={styles.searchContainer}>
@@ -138,17 +123,26 @@ export default function HabitsListScreen() {
             {filterButtons.map((btn) => {
               const isSelected = activeFilter === btn.key;
               return (
-                <TouchableOpacity
+                <Pressable
                   key={btn.key}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isSelected }}
                   onPress={() => setActiveFilter(btn.key)}
-                  style={[styles.filterChip, isSelected && styles.filterChipActive]}
+                  android_ripple={{ color: COLORS.pressed }}
+                  hitSlop={{ top: 4, bottom: 4 }}
+                  style={({ pressed }) => [
+                    styles.filterChip,
+                    isSelected && styles.filterChipActive,
+                    pressed && Platform.OS !== "android" && styles.filterChipPressed
+                  ]}
                 >
-                  <Text style={[styles.filterChipText, isSelected && styles.filterChipTextActive]}>
+                  <Text
+                    style={[styles.filterChipText, isSelected && styles.filterChipTextActive]}
+                    maxFontSizeMultiplier={1.4}
+                  >
                     {btn.label}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               );
             })}
           </ScrollView>
@@ -162,80 +156,61 @@ export default function HabitsListScreen() {
           }
         >
           {habitsQuery.isLoading ? (
-            <>
-              <CardSkeleton lines={1} />
-              <CardSkeleton lines={1} />
-              <CardSkeleton lines={1} />
-            </>
+            <View style={styles.list}>
+              <RowSkeleton trailing={false} />
+              <Divider />
+              <RowSkeleton trailing={false} />
+              <Divider />
+              <RowSkeleton trailing={false} />
+            </View>
           ) : habitsQuery.isError && !habitsQuery.data ? (
-            <Card>
-              <ErrorState
-                title="Couldn't load your habits"
-                error={habitsQuery.error}
-                retrying={habitsQuery.isFetching}
-                onRetry={() => void habitsQuery.refetch()}
-              />
-            </Card>
+            <ErrorState
+              title="Couldn't load your habits"
+              error={habitsQuery.error}
+              retrying={habitsQuery.isFetching}
+              onRetry={() => void habitsQuery.refetch()}
+            />
           ) : filteredHabits.length === 0 ? (
-            <Card style={styles.emptyCard}>
-              <Layers size={44} color={COLORS.textMuted} />
+            <View style={styles.empty}>
               <Text style={styles.emptyTitle}>{empty.title}</Text>
               <Text style={styles.emptySubtitle}>{empty.body}</Text>
               {!searchQuery.trim() && ["active", "all", "action", "measurable"].includes(activeFilter) && (
                 <Button
                   title="Create a habit"
                   icon={<Plus size={16} color={COLORS.white} />}
-                  onPress={() => router.push("/habits/new")}
+                  onPress={openNewHabit}
                 />
               )}
-            </Card>
+            </View>
           ) : (
-            filteredHabits.map((habit) => {
-              const streak = habit.stats?.type === "action" ? habit.stats.currentStreak : 0;
-              const schedule = formatSchedule(habit);
-              const goal = habit.type === "measurable" ? formatGoal(habit, today) : TYPE_LABEL[habit.type];
-              return (
-                <TouchableOpacity
-                  key={habit.id}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${habit.title}. ${goal}. ${schedule}.${
-                    habit.type === "action" ? ` ${streak} ${habit.schedule === "weekly" ? "week" : "day"} streak.` : ""
-                  }${habit.archived ? " Archived." : ""}`}
-                  style={[styles.habitItem, habit.archived && styles.habitItemArchived]}
-                  onPress={() => router.push({ pathname: "/habits/[id]", params: { id: habit.id } })}
-                >
-                  <View style={styles.habitMainRow}>
-                    <View style={[styles.colorIndicator, { backgroundColor: habitColor(habit.color) }]} />
-                    <View style={styles.habitInfo}>
-                      <View style={styles.titleRow}>
-                        <Text
-                          style={[styles.habitTitle, habit.archived && styles.habitTitleArchived]}
-                          numberOfLines={1}
-                        >
-                          {habit.title}
-                        </Text>
-                        {habit.archived && (
-                          <View style={styles.archivedBadge}>
-                            <Archive size={11} color={COLORS.textMuted} />
-                            <Text style={styles.archivedText}>Archived</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.habitSub} numberOfLines={2}>
-                        {goal} · {schedule}
-                      </Text>
-                    </View>
-                    <View style={styles.habitActionCol}>
-                      {habit.type === "action" && <StreakBadge count={streak} size="sm" />}
-                      <ChevronRight size={18} color={COLORS.textMuted} />
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
+            <View style={styles.list}>
+              {filteredHabits.map((habit, index) => {
+                const subtitle = librarySubtitle(habit, today).join(" · ");
+                return (
+                  <React.Fragment key={habit.id}>
+                    {index > 0 ? <Divider /> : null}
+                    <ListRow
+                      title={habit.title}
+                      subtitle={subtitle}
+                      leading={<LeadingDot color={habitColor(habit.color)} dimmed={habit.archived} />}
+                      muted={habit.archived}
+                      titleLines={1}
+                      titleAccessory={
+                        habit.archived ? <Text style={styles.archivedText}>Archived</Text> : null
+                      }
+                      chevron
+                      accessibilityLabel={`${habit.title}. ${subtitle}.${habit.archived ? " Archived." : ""}`}
+                      accessibilityHint="Opens habit details"
+                      onPress={() => router.push({ pathname: "/habits/[id]", params: { id: habit.id } })}
+                    />
+                  </React.Fragment>
+                );
+              })}
+            </View>
           )}
         </ScrollView>
+
+        <Fab onPress={openNewHabit} accessibilityLabel="New habit" />
       </View>
     </SafeAreaView>
   );
@@ -250,69 +225,50 @@ const styles = StyleSheet.create({
     flex: 1
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.sm,
-    gap: SPACING.sm
-  },
-  headerCopy: {
-    flex: 1
+    paddingHorizontal: LIST.gutter,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.sm
   },
   headerTitle: {
-    ...TYPOGRAPHY.title1
+    ...TYPOGRAPHY.hero
   },
   headerSubtitle: {
-    ...TYPOGRAPHY.caption
-  },
-  createButton: {
-    minHeight: 44,
-    minWidth: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 16,
-    borderRadius: BORDER_RADIUS.md,
-    gap: 4
-  },
-  createButtonText: {
-    color: COLORS.white,
-    fontWeight: "700",
-    fontSize: 14
+    fontSize: 13,
+    fontWeight: "500",
+    color: COLORS.textSecondary,
+    marginTop: 2
   },
   searchContainer: {
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: LIST.gutter,
     marginBottom: SPACING.xs
   },
   searchInput: {
     marginBottom: SPACING.xs
   },
   filterBar: {
-    marginVertical: SPACING.xs
+    marginBottom: SPACING.sm
   },
   filterScroll: {
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: LIST.gutter,
     paddingVertical: SPACING.xs,
-    gap: 8
+    gap: SPACING.xs
   },
+  // Low emphasis: plain text until selected (filled, no border).
   filterChip: {
-    minHeight: 44,
+    minHeight: 36,
     justifyContent: "center",
     paddingHorizontal: 14,
     borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border
+    overflow: "hidden"
   },
   filterChipActive: {
-    backgroundColor: COLORS.primaryLight,
-    borderColor: COLORS.primary
+    backgroundColor: COLORS.primaryLight
+  },
+  filterChipPressed: {
+    backgroundColor: COLORS.pressed
   },
   filterChipText: {
-    ...TYPOGRAPHY.caption,
+    fontSize: 13,
     color: COLORS.textSecondary,
     fontWeight: "600"
   },
@@ -321,17 +277,21 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   listContent: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xxxl,
-    gap: SPACING.sm
+    paddingBottom: FAB_CLEARANCE
   },
-  emptyCard: {
+  list: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.divider
+  },
+  empty: {
     alignItems: "center",
+    paddingHorizontal: LIST.gutter + SPACING.sm,
     paddingVertical: SPACING.xxxl
   },
   emptyTitle: {
     ...TYPOGRAPHY.title2,
-    marginTop: SPACING.md
+    textAlign: "center"
   },
   emptySubtitle: {
     ...TYPOGRAPHY.bodySecondary,
@@ -339,64 +299,9 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
     marginBottom: SPACING.lg
   },
-  habitItem: {
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
-    minHeight: 64,
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border
-  },
-  habitItemArchived: {
-    opacity: 0.7
-  },
-  habitMainRow: {
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  colorIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: SPACING.md
-  },
-  habitInfo: {
-    flex: 1
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6
-  },
-  habitTitle: {
-    ...TYPOGRAPHY.title3,
-    flexShrink: 1
-  },
-  habitTitleArchived: {
-    color: COLORS.textSecondary
-  },
-  archivedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surfaceElevated,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: BORDER_RADIUS.xs,
-    gap: 3
-  },
   archivedText: {
-    ...TYPOGRAPHY.micro
-  },
-  habitSub: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary,
-    marginTop: 3
-  },
-  habitActionCol: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginLeft: SPACING.sm
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textMuted
   }
 });

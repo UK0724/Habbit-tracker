@@ -6,6 +6,10 @@ export const COLORS = {
   cardHover: "#1E2C48",
   border: "#24324D",
   borderLight: "#334566",
+  /** Hairline list separators: quieter than `border`, never boxes information. */
+  divider: "#1C2740",
+  /** Android ripple / pressed-row overlay on the background. */
+  pressed: "rgba(148, 163, 184, 0.14)",
 
   primary: "#6366F1",
   primaryHover: "#4F46E5",
@@ -98,6 +102,23 @@ export const BORDER_RADIUS = {
 
 /** Minimum touch target (dp). */
 export const TOUCH_TARGET = 44;
+
+/**
+ * Plain-list metrics (Material-style lists). Principle: only interactive
+ * things look interactive; information is plain text on the background.
+ */
+export const LIST = {
+  /** Minimum height of a two-line list row. */
+  rowMinHeight: 64,
+  /** Horizontal gutter of screen content and list rows. */
+  gutter: 16,
+  /** Visual size of the round trailing checkbox. */
+  checkboxSize: 30,
+  /** Hit area of trailing row controls (Android 48dp). */
+  controlHitSize: 48,
+  /** Floating action button. */
+  fabSize: 56
+};
 
 export const TYPOGRAPHY = {
   hero: {

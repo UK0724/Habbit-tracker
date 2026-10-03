@@ -7,14 +7,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  type TextInput
+  type TextInput,
+  Image
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Flame, Mail, Lock, AlertCircle, Settings } from "lucide-react-native";
+import { Mail, Lock, AlertCircle, Settings } from "lucide-react-native";
 import { Input } from "../../src/components/Input";
 import { Button } from "../../src/components/Button";
 import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from "../../src/constants/theme";
@@ -100,9 +101,11 @@ export default function LoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <View style={styles.iconCircle}>
-            <Flame size={44} color={COLORS.streak} fill={COLORS.streak} />
-          </View>
+          <Image
+            source={require("../../assets/splash-icon.png")}
+            style={styles.logo}
+            accessible={false}
+          />
           <Text style={styles.appTitle} accessibilityRole="header">
             Pulse
           </Text>
@@ -255,6 +258,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: SPACING.xxl
   },
+  logo: { width: 84, height: 84, marginBottom: SPACING.md },
   iconCircle: {
     width: 80,
     height: 80,

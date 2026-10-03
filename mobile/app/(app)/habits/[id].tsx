@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
   Alert,
   ActivityIndicator,
   TextInput
@@ -16,24 +16,24 @@ import {
   ArrowLeft,
   Archive,
   Trash2,
-  Calendar,
+  Check,
+  X,
+  MessageSquarePlus,
   CheckCircle2,
   XCircle,
   SkipForward,
   Clock,
-  Target,
   Pencil,
   CircleDashed,
   ArrowDownCircle,
   Snowflake
 } from "lucide-react-native";
-import { COLORS, SPACING, TYPOGRAPHY, BORDER_RADIUS } from "../../../src/constants/theme";
-import { Card } from "../../../src/components/Card";
+import { COLORS, SPACING, TYPOGRAPHY } from "../../../src/constants/theme";
 import { Button } from "../../../src/components/Button";
 import { Input } from "../../../src/components/Input";
-import { StreakBadge } from "../../../src/components/StreakBadge";
 import { CardSkeleton, ErrorState } from "../../../src/components/StateViews";
 import { StreakRepairBanner } from "../../../src/components/StreakRepairBanner";
+import { RowDivider, SettingsRow } from "../../../src/components/profile/SettingsRow";
 import { habitColor } from "../../../src/utils/habitColor";
 import {
   errorMessage,
@@ -117,6 +117,7 @@ export default function HabitDetailScreen() {
   const [valueInput, setValueInput] = useState("");
   const [comment, setComment] = useState("");
   const [noteError, setNoteError] = useState<string | undefined>();
+  const [noteOpen, setNoteOpen] = useState(false);
   const noteRef = useRef<TextInput>(null);
   const focusedNote = useRef(false);
 
@@ -274,19 +275,22 @@ export default function HabitDetailScreen() {
     saveLogMutation.mutate({ status: null, value, comment: noteForSave() });
   };
 
+  const backButton = (
+    <Pressable
+      style={styles.headerButton}
+      android_ripple={ICON_RIPPLE}
+      accessibilityRole="button"
+      accessibilityLabel="Go back"
+      onPress={() => router.back()}
+    >
+      <ArrowLeft size={24} color={COLORS.text} />
+    </Pressable>
+  );
+
   if (habitQuery.isError || (habitQuery.isSuccess && !habit))
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            onPress={() => router.back()}
-          >
-            <ArrowLeft size={22} color={COLORS.text} />
-          </TouchableOpacity>
-        </View>
+        <View style={styles.header}>{backButton}</View>
         <ErrorState
           title="Couldn't open this habit"
           error={habitQuery.error ?? new Error("This habit may have been deleted.")}
@@ -315,140 +319,115 @@ export default function HabitDetailScreen() {
     return { date, state: entryState(habit, logs, date, today) };
   });
   const noteChanged = Boolean(todayLog) && comment.trim() !== (todayLog?.comment ?? "").trim();
+  const showNoteInput = needsNote || Boolean(todayLog) || noteOpen;
+  const doneCount = logs.filter((log) => entryState(habit, logs, log.date, today) === "done").length;
+  const frozenCount = logs.filter((log) => log.frozen).length;
+  const skipToday = () =>
+    saveLogMutation.mutate({ status: "skipped", value: null, comment: noteForSave() });
+
+  const statItems: { value: string; label: string }[] =
+    habit.type === "action"
+      ? [
+          { value: String(currentStreak), label: weekly ? "Week streak" : "Day streak" },
+          { value: String(doneCount), label: "Done (30 days)" },
+          ...(frozenCount ? [{ value: String(frozenCount), label: "Frozen days" }] : [])
+        ]
+      : [
+          {
+            value:
+              stats?.type === "measurable" && stats.latestValue != null
+                ? `${stats.latestValue}${habit.unit ? ` ${habit.unit}` : ""}`
+                : "—",
+            label: "Latest"
+          },
+          {
+            value: stats?.type === "measurable" && stats.differenceLabel ? stats.differenceLabel : "—",
+            label: "Change"
+          },
+          { value: String(logs.length), label: "Entries (30 days)" }
+        ];
+
+  const noteToggle =
+    !showNoteInput && !habit.archived ? (
+      <Button
+        title="Add note"
+        variant="ghost"
+        icon={<MessageSquarePlus size={18} color={COLORS.primaryText} />}
+        disabled={isBusy}
+        onPress={() => {
+          setNoteOpen(true);
+          setTimeout(() => noteRef.current?.focus(), 50);
+        }}
+        style={styles.secondaryButton}
+      />
+    ) : null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerButton}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={() => router.back()}
-        >
-          <ArrowLeft size={22} color={COLORS.text} />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle} numberOfLines={1} accessibilityRole="header">
-          {habit.title}
-        </Text>
-
-        <View style={styles.headerActions}>
-          {habit.type !== "expense" && (
-            <TouchableOpacity
-              style={styles.headerButton}
-              accessibilityRole="button"
-              accessibilityLabel="Edit habit"
-              disabled={isBusy}
-              accessibilityState={{ disabled: isBusy }}
-              onPress={() => router.push({ pathname: "/habits/new", params: { editId: habit.id } })}
-            >
-              <Pencil size={20} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
+        {backButton}
+        <View style={styles.flex} />
+        {habit.type !== "expense" && (
+          <Pressable
             style={styles.headerButton}
+            android_ripple={ICON_RIPPLE}
             accessibilityRole="button"
-            accessibilityLabel={habit.archived ? "Restore habit" : "Archive habit"}
-            onPress={() => archiveMutation.mutate(!habit.archived)}
+            accessibilityLabel="Edit habit"
             disabled={isBusy}
-            accessibilityState={{ disabled: isBusy, busy: archiveMutation.isPending }}
+            accessibilityState={{ disabled: isBusy }}
+            onPress={() => router.push({ pathname: "/habits/new", params: { editId: habit.id } })}
           >
-            {archiveMutation.isPending ? (
-              <ActivityIndicator size="small" color={COLORS.primaryText} />
-            ) : (
-              <Archive size={20} color={habit.archived ? COLORS.primaryText : COLORS.textSecondary} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerButton}
-            accessibilityRole="button"
-            accessibilityLabel="Delete habit"
-            onPress={handleDelete}
-            disabled={isBusy}
-            accessibilityState={{ disabled: isBusy, busy: deleteMutation.isPending }}
-          >
-            {deleteMutation.isPending ? (
-              <ActivityIndicator size="small" color={COLORS.danger} />
-            ) : (
-              <Trash2 size={20} color={COLORS.dangerText} />
-            )}
-          </TouchableOpacity>
-        </View>
+            <Pencil size={22} color={COLORS.text} />
+          </Pressable>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Overview */}
-        <Card style={styles.overviewCard}>
-          <View style={styles.overviewTop}>
-            <View style={[styles.colorPill, { backgroundColor: habitColor(habit.color) }]} />
-            <View style={styles.overviewInfo}>
-              <Text style={styles.habitMainTitle}>{habit.title}</Text>
-              {habit.description ? <Text style={styles.habitDescription}>{habit.description}</Text> : null}
-            </View>
-          </View>
+        {/* Title */}
+        <View style={styles.titleRow}>
+          <View style={[styles.colorDot, { backgroundColor: habitColor(habit.color) }]} />
+          <Text style={styles.habitMainTitle} accessibilityRole="header">
+            {habit.title}
+          </Text>
+        </View>
+        <Text style={styles.scheduleLine}>
+          {formatSchedule(habit)} · {formatGoal(habit, today)}
+          {habit.archived ? " · Archived" : ""}
+        </Text>
+        {habit.description ? <Text style={styles.habitDescription}>{habit.description}</Text> : null}
 
-          <View style={styles.metaRow}>
-            <View style={styles.metaBadge}>
-              <Calendar size={13} color={COLORS.textMuted} />
-              <Text style={styles.metaBadgeText}>{formatSchedule(habit)}</Text>
+        {/* Stats: plain numbers */}
+        <View style={styles.statsRow}>
+          {statItems.map((item) => (
+            <View key={item.label} style={styles.stat} accessible accessibilityLabel={`${item.label}: ${item.value}`}>
+              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.4}>
+                {item.value}
+              </Text>
+              <Text style={styles.statLabel} maxFontSizeMultiplier={1.4}>
+                {item.label}
+              </Text>
             </View>
-            <View style={styles.metaBadge}>
-              <Target size={13} color={COLORS.textMuted} />
-              <Text style={styles.metaBadgeText}>{formatGoal(habit, today)}</Text>
-            </View>
-            {habit.type === "action" && (
-              <StreakBadge count={currentStreak} size="sm" showLabel unit={weekly ? "week" : "day"} />
-            )}
-          </View>
-
-          {/* Last 7 days */}
-          <View style={styles.strip} accessibilityLabel="Last 7 days">
-            {strip.map(({ date, state }) => (
-              <View
-                key={date}
-                style={styles.stripDay}
-                accessible
-                accessibilityLabel={`${formatDateLabel(date)}: ${STATE_LABEL[state].replace("❄️", "").trim()}`}
-              >
-                <Text style={[styles.stripLabel, date === today && styles.stripToday]}>
-                  {date === today ? "Today" : weekdayShort(date)}
-                </Text>
-                <StateIcon state={state} size={20} />
-              </View>
-            ))}
-          </View>
-
-          {habit.streakRepair && !habit.archived ? (
-            <View style={styles.repairSlot}>
-              <StreakRepairBanner
-                habitId={habit.id}
-                habitTitle={habit.title}
-                offer={habit.streakRepair}
-                disabled={isBusy}
-              />
-            </View>
-          ) : null}
-        </Card>
+          ))}
+        </View>
 
         {/* Today */}
-        <Card style={styles.todayCard}>
-          <Text style={styles.cardHeaderTitle}>Today</Text>
-          <Text style={styles.cardHeaderDate}>{formatDateLabel(today)}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel} accessibilityRole="header">
+            Today · {formatDateLabel(today)}
+          </Text>
 
           {habit.archived ? (
-            <View style={{ gap: SPACING.sm }}>
-              <Text style={styles.habitDescription}>
-                This habit is archived. Restore it to log progress again.
-              </Text>
+            <View style={styles.actionArea}>
+              <Text style={styles.statusText}>This habit is archived. Restore it to log progress again.</Text>
               <Button
                 title="Restore habit"
-                variant="secondary"
                 loading={archiveMutation.isPending}
                 onPress={() => archiveMutation.mutate(false)}
+                fullWidth
               />
             </View>
           ) : habit.type === "expense" ? (
-            <Text style={styles.habitDescription}>Expenses are logged on the web at habbit.abuk.in.</Text>
+            <Text style={styles.statusText}>Expenses are logged on the web at habbit.abuk.in.</Text>
           ) : logsQuery.isLoading ? (
             <ActivityIndicator size="small" color={COLORS.primary} />
           ) : logsQuery.isError ? (
@@ -460,96 +439,50 @@ export default function HabitDetailScreen() {
               onRetry={() => void logsQuery.refetch()}
             />
           ) : (
-            <>
-              {needsNote && (
-                <Input
-                  ref={noteRef}
-                  label="Note (required to complete)"
-                  placeholder="What did you do?"
-                  value={comment}
-                  onChangeText={(text) => {
-                    setComment(text);
-                    if (text.trim()) setNoteError(undefined);
-                  }}
-                  error={noteError}
-                  helperText={`This habit needs a short note each time you complete it. ${noteCounter}`}
-                  multiline
-                  maxLength={NOTE_MAX_LENGTH}
-                />
-              )}
-              {!needsNote && todayLog && (
-                <Input
-                  label="Note (optional)"
-                  placeholder="Add a note to today's entry"
-                  value={comment}
-                  onChangeText={setComment}
-                  helperText={noteCounter}
-                  multiline
-                  maxLength={NOTE_MAX_LENGTH}
-                />
-              )}
-              {noteChanged && todayLog && (
-                <Button
-                  title="Save note"
-                  variant="secondary"
-                  size="sm"
-                  loading={saveLogMutation.isPending}
-                  disabled={isBusy}
-                  onPress={() => {
-                    if (needsNote && !comment.trim() && todayState === "done") {
-                      setNoteError("A completed entry needs a note");
-                      return;
-                    }
-                    saveLogMutation.mutate({ comment: comment.trim() });
-                  }}
-                  style={styles.noteButton}
-                />
-              )}
-
+            <View style={styles.actionArea}>
               {habit.type === "action" ? (
-                <View style={styles.todayActionButtons}>
-                  {todayLog?.status === "done" ? (
+                todayLog?.status === "done" || todayLog?.status === "skipped" ? (
+                  <View style={styles.statusRow}>
+                    <StateIcon state={todayLog.status === "done" ? "done" : "skipped"} size={24} />
+                    <Text style={[styles.statusStrong, styles.flex]}>
+                      {todayLog.status === "done" ? "Done today" : "Skipped today"}
+                    </Text>
                     <Button
-                      title="Done ✓ · Undo"
-                      accessibilityLabel="Done today. Undo"
-                      variant="success"
+                      title={todayLog.status === "done" ? "Undo" : "Undo skip"}
+                      accessibilityLabel={todayLog.status === "done" ? "Done today. Undo" : "Skipped today. Undo skip"}
+                      variant="outline"
+                      size="sm"
                       onPress={() => undoMutation.mutate(todayLog.id)}
                       loading={undoMutation.isPending}
                       disabled={isChangingHabit || saveLogMutation.isPending}
-                      style={{ flex: 1 }}
                     />
-                  ) : todayLog?.status === "skipped" ? (
+                  </View>
+                ) : (
+                  <>
                     <Button
-                      title="Skipped · Undo"
-                      accessibilityLabel="Skipped today. Undo skip"
-                      variant="secondary"
-                      onPress={() => undoMutation.mutate(todayLog.id)}
-                      loading={undoMutation.isPending}
-                      disabled={isChangingHabit || saveLogMutation.isPending}
-                      style={{ flex: 1 }}
+                      title="Mark done"
+                      icon={<Check size={20} color={COLORS.white} />}
+                      size="lg"
+                      onPress={markDone}
+                      loading={saveLogMutation.isPending}
+                      disabled={isChangingHabit || undoMutation.isPending}
+                      fullWidth
                     />
-                  ) : (
-                    <>
+                    <View style={styles.secondaryRow}>
                       <Button
-                        title="Mark as done"
-                        onPress={markDone}
-                        loading={saveLogMutation.isPending}
-                        disabled={isChangingHabit || undoMutation.isPending}
-                        style={{ flex: 1 }}
-                      />
-                      <Button
-                        title="Skip"
+                        title="Skip today"
                         variant="outline"
-                        onPress={() => saveLogMutation.mutate({ status: "skipped", value: null })}
+                        onPress={skipToday}
                         disabled={isBusy}
-                        style={{ minWidth: 90 }}
+                        style={styles.secondaryButton}
                       />
-                    </>
-                  )}
-                </View>
+                      {noteToggle}
+                    </View>
+                  </>
+                )
               ) : (
-                <View style={styles.todayMeasurableRow}>
-                  <Text style={styles.measurableLabel}>
+                <>
+                  <Text style={styles.statusText}>
                     {todayLog?.status === "skipped"
                       ? "Skipped today"
                       : todayLog?.value == null
@@ -566,68 +499,150 @@ export default function HabitDetailScreen() {
                     returnKeyType="done"
                     onSubmitEditing={saveValue}
                   />
-                  <Button title="Save" loading={saveLogMutation.isPending} disabled={isBusy} onPress={saveValue} />
-                  {todayLog && (
+                  <Button
+                    title="Log value"
+                    size="lg"
+                    loading={saveLogMutation.isPending}
+                    disabled={isBusy}
+                    onPress={saveValue}
+                    fullWidth
+                  />
+                  <View style={styles.secondaryRow}>
+                    {todayLog ? (
+                      <Button
+                        title={todayLog.status === "skipped" ? "Undo skip" : "Clear today's entry"}
+                        variant="outline"
+                        loading={undoMutation.isPending}
+                        disabled={isBusy}
+                        onPress={() => undoMutation.mutate(todayLog.id)}
+                        style={styles.secondaryButton}
+                      />
+                    ) : (
+                      <Button
+                        title="Skip today"
+                        variant="outline"
+                        disabled={isBusy}
+                        onPress={skipToday}
+                        style={styles.secondaryButton}
+                      />
+                    )}
+                    {noteToggle}
+                  </View>
+                </>
+              )}
+
+              {showNoteInput && (
+                <View style={styles.noteBlock}>
+                  <Input
+                    ref={noteRef}
+                    label={needsNote ? "Note (required to complete)" : "Note (optional)"}
+                    placeholder={needsNote ? "What did you do?" : todayLog ? "Add a note to today's entry" : "Add a note"}
+                    value={comment}
+                    onChangeText={(text) => {
+                      setComment(text);
+                      if (text.trim()) setNoteError(undefined);
+                    }}
+                    error={needsNote ? noteError : undefined}
+                    helperText={
+                      needsNote
+                        ? `This habit needs a short note each time you complete it. ${noteCounter}`
+                        : noteCounter
+                    }
+                    multiline
+                    maxLength={NOTE_MAX_LENGTH}
+                  />
+                  {noteChanged && todayLog && (
                     <Button
-                      title={todayLog.status === "skipped" ? "Undo skip" : "Clear today's entry"}
-                      variant="ghost"
-                      loading={undoMutation.isPending}
+                      title="Save note"
+                      variant="outline"
+                      size="sm"
+                      loading={saveLogMutation.isPending}
                       disabled={isBusy}
-                      onPress={() => undoMutation.mutate(todayLog.id)}
-                    />
-                  )}
-                  {!todayLog && (
-                    <Button
-                      title="Skip today"
-                      variant="ghost"
-                      disabled={isBusy}
-                      onPress={() => saveLogMutation.mutate({ status: "skipped", value: null })}
+                      onPress={() => {
+                        if (needsNote && !comment.trim() && todayState === "done") {
+                          setNoteError("A completed entry needs a note");
+                          return;
+                        }
+                        saveLogMutation.mutate({ comment: comment.trim() });
+                      }}
+                      style={styles.noteButton}
                     />
                   )}
                 </View>
               )}
-            </>
-          )}
-        </Card>
-
-        {/* History */}
-        <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle} accessibilityRole="header">
-            Quest history
-          </Text>
-          {logsQuery.isSuccess && (
-            <Text style={styles.historyCount}>
-              {logs.length} {logs.length === 1 ? "entry" : "entries"}
-            </Text>
+            </View>
           )}
         </View>
 
-        {logsQuery.isLoading ? (
-          <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: SPACING.md }} />
-        ) : logsQuery.isError ? (
-          <Text style={styles.habitDescription}>History is unavailable right now.</Text>
-        ) : logs.length === 0 ? (
-          <Card style={styles.emptyLogsCard}>
-            <Clock size={36} color={COLORS.textMuted} />
-            <Text style={styles.emptyLogsTitle}>No history yet</Text>
-            <Text style={styles.emptyLogsSubtitle}>Complete this quest today to start your track record.</Text>
-          </Card>
-        ) : (
-          <View style={styles.logList}>
-            {logs.map((log) => {
+        {habit.streakRepair && !habit.archived ? (
+          <View style={styles.repairSlot}>
+            <StreakRepairBanner
+              habitId={habit.id}
+              habitTitle={habit.title}
+              offer={habit.streakRepair}
+              disabled={isBusy}
+            />
+          </View>
+        ) : null}
+
+        {/* Last 7 days */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel} accessibilityRole="header">
+            Last 7 days
+          </Text>
+          <View style={styles.strip}>
+            {strip.map(({ date, state }) => (
+              <View
+                key={date}
+                style={styles.stripDay}
+                accessible
+                accessibilityLabel={`${formatDateLabel(date)}: ${STATE_LABEL[state].replace("❄️", "").trim()}`}
+              >
+                <DayCircle state={state} />
+                <Text style={[styles.stripLabel, date === today && styles.stripToday]} maxFontSizeMultiplier={1.3}>
+                  {date === today ? "Today" : weekdayShort(date)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* History */}
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionLabel} accessibilityRole="header">
+              History
+            </Text>
+            {logsQuery.isSuccess && (
+              <Text style={styles.historyCount}>
+                {logs.length} {logs.length === 1 ? "entry" : "entries"}
+              </Text>
+            )}
+          </View>
+
+          {logsQuery.isLoading ? (
+            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: SPACING.md }} />
+          ) : logsQuery.isError ? (
+            <Text style={styles.statusText}>History is unavailable right now.</Text>
+          ) : logs.length === 0 ? (
+            <View style={styles.emptyLogs}>
+              <Clock size={28} color={COLORS.textMuted} />
+              <Text style={styles.emptyLogsTitle}>No history yet</Text>
+              <Text style={styles.emptyLogsSubtitle}>Complete this habit today to start your track record.</Text>
+            </View>
+          ) : (
+            logs.map((log, index) => {
               const shown = entryState(habit, logs, log.date, today);
               return (
                 <View
                   key={log.id}
-                  style={[styles.logRow, shown === "frozen" && styles.logRowFrozen]}
+                  style={[styles.logRow, index > 0 && styles.logRowDivider]}
                   accessible
                   accessibilityLabel={`${formatDateLabel(log.date)}: ${STATE_LABEL[shown].replace("❄️", "").trim()}${
                     log.value !== null ? `, ${log.value} ${habit.unit ?? ""}` : ""
                   }${log.comment ? `. Note: ${log.comment}` : ""}`}
                 >
-                  <View style={styles.logStatusIcon}>
-                    <StateIcon state={shown} />
-                  </View>
+                  <StateIcon state={shown} size={20} />
                   <View style={styles.logDetails}>
                     <Text style={styles.logDate}>{formatDateLabel(log.date)}</Text>
                     {log.value !== null && (
@@ -640,12 +655,74 @@ export default function HabitDetailScreen() {
                   <Text style={[styles.logStatusText, { color: STATE_COLOR[shown] }]}>{STATE_LABEL[shown]}</Text>
                 </View>
               );
-            })}
-          </View>
-        )}
+            })
+          )}
+        </View>
+
+        {/* Manage */}
+        <View style={styles.manage}>
+          <SettingsRow
+            icon={<Archive size={22} color={COLORS.textSecondary} />}
+            title={habit.archived ? "Restore habit" : "Archive habit"}
+            subtitle={habit.archived ? "Show it on Today again" : "Hide it from Today and turn off reminders"}
+            loading={archiveMutation.isPending}
+            disabled={isBusy}
+            onPress={() => archiveMutation.mutate(!habit.archived)}
+          />
+          <RowDivider inset={false} />
+          <SettingsRow
+            icon={<Trash2 size={22} color={COLORS.dangerText} />}
+            title="Delete habit"
+            subtitle="Permanently removes it and its history"
+            danger
+            loading={deleteMutation.isPending}
+            disabled={isBusy}
+            onPress={handleDelete}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+const ICON_RIPPLE = { color: "rgba(255, 255, 255, 0.12)", borderless: true, radius: 22 } as const;
+
+/** One day in the 7-day strip: a simple filled/outlined circle. */
+function DayCircle({ state }: { state: EntryState }) {
+  const size = 32;
+  const base = { width: size, height: size, borderRadius: size / 2, alignItems: "center" as const, justifyContent: "center" as const };
+  switch (state) {
+    case "done":
+      return (
+        <View style={[base, { backgroundColor: COLORS.success }]}>
+          <Check size={18} color={COLORS.onSuccess} strokeWidth={3} />
+        </View>
+      );
+    case "frozen":
+      return (
+        <View style={[base, { backgroundColor: COLORS.frozenLight }]}>
+          <Snowflake size={16} color={COLORS.frozen} />
+        </View>
+      );
+    case "skipped":
+      return (
+        <View style={[base, { backgroundColor: COLORS.surfaceElevated }]}>
+          <SkipForward size={14} color={COLORS.textSecondary} />
+        </View>
+      );
+    case "below":
+      return <View style={[base, { borderWidth: 2, borderColor: COLORS.warning }]} />;
+    case "missed":
+      return (
+        <View style={[base, { borderWidth: 2, borderColor: COLORS.dangerBorder }]}>
+          <X size={14} color={COLORS.dangerText} />
+        </View>
+      );
+    case "rest":
+      return <View style={[base, { backgroundColor: COLORS.surface }]} />;
+    default:
+      return <View style={[base, { borderWidth: 1.5, borderColor: COLORS.borderLight }]} />;
+  }
 }
 
 const styles = StyleSheet.create({
@@ -653,88 +730,116 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background
   },
+  flex: {
+    flex: 1
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border
+    paddingHorizontal: SPACING.xs,
+    minHeight: 56
   },
   headerButton: {
-    minWidth: 44,
-    minHeight: 44,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center"
   },
-  headerTitle: {
-    ...TYPOGRAPHY.title2,
-    flex: 1,
-    textAlign: "center",
-    marginHorizontal: SPACING.sm
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center"
-  },
   content: {
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.xs,
     paddingBottom: SPACING.xxxl
   },
-  overviewCard: {
-    marginBottom: SPACING.md
-  },
-  overviewTop: {
+  titleRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: SPACING.md
+    alignItems: "center",
+    gap: SPACING.sm
   },
-  colorPill: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginTop: 6,
-    marginRight: SPACING.sm
-  },
-  overviewInfo: {
-    flex: 1
+  colorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6
   },
   habitMainTitle: {
-    ...TYPOGRAPHY.title1
+    ...TYPOGRAPHY.hero,
+    flex: 1
   },
-  habitDescription: {
+  scheduleLine: {
     ...TYPOGRAPHY.bodySecondary,
     marginTop: SPACING.xs
   },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    flexWrap: "wrap"
+  habitDescription: {
+    ...TYPOGRAPHY.bodySecondary,
+    marginTop: SPACING.sm
   },
-  metaBadge: {
-    maxWidth: "100%",
+  statsRow: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surfaceElevated,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: BORDER_RADIUS.sm,
-    gap: 4
+    marginTop: SPACING.xl
   },
-  metaBadgeText: {
-    flexShrink: 1,
+  stat: {
+    flex: 1
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.text,
+    fontVariant: ["tabular-nums"]
+  },
+  statLabel: {
     ...TYPOGRAPHY.caption,
-    color: COLORS.textSecondary
+    color: COLORS.textSecondary,
+    marginTop: 2
+  },
+  section: {
+    marginTop: SPACING.xl,
+    paddingTop: SPACING.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.border
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.primaryText,
+    marginBottom: SPACING.md
+  },
+  actionArea: {
+    gap: SPACING.md
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+    minHeight: 48
+  },
+  statusStrong: {
+    ...TYPOGRAPHY.title3
+  },
+  statusText: {
+    ...TYPOGRAPHY.bodySecondary
+  },
+  secondaryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm
+  },
+  secondaryButton: {
+    flexGrow: 1,
+    flexBasis: 140,
+    elevation: 0,
+    shadowOpacity: 0
+  },
+  noteBlock: {
+    marginTop: SPACING.xs
+  },
+  noteButton: {
+    alignSelf: "flex-start"
+  },
+  repairSlot: {
+    marginTop: SPACING.lg
   },
   strip: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: SPACING.lg,
-    paddingTop: SPACING.md,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceElevated
+    justifyContent: "space-between"
   },
   stripDay: {
     alignItems: "center",
@@ -745,52 +850,22 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.micro
   },
   stripToday: {
-    color: COLORS.primaryText,
+    color: COLORS.text,
     fontWeight: "700"
-  },
-  todayCard: {
-    marginBottom: SPACING.lg,
-    backgroundColor: COLORS.surface
-  },
-  cardHeaderTitle: {
-    ...TYPOGRAPHY.title3
-  },
-  cardHeaderDate: {
-    ...TYPOGRAPHY.caption,
-    marginBottom: SPACING.md
-  },
-  noteButton: {
-    alignSelf: "flex-start",
-    marginBottom: SPACING.md
-  },
-  todayActionButtons: {
-    flexDirection: "row",
-    gap: SPACING.sm
-  },
-  todayMeasurableRow: {
-    gap: SPACING.sm
-  },
-  measurableLabel: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.textSecondary
   },
   sectionTitleRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING.xs,
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: SPACING.md
-  },
-  sectionTitle: {
-    ...TYPOGRAPHY.title2
+    alignItems: "baseline"
   },
   historyCount: {
     ...TYPOGRAPHY.caption
   },
-  emptyLogsCard: {
+  emptyLogs: {
     alignItems: "center",
-    paddingVertical: SPACING.xxl
+    paddingVertical: SPACING.xl
   },
   emptyLogsTitle: {
     ...TYPOGRAPHY.title3,
@@ -801,34 +876,23 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 4
   },
-  logList: {
-    gap: SPACING.sm
-  },
   logRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.card,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border
+    gap: SPACING.lg,
+    minHeight: 56,
+    paddingVertical: SPACING.sm
   },
-  logRowFrozen: {
-    borderColor: COLORS.frozenBorder,
-    backgroundColor: COLORS.frozenLight
-  },
-  repairSlot: {
-    marginTop: SPACING.md
-  },
-  logStatusIcon: {
-    marginRight: SPACING.md
+  logRowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.border
   },
   logDetails: {
     flex: 1
   },
   logDate: {
     ...TYPOGRAPHY.body,
-    fontWeight: "600"
+    fontSize: 15
   },
   logValue: {
     ...TYPOGRAPHY.caption,
@@ -837,12 +901,19 @@ const styles = StyleSheet.create({
   },
   logComment: {
     ...TYPOGRAPHY.caption,
+    color: COLORS.textSecondary,
     fontStyle: "italic",
     marginTop: 2
   },
   logStatusText: {
-    ...TYPOGRAPHY.micro,
-    fontWeight: "700",
+    ...TYPOGRAPHY.caption,
+    fontWeight: "600",
     marginLeft: SPACING.sm
+  },
+  manage: {
+    marginTop: SPACING.xl,
+    marginHorizontal: -SPACING.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.border
   }
 });

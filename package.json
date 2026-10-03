@@ -29,7 +29,7 @@
     "test": "npm --workspace server run check && npm --workspace server run check:tracking",
     "test:e2e": "npm run build:client && playwright test",
     "test:integration": "npm --workspace server run check:integration",
-    "check:mobile": "npm --workspace mobile run typecheck && npm --workspace mobile run check:auth && npm --workspace mobile run check:reminders && npm --workspace mobile run check:native && npm --workspace mobile run check:assets && npm --workspace mobile run check:achievements",
+    "check:mobile": "npm --workspace mobile run typecheck && npm --workspace mobile run check:auth && npm --workspace mobile run check:reminders && npm --workspace mobile run check:native && npm --workspace mobile run check:assets && npm --workspace mobile run check:achievements && npm --workspace mobile run check:expenses && npm --workspace mobile run check:header && npm --workspace mobile run check:upi",
     "check": "npm run lint && npm run build && npm test && npm run test:integration && npm run check:mobile && npm --workspace client run check:worker"
   },
   "devDependencies": {

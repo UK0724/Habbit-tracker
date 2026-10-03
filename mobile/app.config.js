@@ -7,13 +7,14 @@ module.exports = ({ config }) => ({
   ...config,
   plugins: [
     ...(config.plugins ?? []),
+    "./plugins/withOptionalQrCamera.cjs",
     [
       "expo-build-properties",
       {
         android: {
-          // Google Play requires targeting Android 15 (API 35) or newer.
-          compileSdkVersion: 35,
-          targetSdkVersion: 35,
+          // Google Play requires targeting Android 16 (API 36) or newer.
+          compileSdkVersion: 36,
+          targetSdkVersion: 36,
           usesCleartextTraffic: process.env.EAS_BUILD_PROFILE === "preview"
         }
       }

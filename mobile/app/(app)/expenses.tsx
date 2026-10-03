@@ -5,12 +5,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
+  Pressable,
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronLeft, ChevronRight, Plus, Receipt } from "lucide-react-native";
-import { BORDER_RADIUS, COLORS, SPACING, TOUCH_TARGET, TYPOGRAPHY } from "../../src/constants/theme";
+import { COLORS, SPACING, TOUCH_TARGET, TYPOGRAPHY } from "../../src/constants/theme";
 import { ProgressHeader } from "../../src/components/ProgressHeader";
 import { CardSkeleton, ErrorState } from "../../src/components/StateViews";
 import { errorMessage } from "../../src/services/api";
@@ -130,15 +130,16 @@ export default function ExpensesScreen() {
         </View>
 
         <View style={styles.monthSwitcher}>
-          <TouchableOpacity
+          <Pressable
             style={styles.monthArrow}
+            android_ripple={ARROW_RIPPLE}
             onPress={() => setMonth((value) => shiftMonth(value, -1))}
             accessibilityRole="button"
             accessibilityLabel={`Previous month, ${monthLabel(shiftMonth(month, -1), currentYear)}`}
           >
             <ChevronLeft size={24} color={COLORS.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
+          </Pressable>
+          <Pressable
             style={styles.monthLabelButton}
             disabled={month === currentMonth}
             onPress={() => setMonth(currentMonth)}
@@ -153,9 +154,10 @@ export default function ExpensesScreen() {
                 Tap for this month
               </Text>
             ) : null}
-          </TouchableOpacity>
-          <TouchableOpacity
+          </Pressable>
+          <Pressable
             style={[styles.monthArrow, !canGoNext && styles.monthArrowDisabled]}
+            android_ripple={ARROW_RIPPLE}
             disabled={!canGoNext}
             onPress={() => setMonth((value) => (value < currentMonth ? shiftMonth(value, 1) : value))}
             accessibilityRole="button"
@@ -163,7 +165,7 @@ export default function ExpensesScreen() {
             accessibilityState={{ disabled: !canGoNext }}
           >
             <ChevronRight size={24} color={canGoNext ? COLORS.text : COLORS.textMuted} />
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         {initialLoading ? (
@@ -205,7 +207,7 @@ export default function ExpensesScreen() {
                 <Text style={styles.emptyTitle}>No expenses in {monthName} yet — tap + to add one</Text>
               </View>
             ) : (
-              <>
+              <View style={styles.transactions}>
                 <Text style={styles.sectionTitle} accessibilityRole="header">
                   Transactions
                 </Text>
@@ -216,21 +218,21 @@ export default function ExpensesScreen() {
                   onLongPressExpense={askDelete}
                 />
                 <Text style={styles.tip}>Tap to edit · long-press to delete</Text>
-              </>
+              </View>
             )}
           </>
         )}
       </ScrollView>
 
-      <TouchableOpacity
-        style={styles.fab}
-        activeOpacity={0.85}
+      <Pressable
+        style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}
+        android_ripple={{ color: "rgba(255, 255, 255, 0.2)", borderless: false }}
         onPress={openAdd}
         accessibilityRole="button"
         accessibilityLabel="Add expense"
       >
         <Plus size={28} color={COLORS.white} strokeWidth={2.5} />
-      </TouchableOpacity>
+      </Pressable>
 
       <ExpenseSheet
         visible={sheet.open}
@@ -253,6 +255,7 @@ export default function ExpensesScreen() {
 }
 
 const FAB_SIZE = 56;
+const ARROW_RIPPLE = { color: "rgba(255, 255, 255, 0.12)", borderless: true, radius: 24 } as const;
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.background },
@@ -266,12 +269,8 @@ const styles = StyleSheet.create({
   monthSwitcher: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: SPACING.md,
-    paddingHorizontal: SPACING.xs
+    marginHorizontal: -SPACING.sm,
+    marginBottom: SPACING.xs
   },
   monthArrow: {
     width: 48,
@@ -287,9 +286,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: SPACING.xs
   },
-  monthLabel: { ...TYPOGRAPHY.title3 },
+  monthLabel: { ...TYPOGRAPHY.title3, fontSize: 17 },
   monthHint: { ...TYPOGRAPHY.micro, color: COLORS.primaryText, marginTop: 2 },
-  sectionTitle: { ...TYPOGRAPHY.title3, marginTop: SPACING.sm, marginBottom: SPACING.md },
+  sectionTitle: { fontSize: 13, fontWeight: "600", color: COLORS.primaryText, marginBottom: SPACING.sm },
+  transactions: {
+    paddingTop: SPACING.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.border
+  },
   empty: {
     alignItems: "center",
     paddingVertical: SPACING.xxxl,
@@ -304,7 +308,8 @@ const styles = StyleSheet.create({
     bottom: SPACING.xl,
     width: FAB_SIZE,
     height: FAB_SIZE,
-    borderRadius: FAB_SIZE / 2,
+    borderRadius: 16,
+    overflow: "hidden",
     backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
