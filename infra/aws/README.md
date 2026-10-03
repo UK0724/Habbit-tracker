@@ -13,6 +13,7 @@ stack normally while its named resources already exist: use resource import.
 | pulse-dev-api-access | api-access.json | HTTP function URL and URL-only invocation permissions |
 | pulse-web-storage | web-storage.json | Separate private dev/prod web buckets in Mumbai |
 | pulse-dev-edge | edge.json | CloudFront, Free plan, certificate, S3 access policy and dev DNS |
+| pulse-prod-edge | edge.json | CloudFront, Free plan, certificate and S3 access policy; legacy CNAME managed separately |
 
 The API adapts Express HTTP events, connects to its environment's Atlas database,
 and serves the application's `/api` routes. It does not start a web listener or
@@ -73,7 +74,8 @@ Deploy edge with `PublishDns=false`, verify the CloudFront hostname and authenti
 API operations, then change it to true in a reviewed change set. This creates A
 and AAAA aliases only. **Do not set it true for prod while the existing CNAME is
 present**: retain the previous target for rollback and perform the cutover as a
-separate reviewed operation. `habbit.abuk.in` remains on its original host.
+separate reviewed operation. Production has used CloudFront since 2026-09-28;
+its legacy CNAME remains outside CloudFormation. See the production record below.
 
 The public API uses CachingDisabled and AllViewerExceptHostHeader to preserve
 bearer tokens, request bodies, queries and cookies. Only versioned `/assets/*`
@@ -88,10 +90,12 @@ the source tree or environment files. Keep older hashed assets for open tabs.
 `node infra/aws/check-edge.mjs` tests navigation and missing-asset routing.
 `node infra/aws/smoke-dev.mjs https://habbit-dev.abuk.in` tests the verified dev
 host only. It creates two disposable user records, removes its habits/expenses,
-and does not print passwords or tokens. No account-delete API exists yet.
+and does not print passwords or tokens. These original smoke scripts do not
+delete their generated user records; reinspect cleanup before using them.
 
-Remaining work: production public endpoint/edge deployment and cutover,
-distributed authentication throttling, notification keys and reminder scheduling.
+Production endpoint/edge deployment, cutover and shared authentication counters
+were completed in the release below. Notification keys and reminder scheduling
+remain separate work.
 
 `api-access.json` prepares a public Lambda URL origin without API Gateway charges.
 Do not execute its change set until public access is approved. It grants only
@@ -99,8 +103,8 @@ invocation through the function URL, not general Lambda API invocation. Express
 continues to enforce JWT authorization on protected routes. Login, registration
 and health remain public. The origin is also directly reachable, so CloudFront
 alone cannot protect it against abusive traffic or enforce an absolute cost cap.
-Production exposure remains gated on distributed authentication throttling and
-live authorization/isolation tests. Do not configure duplicate CORS in Lambda;
+The initial production exposure gate was satisfied by shared throttling and
+live authorization/isolation tests below. Do not configure duplicate CORS in Lambda;
 the Express app owns CORS. CloudFront must forward Authorization and disable
 API response caching.
 
@@ -140,6 +144,16 @@ and executed. See the production release record below.
 - Backend rollback: update ApiCodeKey to
   `34c1b0b93967b2b8e6608485769929bf606d9f8c49ab16f09074d4eba56b88d5.zip`.
 - Live smoke tests use `node infra/aws/smoke-prod.mjs <verified-url>` and create
-  isolated test users. Habits/expenses are removed, but users remain because there
-  is no account-delete API. Never reuse real users for this script.
+  isolated test users. Habits/expenses are removed; the original smoke script
+  does not delete generated users. Never reuse real users for this script.
 - Scheduled notifications are not deployed. GitHub automation is deferred.
+
+## Latest web release, 2026-10-03
+
+Dev and prod now serve the build from master `661ab7c`, including updated web
+branding. Lambda and infrastructure were unchanged. Both domains passed exact
+asset, MIME, deep-link, API health and unauthenticated access checks; both browser
+login screens loaded without console errors. See
+[the release record](../../docs/releases/2026-10-03-aws-web.md) for artifact
+identities, completed invalidations and rollback instructions. Backend artifact
+keys above describe the initial release, not the current backend deployment.

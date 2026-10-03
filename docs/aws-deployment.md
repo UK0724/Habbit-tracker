@@ -44,7 +44,7 @@ Do not modify unrelated domain/mail records.
 MongoDB connections. `server/src/reminders.lambda.ts` is a separate scheduled
 entry point. The ordinary Node server remains available through `server.ts`.
 
-Deployment still requires:
+The initial deployment checklist was:
 
 - Tighten Atlas users to their environment database (currently user-created roles).
 - Reminder packaging, configuration and schedule permissions.
@@ -156,4 +156,9 @@ usage outside free allowances can still incur charges.
 
 ## SMTP configuration — 2026-09-29
 
-Both backend stacks adopted the repository SMTP-capable template through configure-smtp-dev and configure-smtp-prod. Both reached UPDATE_COMPLETE. Sender: learnverse02@gmail.com. SmtpPass is supplied as a NoEcho parameter; no secret is stored in this record. Only ApiFunction configuration changed; existing code keys, database/JWT parameters and IAM were preserved. Both API health endpoints returned HTTP 200. Email delivery has not yet been verified with a real password-reset email. This supersedes the earlier note that SMTP parameters were not adopted.
+Both backend stacks adopted the repository SMTP-capable template through configure-smtp-dev and configure-smtp-prod. Both reached UPDATE_COMPLETE. Sender: learnverse02@gmail.com. SmtpPass is supplied as a NoEcho parameter; no secret is stored in this record. Only ApiFunction configuration changed; existing code keys, database/JWT parameters and IAM were preserved. Both API health endpoints returned HTTP 200. Email delivery was not verified in that configuration-only deployment; the user later confirmed successful password-reset delivery from both website and mobile. This supersedes the earlier note that SMTP parameters were not adopted.
+
+## Web release, 2026-10-03
+
+Dev and prod were updated from master `661ab7c`; their existing backend and
+infrastructure were retained. See [the verified release and rollback record](releases/2026-10-03-aws-web.md).
